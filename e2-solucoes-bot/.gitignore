@@ -1,0 +1,74 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+docker/.env
+docker/.env.dev
+docker/.env.prod
+
+# n8n data
+n8n/custom-nodes/node_modules
+docker/configs/n8n/.n8n/database.sqlite
+docker/configs/n8n/.n8n/*.json
+
+# Supabase volumes
+docker/configs/supabase/volumes/*
+!docker/configs/supabase/volumes/.gitkeep
+
+# PostgreSQL data
+docker/configs/postgres/data/
+
+# Logs
+*.log
+logs/
+docker/logs/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Backups
+backups/
+*.sql.gz
+*.tar.gz
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if any)
+node_modules/
+
+# Python (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Secrets and keys
+*.pem
+*.key
+*.crt
+*.p12
+service-account.json
+credentials.json
+
+# Docker override files (personal)
+docker-compose.override.yml
+
+# Test data
+test-data/
+*.test
+
+# Claude docs (generated documentation)
+claudedocs/

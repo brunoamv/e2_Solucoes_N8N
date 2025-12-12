@@ -1,0 +1,360 @@
+{
+  "name": "02 - AI Agent Conversation",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.*, array_agg(json_build_object('role', m.direction, 'content', m.content) ORDER BY m.created_at) as message_history FROM conversations c LEFT JOIN messages m ON m.conversation_id = c.id WHERE c.phone_number = $1 AND c.status IN ('active', 'collecting_data') GROUP BY c.id ORDER BY c.updated_at DESC LIMIT 1",
+        "additionalFields": {
+          "queryParameters": "={{ $json.phone_number }}"
+        }
+      },
+      "id": "get-conversation",
+      "name": "Get Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "conversation-exists",
+      "name": "Conversation Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "conversations",
+        "columns": "phone_number, whatsapp_name, status, stage, service_type, collected_data, conversation_context",
+        "additionalFields": {
+          "values": "'{{ $json.phone_number }}', '{{ $json.whatsapp_name }}', 'active', 'greeting', null, '{}', '{}'"
+        }
+      },
+      "id": "create-conversation",
+      "name": "Create Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [850, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build system prompt based on conversation stage\nconst conversation = $input.first().json;\nconst stage = conversation.stage || 'greeting';\nconst serviceType = conversation.service_type;\nconst collectedData = conversation.collected_data || {};\n\nconst systemPrompts = {\n  greeting: `Você é um assistente virtual da E2 Soluções, empresa especializada em energia elétrica em Goiás.\n\nSeu objetivo é:\n1. Cumprimentar o cliente de forma amigável e profissional\n2. Apresentar brevemente a E2 Soluções\n3. Perguntar como pode ajudar\n\nServiços oferecidos:\n- Energia Solar Fotovoltaica\n- Subestação Elétrica (manutenção, reforma, construção)\n- Projetos Elétricos\n- Armazenamento de Energia (BESS)\n- Análise e Laudos Elétricos\n\nSeja objetivo, use português brasileiro informal mas profissional.`,\n\n  identifying_service: `Você é um assistente virtual da E2 Soluções.\n\nO cliente já se apresentou. Agora você precisa:\n1. Identificar qual serviço ele precisa\n2. Se ele não mencionou claramente, ofereça as opções:\n   - Energia Solar\n   - Subestação\n   - Projeto Elétrico\n   - Armazenamento de Energia (BESS)\n   - Análise/Laudo\n\nAssim que identificar o serviço, confirme com o cliente e avance para coletar dados.`,\n\n  collecting_data: `Você é um assistente virtual da E2 Soluções coletando dados para ${serviceType}.\n\nDados já coletados: ${JSON.stringify(collectedData, null, 2)}\n\nCampos obrigatórios que faltam:\n${getMissingFields(serviceType, collectedData)}\n\nPergunte UM campo por vez de forma natural. Quando receber a resposta, confirme e pergunte o próximo.`,\n\n  scheduling: `Você é um assistente virtual da E2 Soluções agendando visita técnica.\n\nDados do cliente: ${JSON.stringify(collectedData, null, 2)}\n\nPergunte preferência de dias da semana e turno (manhã 8-12h ou tarde 13-18h).\nApós confirmar, informe que o agendamento será processado e nossa equipe entrará em contato.`,\n\n  completed: `Você é um assistente virtual da E2 Soluções.\n\nO atendimento foi concluído. Se o cliente tiver novas dúvidas:\n- Responda de forma útil usando a base de conhecimento\n- Se for um novo serviço, ofereça iniciar novo atendimento\n- Seja sempre cordial e profissional`\n};\n\nfunction getMissingFields(service, data) {\n  const mandatory = ['nome', 'email', 'telefone', 'endereco', 'cidade', 'estado'];\n  const serviceFields = {\n    'energia_solar': ['consumo_kwh', 'tipo_instalacao'],\n    'subestacao': ['tensao', 'tipo_servico'],\n    'projeto_eletrico': ['tipo_projeto', 'area_m2'],\n    'armazenamento_energia': ['possui_solar', 'consumo_kwh'],\n    'analise_laudo': ['tipo_analise']\n  };\n  \n  const allRequired = [...mandatory, ...(serviceFields[service] || [])];\n  const missing = allRequired.filter(field => !data[field]);\n  \n  return missing.length ? missing.join(', ') : 'Nenhum (dados completos)';\n}\n\nreturn {\n  system_prompt: systemPrompts[stage] || systemPrompts.greeting,\n  stage: stage,\n  service_type: serviceType,\n  conversation_id: conversation.id\n};"
+      },
+      "id": "build-system-prompt",
+      "name": "Build System Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1024
+        },
+        "text": "={{ $json.system_prompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "role": "user",
+              "content": "={{ $('Get Conversation').item.json.message_history.slice(-10).map(m => `${m.role}: ${m.content}`).join('\\n\\n') }}\n\nuser: {{ $('Execute Workflow Trigger').item.json.content }}"
+            }
+          ]
+        }
+      },
+      "id": "claude-ai-agent",
+      "name": "Claude AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "1",
+          "name": "Anthropic Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/match_knowledge",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query_embedding",
+              "value": "={{ $json.embedding }}"
+            },
+            {
+              "name": "match_threshold",
+              "value": "0.7"
+            },
+            {
+              "name": "match_count",
+              "value": "3"
+            }
+          ]
+        }
+      },
+      "id": "query-knowledge-base",
+      "name": "Query Knowledge Base",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze Claude's response and determine next stage\nconst response = $('Claude AI Agent').first().json.response;\nconst currentStage = $json.stage;\nconst serviceType = $json.service_type;\n\n// Keywords for service identification\nconst serviceKeywords = {\n  'energia_solar': ['solar', 'painel', 'fotovoltaic', 'energia renovável', 'geração'],\n  'subestacao': ['subestação', 'transformador', 'alta tensão', 'média tensão'],\n  'projeto_eletrico': ['projeto', 'elétrico', 'instalação', 'dimensionamento'],\n  'armazenamento_energia': ['bateria', 'bess', 'armazenamento', 'backup'],\n  'analise_laudo': ['análise', 'laudo', 'perícia', 'qualidade energia']\n};\n\nlet nextStage = currentStage;\nlet detectedService = serviceType;\n\n// Stage progression logic\nif (currentStage === 'greeting') {\n  nextStage = 'identifying_service';\n} else if (currentStage === 'identifying_service') {\n  // Try to detect service from response\n  const responseLower = response.toLowerCase();\n  for (const [service, keywords] of Object.entries(serviceKeywords)) {\n    if (keywords.some(kw => responseLower.includes(kw))) {\n      detectedService = service;\n      nextStage = 'collecting_data';\n      break;\n    }\n  }\n} else if (currentStage === 'collecting_data') {\n  // Check if data collection is complete\n  // This would need to query the function is_data_collection_complete()\n  nextStage = 'collecting_data'; // Stay here until complete\n} else if (currentStage === 'scheduling') {\n  nextStage = 'completed';\n}\n\nreturn {\n  response: response,\n  next_stage: nextStage,\n  detected_service: detectedService,\n  conversation_id: $json.conversation_id\n};"
+      },
+      "id": "analyze-response",
+      "name": "Analyze Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversations SET stage = $1, service_type = $2, updated_at = NOW() WHERE id = $3",
+        "additionalFields": {
+          "queryParameters": "={{ $json.next_stage }},={{ $json.detected_service }},={{ $json.conversation_id }}"
+        }
+      },
+      "id": "update-conversation-stage",
+      "name": "Update Conversation Stage",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "messages",
+        "columns": "conversation_id, direction, content, message_type",
+        "additionalFields": {
+          "values": "'{{ $json.conversation_id }}', 'outbound', '{{ $json.response }}', 'text'"
+        }
+      },
+      "id": "save-outbound-message",
+      "name": "Save Outbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Execute Workflow Trigger').item.json.phone_number }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.response }}"
+            }
+          ]
+        }
+      },
+      "id": "send-whatsapp-message",
+      "name": "Send WhatsApp Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2050, 300]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation": {
+      "main": [
+        [
+          {
+            "node": "Conversation Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Exists?": {
+      "main": [
+        [
+          {
+            "node": "Build System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Conversation": {
+      "main": [
+        [
+          {
+            "node": "Build System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build System Prompt": {
+      "main": [
+        [
+          {
+            "node": "Claude AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Analyze Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Response": {
+      "main": [
+        [
+          {
+            "node": "Update Conversation Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Conversation Stage": {
+      "main": [
+        [
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Outbound Message": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "2"
+}

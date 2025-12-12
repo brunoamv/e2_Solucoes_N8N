@@ -1,0 +1,290 @@
+{
+  "name": "01 - WhatsApp Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-evolution",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-whatsapp",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "whatsapp-evolution"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.event }}",
+              "operation": "equals",
+              "value2": "messages.upsert"
+            }
+          ]
+        }
+      },
+      "id": "filter-messages",
+      "name": "Filter Messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract message data\nconst data = $input.item.json.body.data;\nconst message = data.message || {};\nconst key = data.key || {};\n\n// Extract relevant fields\nconst output = {\n  phone_number: key.remoteJid ? key.remoteJid.replace('@s.whatsapp.net', '') : '',\n  whatsapp_name: message.pushName || '',\n  message_id: key.id || '',\n  message_type: 'text',\n  content: '',\n  media_url: null,\n  timestamp: new Date().toISOString()\n};\n\n// Determine message type and extract content\nif (message.conversation) {\n  output.message_type = 'text';\n  output.content = message.conversation;\n} else if (message.extendedTextMessage) {\n  output.message_type = 'text';\n  output.content = message.extendedTextMessage.text || '';\n} else if (message.imageMessage) {\n  output.message_type = 'image';\n  output.media_url = message.imageMessage.url || '';\n  output.content = message.imageMessage.caption || '[Imagem enviada]';\n} else if (message.documentMessage) {\n  output.message_type = 'document';\n  output.media_url = message.documentMessage.url || '';\n  output.content = message.documentMessage.fileName || '[Documento enviado]';\n} else if (message.audioMessage) {\n  output.message_type = 'audio';\n  output.media_url = message.audioMessage.url || '';\n  output.content = '[Áudio enviado]';\n} else if (message.locationMessage) {\n  output.message_type = 'location';\n  const lat = message.locationMessage.degreesLatitude || 0;\n  const lon = message.locationMessage.degreesLongitude || 0;\n  output.content = `Localização: ${lat}, ${lon}`;\n}\n\nreturn output;"
+      },
+      "id": "extract-message-data",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id FROM messages WHERE whatsapp_message_id = $1",
+        "additionalFields": {
+          "queryParameters": "={{ $json.message_id }}"
+        }
+      },
+      "id": "check-duplicate",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [850, 200],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "equals",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "is-new-message",
+      "name": "Is New Message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "messages",
+        "columns": "conversation_id, direction, content, message_type, media_url, whatsapp_message_id",
+        "additionalFields": {
+          "values": "null, 'inbound', '{{ $json.content }}', '{{ $json.message_type }}', {{ $json.media_url ? \"'\" + $json.media_url + \"'\" : \"null\" }}, '{{ $json.message_id }}'"
+        }
+      },
+      "id": "save-inbound-message",
+      "name": "Save Inbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message_type }}",
+              "operation": "equals",
+              "value2": "image"
+            }
+          ]
+        }
+      },
+      "id": "is-image",
+      "name": "Is Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 100]
+    },
+    {
+      "parameters": {
+        "workflowId": "2",
+        "options": {}
+      },
+      "id": "trigger-ai-agent",
+      "name": "Trigger AI Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "workflowId": "4",
+        "options": {}
+      },
+      "id": "trigger-image-analysis",
+      "name": "Trigger Image Analysis",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1650, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'ok' } }}",
+        "options": {}
+      },
+      "id": "webhook-response-duplicate",
+      "name": "Response Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Filter Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Messages": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Is New Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Message?": {
+      "main": [
+        [
+          {
+            "node": "Save Inbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Inbound Message": {
+      "main": [
+        [
+          {
+            "node": "Is Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Image?": {
+      "main": [
+        [
+          {
+            "node": "Trigger Image Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Image Analysis": {
+      "main": [
+        [
+          {
+            "node": "Trigger AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "1"
+}

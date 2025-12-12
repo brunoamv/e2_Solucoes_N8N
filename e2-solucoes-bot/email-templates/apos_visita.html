@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Como Foi Sua Experiência?</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #f59e0b;
+            margin-bottom: 20px;
+        }
+        .thank-you-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px solid #fbbf24;
+            text-align: center;
+        }
+        .thank-you-card h3 {
+            margin: 0 0 15px;
+            color: #92400e;
+            font-size: 22px;
+        }
+        .thank-you-card p {
+            color: #78350f;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .rating-section {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px solid #e5e7eb;
+        }
+        .rating-section h4 {
+            margin: 0 0 20px;
+            color: #1f2937;
+            font-size: 18px;
+            text-align: center;
+        }
+        .stars {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            font-size: 40px;
+            margin: 20px 0;
+        }
+        .star-link {
+            text-decoration: none;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+        .star-link:hover {
+            transform: scale(1.2);
+        }
+        .feedback-button {
+            display: inline-block;
+            background-color: #f59e0b;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
+        }
+        .feedback-button:hover {
+            background-color: #d97706;
+        }
+        .next-steps-box {
+            background-color: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .next-steps-box h4 {
+            margin: 0 0 15px;
+            color: #1e40af;
+            font-size: 18px;
+        }
+        .next-steps-box ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .next-steps-box li {
+            color: #1e40af;
+            margin: 10px 0;
+        }
+        .social-box {
+            background-color: #f3f4f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .social-box h4 {
+            margin: 0 0 15px;
+            color: #374151;
+            font-size: 16px;
+        }
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 15px 0;
+        }
+        .social-link {
+            display: inline-block;
+            text-decoration: none;
+            font-size: 14px;
+            color: #4b5563;
+            padding: 8px 16px;
+            background-color: #ffffff;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+        }
+        .social-link:hover {
+            background-color: #f9fafb;
+        }
+        .referral-box {
+            background-color: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .referral-box h4 {
+            margin: 0 0 10px;
+            color: #065f46;
+            font-size: 16px;
+        }
+        .referral-box p {
+            margin: 10px 0;
+            color: #047857;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⭐ Como Foi Sua Experiência?</h1>
+            <p>Sua opinião é muito importante para nós!</p>
+        </div>
+
+        <div class="content">
+            <p class="greeting">Olá {{name}},</p>
+
+            <div class="thank-you-card">
+                <h3>🙏 Muito Obrigado!</h3>
+                <p>Agradecemos por escolher a E2 Soluções para seu projeto de <strong>{{service_name}}</strong>.</p>
+                <p>Esperamos que nossa visita técnica tenha atendido suas expectativas!</p>
+            </div>
+
+            <div class="rating-section">
+                <h4>Como você avalia nosso atendimento?</h4>
+                <p style="text-align: center; color: #6b7280; font-size: 14px;">Clique nas estrelas para avaliar (1 a 5)</p>
+                <div class="stars">
+                    <a href="https://forms.gle/e2rating?score=1" class="star-link">⭐</a>
+                    <a href="https://forms.gle/e2rating?score=2" class="star-link">⭐</a>
+                    <a href="https://forms.gle/e2rating?score=3" class="star-link">⭐</a>
+                    <a href="https://forms.gle/e2rating?score=4" class="star-link">⭐</a>
+                    <a href="https://forms.gle/e2rating?score=5" class="star-link">⭐</a>
+                </div>
+                <p style="text-align: center; margin-top: 20px;">Ou deixe um comentário detalhado:</p>
+                <center>
+                    <a href="https://forms.gle/e2feedback" class="feedback-button">💬 Deixar Feedback Completo</a>
+                </center>
+            </div>
+
+            <div class="next-steps-box">
+                <h4>📋 Próximos Passos</h4>
+                <ul>
+                    <li>Você receberá a <strong>proposta comercial</strong> em até 48h úteis</li>
+                    <li>Nossa equipe está à disposição para esclarecer dúvidas</li>
+                    <li>Caso precise de ajustes na proposta, entre em contato</li>
+                    <li>Fique atento ao email para não perder prazos promocionais</li>
+                </ul>
+            </div>
+
+            <div class="referral-box">
+                <h4>💚 Indique e Ganhe!</h4>
+                <p>Conhece alguém que precisa de serviços elétricos ou energia solar?</p>
+                <p><strong>Indique a E2 Soluções e ganhe 5% de desconto</strong> na sua próxima contratação para cada indicação que fechar negócio!</p>
+                <p style="text-align: center; margin-top: 15px;">
+                    <a href="https://wa.me/556299999999?text=Quero%20indicar%20a%20E2%20Soluções" style="color: #047857; font-weight: 600;">📱 Fazer Indicação via WhatsApp</a>
+                </p>
+            </div>
+
+            <div class="social-box">
+                <h4>🌐 Siga a E2 Soluções nas Redes Sociais</h4>
+                <p style="font-size: 14px; color: #6b7280; margin-bottom: 15px;">Fique por dentro de novidades, dicas e promoções!</p>
+                <div class="social-links">
+                    <a href="https://instagram.com/e2solucoes" class="social-link">📷 Instagram</a>
+                    <a href="https://facebook.com/e2solucoes" class="social-link">👥 Facebook</a>
+                    <a href="https://linkedin.com/company/e2solucoes" class="social-link">💼 LinkedIn</a>
+                </div>
+            </div>
+
+            <p style="margin-top: 30px; text-align: center; font-size: 14px; color: #6b7280;">
+                Dúvidas ou precisa de algo? Estamos sempre à disposição!
+            </p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <strong>📱 WhatsApp:</strong> (62) 99999-9999<br>
+                <strong>📧 Email:</strong> atendimento@e2solucoes.com.br
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>E2 Soluções - Energia e Engenharia Elétrica</strong></p>
+            <p>Goiânia - GO | CREA-GO: 123456</p>
+            <p style="font-size: 12px; margin-top: 10px;">
+                © 2024 E2 Soluções. Todos os direitos reservados.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

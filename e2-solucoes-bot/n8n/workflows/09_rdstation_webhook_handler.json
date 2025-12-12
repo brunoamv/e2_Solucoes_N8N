@@ -1,0 +1,399 @@
+{
+  "name": "09 - RD Station Webhook Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rdstation-webhook",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "rdstation-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse RD Station webhook payload\nconst payload = $input.first().json;\n\n// RD Station webhook event types:\n// OPPORTUNITY.CREATED - New deal created\n// OPPORTUNITY.UPDATED - Deal updated (stage changed, value updated, etc.)\n// OPPORTUNITY.WON - Deal marked as won\n// OPPORTUNITY.LOST - Deal marked as lost\n// TASK.CREATED - New task created\n// TASK.UPDATED - Task updated\n\nconst eventType = payload.event_type || payload.event;\nconst eventData = payload.data || payload;\n\n// Extract relevant data based on event type\nif (eventType.startsWith('OPPORTUNITY')) {\n  // Deal/Opportunity event\n  const deal = eventData.opportunity || eventData;\n  \n  return {\n    event_type: eventType,\n    event_category: 'opportunity',\n    deal_id: deal.id,\n    deal_name: deal.name || deal.title,\n    deal_stage: deal.stage || deal.deal_stage,\n    deal_value: deal.value || deal.deal_value || 0,\n    contact_email: deal.contact?.email || deal.email,\n    contact_name: deal.contact?.name || deal.name,\n    contact_phone: deal.contact?.phone || deal.phone,\n    user_id: deal.user_id || deal.owner_id,\n    custom_fields: deal.custom_fields || {},\n    webhook_payload: payload\n  };\n} else if (eventType.startsWith('TASK')) {\n  // Task event\n  const task = eventData.task || eventData;\n  \n  return {\n    event_type: eventType,\n    event_category: 'task',\n    task_id: task.id,\n    task_subject: task.subject || task.title,\n    task_type: task.type,\n    task_due_date: task.due_date,\n    task_status: task.status,\n    deal_id: task.deal_id || task.opportunity_id,\n    user_id: task.user_id || task.assigned_to,\n    webhook_payload: payload\n  };\n} else {\n  // Unknown event type\n  return {\n    event_type: eventType,\n    event_category: 'unknown',\n    webhook_payload: payload\n  };\n}\n"
+      },
+      "id": "parse-webhook",
+      "name": "Parse Webhook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "combineOperation": "any"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event_category }}",
+              "rightValue": "opportunity",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "route-by-category",
+      "name": "Route by Category",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT l.*, c.id as conversation_id, c.whatsapp_id\nFROM leads l\nJOIN conversations c ON c.id = l.conversation_id\nWHERE l.rdstation_deal_id = $1\nLIMIT 1",
+        "additionalFields": {
+          "queryParameters": "={{ $json.deal_id }}"
+        }
+      },
+      "id": "find-lead-by-deal",
+      "name": "Find Lead by Deal ID",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [850, 200],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "combineOperation": "any"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-lead-exists",
+      "name": "Check Lead Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine what action to take based on event type and stage change\nconst webhook = $('Parse Webhook').first().json;\nconst lead = $input.first().json;\n\nconst eventType = webhook.event_type;\nconst dealStage = webhook.deal_stage;\n\n// Define stage-based actions\nconst actions = [];\n\n// Deal won - send congratulations and next steps\nif (eventType === 'OPPORTUNITY.WON') {\n  actions.push({\n    type: 'send_whatsapp',\n    message: `🎉 *Parabéns, ${lead.name}!*\\n\\nSua proposta foi aprovada!\\n\\nNossa equipe entrará em contato em breve para alinhar os próximos passos da implementação do projeto de *${lead.service_type}*.\\n\\nObrigado pela confiança na E2 Soluções! 💚`,\n    priority: 'high'\n  });\n  \n  actions.push({\n    type: 'update_lead_status',\n    new_status: 'won',\n    notes: 'Deal fechado no RD Station'\n  });\n}\n\n// Deal lost - send feedback request\nif (eventType === 'OPPORTUNITY.LOST') {\n  actions.push({\n    type: 'send_whatsapp',\n    message: `Olá ${lead.name},\\n\\nNotamos que você optou por não prosseguir com nosso projeto de ${lead.service_type} neste momento.\\n\\nFicamos à disposição caso suas necessidades mudem no futuro!\\n\\nPoderia nos contar o motivo? Sua opinião nos ajuda a melhorar! 🙏`,\n    priority: 'low'\n  });\n  \n  actions.push({\n    type: 'update_lead_status',\n    new_status: 'lost',\n    notes: 'Deal perdido no RD Station'\n  });\n}\n\n// Deal stage changed - notify if relevant\nif (eventType === 'OPPORTUNITY.UPDATED' && dealStage) {\n  const stageMessages = {\n    'proposal_sent': `Olá ${lead.name}! 📧\\n\\nSua proposta comercial foi enviada!\\n\\nVerifique seu email e fique à vontade para tirar dúvidas. Estamos à disposição!`,\n    'negotiation': `Olá ${lead.name}!\\n\\nEstamos finalizando os ajustes da proposta conforme nossa conversa.\\n\\nEm breve você terá a versão atualizada!`,\n    'contract': `🎊 Ótima notícia, ${lead.name}!\\n\\nEstamos preparando o contrato do seu projeto de ${lead.service_type}.\\n\\nVocê receberá o documento em breve para assinatura!`\n  };\n  \n  if (stageMessages[dealStage]) {\n    actions.push({\n      type: 'send_whatsapp',\n      message: stageMessages[dealStage],\n      priority: 'medium'\n    });\n  }\n  \n  actions.push({\n    type: 'update_lead_stage',\n    new_stage: dealStage\n  });\n}\n\nreturn {\n  lead_id: lead.id,\n  conversation_id: lead.conversation_id,\n  whatsapp_id: lead.whatsapp_id,\n  phone_number: lead.phone_number,\n  actions: actions,\n  webhook_event: webhook.event_type,\n  deal_id: webhook.deal_id\n};\n"
+      },
+      "id": "determine-actions",
+      "name": "Determine Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 100]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "actions",
+        "options": {}
+      },
+      "id": "split-actions",
+      "name": "Split Actions",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1450, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "combineOperation": "any"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "send_whatsapp",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "route-by-action-type",
+      "name": "Route by Action Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1650, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Determine Actions').item.json.phone_number }}\",\n  \"text\": \"{{ $json.message }}\"\n}"
+      },
+      "id": "send-whatsapp-message",
+      "name": "Send WhatsApp Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1850, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads\nSET status = $1,\n    updated_at = NOW(),\n    notes = COALESCE(notes, '') || '\\n' || $2\nWHERE id = $3",
+        "additionalFields": {
+          "queryParameters": "={{ $json.new_status }},={{ $json.notes }},={{ $('Determine Actions').item.json.lead_id }}"
+        }
+      },
+      "id": "update-lead-status",
+      "name": "Update Lead Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1850, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads\nSET rdstation_stage = $1,\n    updated_at = NOW()\nWHERE id = $2",
+        "additionalFields": {
+          "queryParameters": "={{ $json.new_stage }},={{ $('Determine Actions').item.json.lead_id }}"
+        }
+      },
+      "id": "update-lead-stage",
+      "name": "Update Lead Stage",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1850, 200],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO webhook_logs (\n  source,\n  event_type,\n  payload,\n  processed_at,\n  status,\n  lead_id\n) VALUES ($1, $2, $3, NOW(), $4, $5)",
+        "additionalFields": {
+          "queryParameters": "=rdstation,={{ $('Parse Webhook').item.json.event_type }},={{ JSON.stringify($('Parse Webhook').item.json.webhook_payload) }},processed,={{ $('Determine Actions').item.json.lead_id }}"
+        }
+      },
+      "id": "log-webhook",
+      "name": "Log Webhook",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2050, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO webhook_logs (\n  source,\n  event_type,\n  payload,\n  processed_at,\n  status,\n  error_message\n) VALUES ($1, $2, $3, NOW(), $4, $5)",
+        "additionalFields": {
+          "queryParameters": "=rdstation,={{ $('Parse Webhook').item.json.event_type }},={{ JSON.stringify($('Parse Webhook').item.json.webhook_payload) }},ignored,Lead not found in database"
+        }
+      },
+      "id": "log-ignored-webhook",
+      "name": "Log Ignored Webhook",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Webhook": {
+      "main": [
+        [
+          {
+            "node": "Route by Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Category": {
+      "main": [
+        [
+          {
+            "node": "Find Lead by Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Lead by Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Check Lead Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Lead Exists": {
+      "main": [
+        [
+          {
+            "node": "Determine Actions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Ignored Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Actions": {
+      "main": [
+        [
+          {
+            "node": "Split Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Actions": {
+      "main": [
+        [
+          {
+            "node": "Route by Action Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Action Type": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Lead Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Lead Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Log Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Status": {
+      "main": [
+        [
+          {
+            "node": "Log Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Stage": {
+      "main": [
+        [
+          {
+            "node": "Log Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "9"
+}

@@ -1,0 +1,282 @@
+{
+  "name": "04 - Image Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.media_url }}",
+        "responseFormat": "file"
+      },
+      "id": "download-image",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM conversations WHERE phone_number = $1 AND status = 'active' ORDER BY updated_at DESC LIMIT 1",
+        "additionalFields": {
+          "queryParameters": "={{ $('Execute Workflow Trigger').item.json.phone_number }}"
+        }
+      },
+      "id": "get-conversation",
+      "name": "Get Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 500],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine analysis type based on conversation context\nconst conversation = $('Get Conversation').first().json;\nconst serviceType = conversation.service_type;\nconst stage = conversation.stage;\nconst collectedData = conversation.collected_data || {};\n\nlet analysisPrompt = '';\n\nif (serviceType === 'energia_solar' && !collectedData.foto_conta) {\n  // Analyzing energy bill\n  analysisPrompt = `Analise esta conta de energia elétrica brasileira e extraia:\n\n1. **Consumo kWh/mês**: Consumo médio em kWh\n2. **Valor Total**: Valor total da conta em R$\n3. **Tarifa**: Valor da tarifa por kWh (se visível)\n4. **Concessionária**: Nome da distribuidora de energia\n5. **Demanda Contratada**: Se aplicável (consumidores grupo A)\n6. **Bandeira Tarifária**: Cor da bandeira (verde/amarela/vermelha)\n\nSe a imagem não for uma conta de energia, informe que precisa de uma foto da conta.\n\nFormato de resposta em JSON:\n\\`\\`\\`json\n{\n  \"tipo\": \"conta_energia\",\n  \"consumo_kwh\": número,\n  \"valor_total\": número,\n  \"tarifa_kwh\": número,\n  \"concessionaria\": \"string\",\n  \"demanda_contratada\": número ou null,\n  \"bandeira\": \"verde|amarela|vermelha\",\n  \"observacoes\": \"string\"\n}\n\\`\\`\\``;\n} else if (serviceType === 'energia_solar' && collectedData.foto_conta) {\n  // Analyzing installation site\n  analysisPrompt = `Analise esta foto do local de instalação solar e identifique:\n\n1. **Tipo de Telhado**: Cerâmica, metálico, laje, fibrocimento\n2. **Inclinação**: Aproximada em graus\n3. **Orientação**: Se possível identificar (Norte, Sul, Leste, Oeste)\n4. **Área Disponível**: Estimativa visual em m²\n5. **Sombreamento**: Presença de árvores, prédios, obstáculos\n6. **Condições**: Estado do telhado (bom, regular, precisa reforma)\n7. **Acessibilidade**: Facilidade de acesso para instalação\n\nFormato de resposta em JSON:\n\\`\\`\\`json\n{\n  \"tipo\": \"local_instalacao\",\n  \"tipo_telhado\": \"string\",\n  \"inclinacao\": número,\n  \"orientacao\": \"string\",\n  \"area_disponivel\": número,\n  \"sombreamento\": \"baixo|médio|alto\",\n  \"condicoes\": \"string\",\n  \"acessibilidade\": \"string\",\n  \"recomendacoes\": \"string\"\n}\n\\`\\`\\``;\n} else if (serviceType === 'subestacao') {\n  // Analyzing substation equipment\n  analysisPrompt = `Analise esta imagem de equipamento elétrico de subestação:\n\n1. **Tipo de Equipamento**: Transformador, disjuntor, painel, etc.\n2. **Estado Aparente**: Bom, oxidação, danos visíveis\n3. **Fabricante**: Se a placa for visível\n4. **Potência/Tensão**: Se informações forem visíveis\n5. **Problemas Identificados**: Vazamento, aquecimento, corrosão\n6. **Urgência**: Baixa, média, alta\n\nFormato de resposta em JSON:\n\\`\\`\\`json\n{\n  \"tipo\": \"equipamento_subestacao\",\n  \"equipamento\": \"string\",\n  \"estado\": \"string\",\n  \"fabricante\": \"string\",\n  \"especificacoes\": \"string\",\n  \"problemas\": [\"string\"],\n  \"urgencia\": \"baixa|media|alta\",\n  \"recomendacoes\": \"string\"\n}\n\\`\\`\\``;\n} else if (serviceType === 'analise_laudo') {\n  // Analyzing electrical panel for quality analysis\n  analysisPrompt = `Analise este painel elétrico para identificar:\n\n1. **Tipo de Instalação**: Residencial, comercial, industrial\n2. **Padrão de Entrada**: Monofásico, bifásico, trifásico\n3. **Organização**: Adequada, precisa melhorias, inadequada\n4. **Disjuntores**: Identificação, proteção adequada\n5. **Aterramento**: Visível e adequado\n6. **Conformidade NR-10/NBR**: Aparente conformidade\n7. **Riscos Identificados**: Fios expostos, sobrecarga, etc.\n\nFormato de resposta em JSON:\n\\`\\`\\`json\n{\n  \"tipo\": \"painel_eletrico\",\n  \"tipo_instalacao\": \"string\",\n  \"padrao_entrada\": \"string\",\n  \"organizacao\": \"string\",\n  \"disjuntores\": \"string\",\n  \"aterramento\": \"string\",\n  \"conformidade\": \"string\",\n  \"riscos\": [\"string\"],\n  \"urgencia_correcao\": \"baixa|media|alta\",\n  \"recomendacoes\": \"string\"\n}\n\\`\\`\\``;\n} else {\n  // Generic image analysis\n  analysisPrompt = `Analise esta imagem relacionada a serviços elétricos e energia.\n\nDescreva:\n1. O que você vê na imagem\n2. Tipo de equipamento ou instalação\n3. Possíveis problemas ou observações\n4. Recomendações iniciais\n\nFormato de resposta em JSON:\n\\`\\`\\`json\n{\n  \"tipo\": \"analise_geral\",\n  \"descricao\": \"string\",\n  \"categoria\": \"string\",\n  \"observacoes\": \"string\",\n  \"recomendacoes\": \"string\"\n}\n\\`\\`\\``;\n}\n\nreturn {\n  analysis_prompt: analysisPrompt,\n  service_type: serviceType,\n  conversation_id: conversation.id\n};"
+      },
+      "id": "build-analysis-prompt",
+      "name": "Build Analysis Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 2048
+        },
+        "messages": {
+          "messageValues": [
+            {
+              "role": "user",
+              "content": "={{ $json.analysis_prompt }}"
+            }
+          ]
+        },
+        "images": {
+          "imageValues": [
+            {
+              "imageType": "binary",
+              "binaryPropertyName": "data"
+            }
+          ]
+        }
+      },
+      "id": "claude-vision-analysis",
+      "name": "Claude Vision Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "1",
+          "name": "Anthropic Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse JSON response from Claude Vision\nconst response = $input.first().json.response;\nconst serviceType = $('Build Analysis Prompt').first().json.service_type;\nconst conversationId = $('Build Analysis Prompt').first().json.conversation_id;\n\n// Extract JSON from response (Claude might include markdown code blocks)\nconst jsonMatch = response.match(/```json\\n([\\s\\S]*?)\\n```/) || response.match(/({[\\s\\S]*})/);\nlet analysisData = {};\n\ntry {\n  if (jsonMatch && jsonMatch[1]) {\n    analysisData = JSON.parse(jsonMatch[1]);\n  } else {\n    // If no JSON found, create a basic structure\n    analysisData = {\n      tipo: 'analise_geral',\n      descricao: response,\n      observacoes: 'Análise em texto livre'\n    };\n  }\n} catch (e) {\n  analysisData = {\n    tipo: 'erro',\n    descricao: response,\n    erro: e.message\n  };\n}\n\n// Generate user-friendly summary in Portuguese\nlet summary = '';\n\nswitch(analysisData.tipo) {\n  case 'conta_energia':\n    summary = `📊 *Análise da Conta de Energia*\\n\\n`;\n    summary += `💡 Consumo médio: ${analysisData.consumo_kwh} kWh/mês\\n`;\n    summary += `💰 Valor: R$ ${analysisData.valor_total}\\n`;\n    if (analysisData.tarifa_kwh) summary += `⚡ Tarifa: R$ ${analysisData.tarifa_kwh}/kWh\\n`;\n    summary += `🏢 Distribuidora: ${analysisData.concessionaria}\\n`;\n    if (analysisData.bandeira) summary += `🚦 Bandeira: ${analysisData.bandeira}\\n`;\n    if (analysisData.observacoes) summary += `\\n📝 ${analysisData.observacoes}`;\n    break;\n    \n  case 'local_instalacao':\n    summary = `🏠 *Análise do Local de Instalação*\\n\\n`;\n    summary += `🏗️ Telhado: ${analysisData.tipo_telhado}\\n`;\n    summary += `📐 Inclinação: ~${analysisData.inclinacao}°\\n`;\n    summary += `📏 Área disponível: ~${analysisData.area_disponivel}m²\\n`;\n    summary += `🌳 Sombreamento: ${analysisData.sombreamento}\\n`;\n    summary += `✅ Condições: ${analysisData.condicoes}\\n`;\n    if (analysisData.recomendacoes) summary += `\\n💡 ${analysisData.recomendacoes}`;\n    break;\n    \n  case 'equipamento_subestacao':\n    summary = `⚡ *Análise de Equipamento*\\n\\n`;\n    summary += `🔧 Equipamento: ${analysisData.equipamento}\\n`;\n    summary += `📊 Estado: ${analysisData.estado}\\n`;\n    if (analysisData.fabricante) summary += `🏭 Fabricante: ${analysisData.fabricante}\\n`;\n    if (analysisData.problemas && analysisData.problemas.length > 0) {\n      summary += `\\n⚠️ Problemas identificados:\\n`;\n      analysisData.problemas.forEach(p => summary += `  • ${p}\\n`);\n    }\n    summary += `\\n🚨 Urgência: ${analysisData.urgencia}\\n`;\n    if (analysisData.recomendacoes) summary += `\\n💡 ${analysisData.recomendacoes}`;\n    break;\n    \n  case 'painel_eletrico':\n    summary = `🔌 *Análise do Painel Elétrico*\\n\\n`;\n    summary += `🏢 Tipo: ${analysisData.tipo_instalacao}\\n`;\n    summary += `⚡ Padrão: ${analysisData.padrao_entrada}\\n`;\n    summary += `📋 Organização: ${analysisData.organizacao}\\n`;\n    summary += `✅ Conformidade: ${analysisData.conformidade}\\n`;\n    if (analysisData.riscos && analysisData.riscos.length > 0) {\n      summary += `\\n⚠️ Riscos identificados:\\n`;\n      analysisData.riscos.forEach(r => summary += `  • ${r}\\n`);\n    }\n    summary += `\\n🚨 Urgência de correção: ${analysisData.urgencia_correcao}\\n`;\n    if (analysisData.recomendacoes) summary += `\\n💡 ${analysisData.recomendacoes}`;\n    break;\n    \n  default:\n    summary = `📸 *Análise da Imagem*\\n\\n${analysisData.descricao}\\n`;\n    if (analysisData.recomendacoes) summary += `\\n💡 ${analysisData.recomendacoes}`;\n}\n\nreturn {\n  analysis_data: analysisData,\n  summary: summary,\n  conversation_id: conversationId,\n  service_type: serviceType\n};"
+      },
+      "id": "parse-analysis-result",
+      "name": "Parse Analysis Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversations SET collected_data = collected_data || $1::jsonb WHERE id = $2",
+        "additionalFields": {
+          "queryParameters": "={{ JSON.stringify({ foto_analise: $json.analysis_data }) }},={{ $json.conversation_id }}"
+        }
+      },
+      "id": "save-analysis-to-conversation",
+      "name": "Save Analysis to Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "messages",
+        "columns": "conversation_id, direction, content, message_type",
+        "additionalFields": {
+          "values": "'{{ $json.conversation_id }}', 'outbound', '{{ $json.summary }}', 'text'"
+        }
+      },
+      "id": "save-outbound-message",
+      "name": "Save Outbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Execute Workflow Trigger').item.json.phone_number }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.summary }}"
+            }
+          ]
+        }
+      },
+      "id": "send-whatsapp-response",
+      "name": "Send WhatsApp Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1650, 300]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Build Analysis Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation": {
+      "main": [
+        [
+          {
+            "node": "Build Analysis Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Analysis Prompt": {
+      "main": [
+        [
+          {
+            "node": "Claude Vision Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Vision Analysis": {
+      "main": [
+        [
+          {
+            "node": "Parse Analysis Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Analysis Result": {
+      "main": [
+        [
+          {
+            "node": "Save Analysis to Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Analysis to Conversation": {
+      "main": [
+        [
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Outbound Message": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "4"
+}

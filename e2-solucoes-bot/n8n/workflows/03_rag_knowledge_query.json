@@ -1,0 +1,232 @@
+{
+  "name": "03 - RAG Knowledge Query",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rag-query",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5a8b3c2d-1e4f-5g6h-7i8j-9k0l1m2n3o4p",
+      "name": "Webhook RAG Query",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rag-query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.query_text }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "6b9c4d3e-2f5g-6h7i-8j9k-0l1m2n3o4p5q",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"query_text is required\", \"status\": \"error\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "7c0d5e4f-3g6h-7i8j-9k0l-1m2n3o4p5q6r",
+      "name": "Error Missing Query",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        680,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "embeddings",
+        "model": "text-embedding-3-small",
+        "text": "={{ $json.body.query_text }}"
+      },
+      "id": "8d1e6f5g-4h7i-8j9k-0l1m-2n3o4p5q6r7s",
+      "name": "Generate Embedding (OpenAI)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        680,
+        180
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-embeddings",
+          "name": "OpenAI API (Embeddings)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT * FROM match_documents(\n  '[{{ $json.data[0].embedding.join(\",\") }}]'::vector,\n  {{ $node[\"Webhook RAG Query\"].json.body.match_threshold || 0.75 }},\n  {{ $node[\"Webhook RAG Query\"].json.body.match_count || 5 }},\n  {{ $node[\"Webhook RAG Query\"].json.body.category ? \"'\" + $node[\"Webhook RAG Query\"].json.body.category + \"'\" : \"NULL\" }}\n)",
+        "options": {}
+      },
+      "id": "9e2f7g6h-5i8j-9k0l-1m2n-3o4p5q6r7s8t",
+      "name": "Query Supabase (match_documents)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-postgres",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format results for AI Agent consumption\nconst items = $input.all();\nconst webhookData = $node[\"Webhook RAG Query\"].json.body;\n\nif (!items || items.length === 0) {\n  return [{\n    json: {\n      success: false,\n      results: [],\n      context: \"\",\n      metadata: {\n        query: webhookData.query_text,\n        total_results: 0,\n        category_filter: webhookData.category || null,\n        match_threshold: webhookData.match_threshold || 0.75\n      },\n      message: \"Nenhum conhecimento relevante encontrado\"\n    }\n  }];\n}\n\n// Process and structure results\nconst results = items.map((item, index) => ({\n  rank: index + 1,\n  content: item.json.content,\n  source: {\n    file: item.json.source_file,\n    category: item.json.category,\n    id: item.json.id\n  },\n  similarity: parseFloat(item.json.similarity).toFixed(3),\n  relevance: item.json.similarity > 0.85 ? \"high\" : item.json.similarity > 0.75 ? \"medium\" : \"low\"\n}));\n\n// Create context string for AI (combines top results)\nconst context = results\n  .slice(0, 3) // Top 3 most relevant\n  .map((r, idx) => `[Fonte ${idx + 1} - ${r.source.file} (${(parseFloat(r.similarity) * 100).toFixed(1)}% similar)]\\n${r.content}`)\n  .join(\"\\n\\n---\\n\\n\");\n\n// Calculate average similarity\nconst avgSimilarity = results.reduce((acc, r) => acc + parseFloat(r.similarity), 0) / results.length;\n\nreturn [{\n  json: {\n    success: true,\n    results: results,\n    context: context,\n    metadata: {\n      query: webhookData.query_text,\n      total_results: results.length,\n      average_similarity: avgSimilarity.toFixed(3),\n      category_filter: webhookData.category || null,\n      match_threshold: webhookData.match_threshold || 0.75,\n      categories_found: [...new Set(results.map(r => r.source.category))],\n      files_found: [...new Set(results.map(r => r.source.file))]\n    },\n    usage: {\n      description: \"Use 'context' field to inject into AI prompt as knowledge base\",\n      example: `Baseado no seguinte conhecimento da E2 Soluções:\\n\\n${context.substring(0, 200)}...`\n    }\n  }\n}];"
+      },
+      "id": "0f3g8h7i-6j9k-0l1m-2n3o-4p5q6r7s8t9u",
+      "name": "Format Results for AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-RAG-Results",
+                "value": "={{ $json.metadata.total_results }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "1g4h9i8j-7k0l-1m2n-3o4p-5q6r7s8t9u0v",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook RAG Query": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Generate Embedding (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Missing Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embedding (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Query Supabase (match_documents)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Supabase (match_documents)": {
+      "main": [
+        [
+          {
+            "node": "Format Results for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Results for AI": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-12T00:00:00.000Z",
+      "updatedAt": "2025-01-12T00:00:00.000Z",
+      "id": "rag",
+      "name": "RAG"
+    },
+    {
+      "createdAt": "2025-01-12T00:00:00.000Z",
+      "updatedAt": "2025-01-12T00:00:00.000Z",
+      "id": "knowledge",
+      "name": "Knowledge Base"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-12T00:00:00.000Z",
+  "versionId": "1.0.0"
+}

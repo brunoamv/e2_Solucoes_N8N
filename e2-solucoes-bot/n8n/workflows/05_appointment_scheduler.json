@@ -1,0 +1,235 @@
+{
+  "name": "05 - Appointment Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM appointments WHERE id = $1",
+        "additionalFields": {
+          "queryParameters": "={{ $json.appointment_id }}"
+        }
+      },
+      "id": "get-appointment",
+      "name": "Get Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT l.*, c.phone_number, c.whatsapp_name FROM leads l JOIN conversations c ON c.id = l.conversation_id WHERE l.id = $1",
+        "additionalFields": {
+          "queryParameters": "={{ $('Get Appointment').item.json.lead_id }}"
+        }
+      },
+      "id": "get-lead-data",
+      "name": "Get Lead Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Google Calendar event from appointment data\nconst appointment = $('Get Appointment').first().json;\nconst lead = $('Get Lead Data').first().json;\n\n// Parse scheduled_date (format: YYYY-MM-DD HH:MM:SS)\nconst scheduledDate = new Date(appointment.scheduled_date);\n\n// Duration based on service type\nconst serviceDurations = {\n  'energia_solar': 120, // 2 hours\n  'subestacao': 180, // 3 hours\n  'projeto_eletrico': 90, // 1.5 hours\n  'armazenamento_energia': 120, // 2 hours\n  'analise_laudo': 120 // 2 hours\n};\n\nconst duration = serviceDurations[lead.service_type] || 120;\nconst endDate = new Date(scheduledDate.getTime() + duration * 60000);\n\n// Build event title\nconst serviceNames = {\n  'energia_solar': 'Energia Solar',\n  'subestacao': 'Subestação',\n  'projeto_eletrico': 'Projeto Elétrico',\n  'armazenamento_energia': 'BESS',\n  'analise_laudo': 'Análise/Laudo'\n};\n\nconst eventTitle = `[E2] Visita ${serviceNames[lead.service_type]} - ${lead.name}`;\n\n// Build description\nlet description = `=== VISITA TÉCNICA E2 SOLUÇÕES ===\\n\\n`;\ndescription += `CLIENTE: ${lead.name}\\n`;\ndescription += `TELEFONE: ${lead.phone_number}\\n`;\ndescription += `EMAIL: ${lead.email}\\n`;\ndescription += `ENDEREÇO: ${lead.address}, ${lead.city}/${lead.state}\\n`;\ndescription += `\\nSERVIÇO: ${serviceNames[lead.service_type]}\\n`;\n\nif (lead.service_data) {\n  description += `\\n--- DADOS DO SERVIÇO ---\\n`;\n  const data = lead.service_data;\n  \n  if (data.consumo_kwh) description += `Consumo: ${data.consumo_kwh} kWh/mês\\n`;\n  if (data.potencia_kwp) description += `Potência Solar: ${data.potencia_kwp} kWp\\n`;\n  if (data.tensao) description += `Tensão: ${data.tensao}\\n`;\n  if (data.tipo_servico) description += `Tipo: ${data.tipo_servico}\\n`;\n  if (data.tipo_analise) description += `Análise: ${data.tipo_analise}\\n`;\n}\n\nif (appointment.notes) {\n  description += `\\n--- OBSERVAÇÕES ---\\n${appointment.notes}\\n`;\n}\n\ndescription += `\\n--- LINKS ---\\n`;\ndescription += `RD Station Deal: ${$env.RDSTATION_URL}/deals/${lead.rdstation_deal_id}\\n`;\ndescription += `WhatsApp: https://wa.me/${lead.phone_number.replace(/\\D/g, '')}\\n`;\n\n// Build attendees\nconst attendees = [\n  { email: $env.GOOGLE_TECHNICIAN_EMAIL } // Técnico E2\n];\n\nif (lead.email && lead.email.includes('@')) {\n  attendees.push({ email: lead.email }); // Cliente\n}\n\n// Build location\nconst location = `${lead.address}, ${lead.city} - ${lead.state}, ${lead.cep || ''}`;\n\n// Reminders\nconst reminders = {\n  useDefault: false,\n  overrides: [\n    { method: 'email', minutes: 1440 }, // 24h antes\n    { method: 'popup', minutes: 120 }, // 2h antes\n    { method: 'email', minutes: 120 } // 2h antes\n  ]\n};\n\nreturn {\n  summary: eventTitle,\n  description: description,\n  location: location,\n  start: {\n    dateTime: scheduledDate.toISOString(),\n    timeZone: 'America/Sao_Paulo'\n  },\n  end: {\n    dateTime: endDate.toISOString(),\n    timeZone: 'America/Sao_Paulo'\n  },\n  attendees: attendees,\n  reminders: reminders,\n  colorId: '9', // Azul para visitas técnicas\n  appointment_id: appointment.id,\n  lead_id: lead.id\n};"
+      },
+      "id": "build-calendar-event",
+      "name": "Build Calendar Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "calendarId": "={{ $env.GOOGLE_CALENDAR_ID }}",
+        "operation": "create",
+        "eventData": {
+          "summary": "={{ $json.summary }}",
+          "description": "={{ $json.description }}",
+          "location": "={{ $json.location }}",
+          "start": "={{ $json.start }}",
+          "end": "={{ $json.end }}",
+          "attendees": "={{ JSON.stringify($json.attendees) }}",
+          "reminders": "={{ JSON.stringify($json.reminders) }}",
+          "colorId": "={{ $json.colorId }}"
+        }
+      },
+      "id": "create-google-event",
+      "name": "Create Google Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "1",
+          "name": "Google Calendar API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE appointments SET google_event_id = $1, status = 'confirmed', updated_at = NOW() WHERE id = $2",
+        "additionalFields": {
+          "queryParameters": "={{ $('Create Google Event').item.json.id }},={{ $('Build Calendar Event').item.json.appointment_id }}"
+        }
+      },
+      "id": "update-appointment",
+      "name": "Update Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RDSTATION_API_URL }}/tasks",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RDSTATION_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subject\": \"Visita Técnica - {{ $('Get Lead Data').item.json.name }}\",\n  \"deal_id\": \"{{ $('Get Lead Data').item.json.rdstation_deal_id }}\",\n  \"assigned_user_id\": \"{{ $env.RDSTATION_USER_TECNICO }}\",\n  \"due_date\": \"{{ $('Get Appointment').item.json.scheduled_date }}\",\n  \"notes\": \"Visita técnica agendada via bot WhatsApp.\\n\\nEndereço: {{ $('Get Lead Data').item.json.address }}, {{ $('Get Lead Data').item.json.city }}/{{ $('Get Lead Data').item.json.state }}\\n\\nGoogle Calendar: {{ $('Create Google Event').item.json.htmlLink }}\"\n}"
+      },
+      "id": "create-rdstation-task",
+      "name": "Create RD Station Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "7",
+        "options": {}
+      },
+      "id": "send-confirmation-email",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Appointment": {
+      "main": [
+        [
+          {
+            "node": "Get Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Build Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Create Google Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Event": {
+      "main": [
+        [
+          {
+            "node": "Update Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Appointment": {
+      "main": [
+        [
+          {
+            "node": "Create RD Station Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create RD Station Task": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "5"
+}

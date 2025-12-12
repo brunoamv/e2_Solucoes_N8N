@@ -1,0 +1,209 @@
+{
+  "name": "07 - Send Email",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract email parameters from trigger\nconst input = $input.first().json;\n\n// Required fields\nconst to = input.to || input.email;\nconst template = input.template || input.email_template;\n\nif (!to) {\n  throw new Error('Email recipient (to) is required');\n}\n\nif (!template) {\n  throw new Error('Email template is required');\n}\n\n// Map template names to file paths\nconst templateFiles = {\n  'novo_lead': 'novo_lead.html',\n  'confirmacao_agendamento': 'confirmacao_agendamento.html',\n  'lembrete_24h': 'lembrete_24h.html',\n  'lembrete_2h': 'lembrete_2h.html',\n  'apos_visita': 'apos_visita.html'\n};\n\nconst templateFile = templateFiles[template];\nif (!templateFile) {\n  throw new Error(`Unknown template: ${template}. Available: ${Object.keys(templateFiles).join(', ')}`);\n}\n\n// Extract data for template rendering\nconst data = input.data || {};\n\n// Merge with top-level fields for convenience\nconst templateData = {\n  name: input.name || data.name || 'Cliente',\n  email: to,\n  phone: input.phone_number || input.phone || data.phone || '',\n  service_type: input.service_type || data.service_type || '',\n  service_name: input.service_name || data.service_name || '',\n  scheduled_date: input.scheduled_date || data.scheduled_date || '',\n  formatted_date: input.formatted_date || data.formatted_date || '',\n  formatted_time: input.formatted_time || data.formatted_time || '',\n  address: input.address || data.address || '',\n  notes: input.notes || data.notes || '',\n  google_event_link: input.google_event_link || data.google_event_link || '',\n  ...data // Include any additional custom data\n};\n\n// Subject mapping for each template type\nconst subjectTemplates = {\n  'novo_lead': '🎉 Bem-vindo à E2 Soluções - ${service_name}',\n  'confirmacao_agendamento': '✅ Visita Confirmada - ${formatted_date} às ${formatted_time}',\n  'lembrete_24h': '🔔 Lembrete: Visita Técnica E2 amanhã',\n  'lembrete_2h': '⏰ URGENTE: Visita Técnica em 2 horas',\n  'apos_visita': '⭐ Como foi sua experiência com a E2 Soluções?'\n};\n\nconst subjectTemplate = input.subject || subjectTemplates[template] || 'E2 Soluções';\n\n// Simple template variable replacement\nconst renderTemplate = (str, data) => {\n  return str.replace(/\\$\\{(\\w+)\\}/g, (match, key) => data[key] || match);\n};\n\nconst subject = renderTemplate(subjectTemplate, templateData);\n\nreturn {\n  to: to,\n  subject: subject,\n  template: template,\n  template_file: templateFile,\n  template_data: templateData,\n  from_name: 'E2 Soluções',\n  from_email: process.env.SMTP_FROM_EMAIL || 'contato@e2solucoes.com.br',\n  reply_to: process.env.SMTP_REPLY_TO || 'atendimento@e2solucoes.com.br'\n};\n"
+      },
+      "id": "prepare-email-data",
+      "name": "Prepare Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "command": "=cat {{ $env.HOME }}/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/email-templates/{{ $json.template_file }}"
+      },
+      "id": "read-template-file",
+      "name": "Read Template File",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get template HTML and data\nconst templateHtml = $('Read Template File').first().json.stdout;\nconst data = $input.first().json;\nconst templateData = data.template_data;\n\n// Simple template variable replacement\nconst renderTemplate = (html, data) => {\n  let rendered = html;\n  \n  // Replace {{variable}} style placeholders\n  rendered = rendered.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (match, key) => {\n    return data[key] !== undefined ? data[key] : match;\n  });\n  \n  // Handle conditional blocks: {{#if variable}}...{{/if}}\n  rendered = rendered.replace(/\\{\\{#if\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/if\\}\\}/g, (match, key, content) => {\n    return data[key] ? content : '';\n  });\n  \n  // Handle inverted conditionals: {{#unless variable}}...{{/unless}}\n  rendered = rendered.replace(/\\{\\{#unless\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/unless\\}\\}/g, (match, key, content) => {\n    return !data[key] ? content : '';\n  });\n  \n  return rendered;\n};\n\n// Render the template\nconst htmlBody = renderTemplate(templateHtml, templateData);\n\n// Generate plain text version (simple HTML stripping)\nconst textBody = htmlBody\n  .replace(/<style[^>]*>.*?<\\/style>/gs, '')\n  .replace(/<script[^>]*>.*?<\\/script>/gs, '')\n  .replace(/<[^>]+>/g, '')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&amp;/g, '&')\n  .replace(/\\n\\s*\\n/g, '\\n\\n')\n  .trim();\n\nreturn {\n  ...data,\n  html_body: htmlBody,\n  text_body: textBody\n};\n"
+      },
+      "id": "render-template",
+      "name": "Render Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_email }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html_body }}",
+        "options": {
+          "fromName": "={{ $json.from_name }}",
+          "replyTo": "={{ $json.reply_to }}",
+          "ccEmail": "",
+          "bccEmail": "",
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "send-email-smtp",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1050, 300],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP - E2 Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_logs (\n  recipient_email,\n  recipient_name,\n  subject,\n  template_used,\n  status,\n  sent_at,\n  metadata\n) VALUES ($1, $2, $3, $4, $5, NOW(), $6)",
+        "additionalFields": {
+          "queryParameters": "={{ $json.to }},={{ $json.template_data.name }},={{ $json.subject }},={{ $json.template }},sent,={{ JSON.stringify({ template_data: $json.template_data }) }}"
+        }
+      },
+      "id": "log-email-sent",
+      "name": "Log Email Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return success response\nconst input = $input.first().json;\n\nreturn {\n  success: true,\n  message: 'Email sent successfully',\n  recipient: input.to,\n  subject: input.subject,\n  template: input.template,\n  sent_at: new Date().toISOString()\n};\n"
+      },
+      "id": "return-success",
+      "name": "Return Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ $json.error }}",
+        "options": {}
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [850, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_logs (\n  recipient_email,\n  recipient_name,\n  subject,\n  template_used,\n  status,\n  sent_at,\n  error_message,\n  metadata\n) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)",
+        "additionalFields": {
+          "queryParameters": "={{ $('Prepare Email Data').item.json.to }},={{ $('Prepare Email Data').item.json.template_data.name }},={{ $('Prepare Email Data').item.json.subject }},={{ $('Prepare Email Data').item.json.template }},failed,={{ $json.message }},={{ JSON.stringify({ error: $json.message }) }}"
+        }
+      },
+      "id": "log-email-error",
+      "name": "Log Email Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1050, 500],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Data": {
+      "main": [
+        [
+          {
+            "node": "Read Template File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Template File": {
+      "main": [
+        [
+          {
+            "node": "Render Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Template": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Log Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "errorWorkflow": "error-handler"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "7"
+}

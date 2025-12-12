@@ -1,0 +1,93 @@
+# ============================================================================
+# E2 Soluções Bot - Docker Compose DEVELOPMENT
+# ============================================================================
+#
+# Configuração minimalista para desenvolvimento local do Sprint 1.1
+#
+# Uso:
+#   docker-compose -f docker/docker-compose-dev.yml up -d
+#   docker-compose -f docker/docker-compose-dev.yml down
+#
+# Acesso:
+#   n8n: http://localhost:5678 (sem autenticação)
+#
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # n8n - Workflow Automation (Sprint 1.1)
+  # ============================================================================
+  n8n-dev:
+    image: n8nio/n8n:latest
+    container_name: e2bot-n8n-dev
+    restart: unless-stopped
+
+    ports:
+      - "5678:5678"
+
+    environment:
+      # === Development Configuration ===
+      - NODE_ENV=development
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_HOST=localhost
+
+      # === No Authentication (Dev Only) ===
+      - N8N_BASIC_AUTH_ACTIVE=false
+
+      # === Webhooks ===
+      - WEBHOOK_URL=http://localhost:5678/
+
+      # === Timezone ===
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+
+      # === Logging ===
+      - N8N_LOG_LEVEL=debug
+      - N8N_LOG_OUTPUT=console
+
+      # === Sprint 1.1 Credentials (do .env) ===
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+
+      # === Performance (Dev) ===
+      - N8N_PAYLOAD_SIZE_MAX=16
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
+
+    volumes:
+      # Dados persistentes do n8n
+      - n8n_dev_data:/home/node/.n8n
+
+      # Workflows (read-only para preservar originais)
+      - ../n8n/workflows:/workflows:ro
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - e2bot-dev
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  n8n_dev_data:
+    driver: local
+    name: e2bot_n8n_dev_data
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  e2bot-dev:
+    driver: bridge
+    name: e2bot-dev-network

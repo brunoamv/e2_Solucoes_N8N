@@ -1,0 +1,334 @@
+{
+  "name": "10 - Handoff to Human",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract handoff request data\nconst input = $input.first().json;\n\nconst conversationId = input.conversation_id;\nconst leadId = input.lead_id;\nconst reason = input.reason || 'general_inquiry';\nconst userMessage = input.user_message || '';\nconst urgency = input.urgency || 'normal'; // low, normal, high, urgent\n\n// Reason mapping for better categorization\nconst reasonCategories = {\n  'complex_technical': {\n    label: 'Questão Técnica Complexa',\n    icon: '🔧',\n    priority: 'high',\n    team: 'technical'\n  },\n  'pricing_negotiation': {\n    label: 'Negociação de Preço',\n    icon: '💰',\n    priority: 'high',\n    team: 'commercial'\n  },\n  'urgent_request': {\n    label: 'Solicitação Urgente',\n    icon: '🚨',\n    priority: 'urgent',\n    team: 'commercial'\n  },\n  'complaint': {\n    label: 'Reclamação/Problema',\n    icon: '⚠️',\n    priority: 'urgent',\n    team: 'support'\n  },\n  'contract_discussion': {\n    label: 'Discussão Contratual',\n    icon: '📄',\n    priority: 'high',\n    team: 'commercial'\n  },\n  'general_inquiry': {\n    label: 'Consulta Geral',\n    icon: 'ℹ️',\n    priority: 'normal',\n    team: 'commercial'\n  },\n  'user_requested': {\n    label: 'Cliente Solicitou Atendente',\n    icon: '👤',\n    priority: 'high',\n    team: 'commercial'\n  }\n};\n\nconst category = reasonCategories[reason] || reasonCategories['general_inquiry'];\n\n// Override priority if urgency is explicitly set\nif (urgency !== 'normal') {\n  category.priority = urgency;\n}\n\nreturn {\n  conversation_id: conversationId,\n  lead_id: leadId,\n  reason: reason,\n  reason_label: category.label,\n  reason_icon: category.icon,\n  priority: category.priority,\n  team: category.team,\n  user_message: userMessage,\n  handoff_timestamp: new Date().toISOString()\n};\n"
+      },
+      "id": "prepare-handoff-data",
+      "name": "Prepare Handoff Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.*, l.name, l.email, l.phone_number, l.service_type, l.status as lead_status\nFROM conversations c\nLEFT JOIN leads l ON l.conversation_id = c.id\nWHERE c.id = $1",
+        "additionalFields": {
+          "queryParameters": "={{ $json.conversation_id }}"
+        }
+      },
+      "id": "get-conversation-context",
+      "name": "Get Conversation Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversations\nSET handoff_requested = true,\n    handoff_reason = $1,\n    handoff_timestamp = NOW(),\n    bot_active = false,\n    updated_at = NOW()\nWHERE id = $2",
+        "additionalFields": {
+          "queryParameters": "={{ $('Prepare Handoff Data').item.json.reason }},={{ $('Prepare Handoff Data').item.json.conversation_id }}"
+        }
+      },
+      "id": "mark-handoff-requested",
+      "name": "Mark Handoff Requested",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build handoff notification for team\nconst handoff = $('Prepare Handoff Data').first().json;\nconst context = $('Get Conversation Context').first().json;\n\nconst serviceNames = {\n  'energia_solar': 'Energia Solar',\n  'subestacao': 'Subestação',\n  'projeto_eletrico': 'Projeto Elétrico',\n  'armazenamento_energia': 'Armazenamento de Energia (BESS)',\n  'analise_laudo': 'Análise e Laudos Técnicos'\n};\n\nconst serviceName = serviceNames[context.service_type] || 'Não especificado';\n\n// Build WhatsApp notification for internal team\nconst teamNotification = `🔔 *NOVO ATENDIMENTO HUMANO SOLICITADO*\\n\\n` +\n  `${handoff.reason_icon} *Motivo*: ${handoff.reason_label}\\n` +\n  `⚡ *Prioridade*: ${handoff.priority.toUpperCase()}\\n` +\n  `👤 *Cliente*: ${context.name || context.whatsapp_name}\\n` +\n  `📱 *Telefone*: ${context.phone_number}\\n` +\n  `🔧 *Serviço*: ${serviceName}\\n` +\n  `📊 *Status Lead*: ${context.lead_status || 'novo'}\\n\\n` +\n  `💬 *Última Mensagem do Cliente*:\\n\"${handoff.user_message.substring(0, 200)}${handoff.user_message.length > 200 ? '...' : ''}\"\\n\\n` +\n  `---\\n` +\n  `🔗 Link WhatsApp: https://wa.me/${context.phone_number.replace(/\\\\D/g, '')}\\n` +\n  (context.rdstation_deal_id ? `💼 RD Station: ${process.env.RDSTATION_URL}/deals/${context.rdstation_deal_id}\\n` : '') +\n  `⏰ ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;\n\n// Build customer notification\nconst customerNotification = `${handoff.reason_icon} Entendi!\\n\\n` +\n  `Vou transferir você para um especialista da nossa equipe comercial.\\n\\n` +\n  `⏰ *Tempo de espera estimado*:\\n` +\n  (handoff.priority === 'urgent' ? '• Imediato (atendimento prioritário)\\n' :\n   handoff.priority === 'high' ? '• Até 30 minutos\\n' :\n   '• Até 2 horas úteis\\n') +\n  `\\n📞 *Horário de atendimento*:\\nSegunda a Sexta, 8h às 18h\\n\\n` +\n  `Enquanto isso, você pode continuar enviando suas dúvidas que nosso especialista verá assim que assumir o atendimento!\\n\\n` +\n  `Obrigado pela compreensão! 🙏`;\n\n// Determine team contact based on priority and reason\nconst teamContacts = {\n  commercial: process.env.COMMERCIAL_TEAM_GROUP || process.env.COMMERCIAL_TEAM_PHONE,\n  technical: process.env.TECHNICAL_TEAM_PHONE || process.env.COMMERCIAL_TEAM_PHONE,\n  support: process.env.SUPPORT_TEAM_PHONE || process.env.COMMERCIAL_TEAM_PHONE\n};\n\nconst targetTeamPhone = teamContacts[handoff.team] || teamContacts.commercial;\n\nreturn {\n  ...handoff,\n  customer_phone: context.phone_number,\n  customer_name: context.name || context.whatsapp_name,\n  team_phone: targetTeamPhone,\n  team_notification: teamNotification,\n  customer_notification: customerNotification,\n  context: context\n};\n"
+      },
+      "id": "build-notifications",
+      "name": "Build Notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.customer_phone }}\",\n  \"text\": \"{{ $json.customer_notification }}\"\n}"
+      },
+      "id": "notify-customer",
+      "name": "Notify Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.team_phone }}\",\n  \"text\": \"{{ $json.team_notification }}\"\n}"
+      },
+      "id": "notify-team",
+      "name": "Notify Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "combineOperation": "any"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Build Notifications').item.json.context.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-has-email",
+      "name": "Check Has Email",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.SMTP_FROM_EMAIL }}",
+        "toEmail": "={{ $env.COMMERCIAL_TEAM_EMAIL }}",
+        "subject": "=🔔 Atendimento Humano: {{ $('Build Notifications').item.json.reason_label }} - {{ $('Build Notifications').item.json.customer_name }}",
+        "emailFormat": "text",
+        "text": "=ATENDIMENTO HUMANO SOLICITADO\\n\\n{{ $('Build Notifications').item.json.team_notification }}",
+        "options": {
+          "fromName": "E2 Bot - Sistema de Notificações"
+        }
+      },
+      "id": "send-email-to-team",
+      "name": "Send Email to Team",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1650, 300],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP - E2 Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO handoff_logs (\n  conversation_id,\n  lead_id,\n  reason,\n  priority,\n  team,\n  user_message,\n  handoff_timestamp,\n  status\n) VALUES ($1, $2, $3, $4, $5, $6, NOW(), 'pending')",
+        "additionalFields": {
+          "queryParameters": "={{ $json.conversation_id }},={{ $json.lead_id }},={{ $json.reason }},={{ $json.priority }},={{ $json.team }},={{ $json.user_message }}"
+        }
+      },
+      "id": "log-handoff",
+      "name": "Log Handoff",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return handoff success response\nconst handoff = $input.first().json;\n\nreturn {\n  success: true,\n  handoff_requested: true,\n  conversation_id: handoff.conversation_id,\n  lead_id: handoff.lead_id,\n  reason: handoff.reason,\n  priority: handoff.priority,\n  team: handoff.team,\n  message: 'Handoff solicitado com sucesso. Equipe notificada.'\n};\n"
+      },
+      "id": "return-success",
+      "name": "Return Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 300]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Handoff Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Handoff Data": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Context": {
+      "main": [
+        [
+          {
+            "node": "Mark Handoff Requested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Handoff Requested": {
+      "main": [
+        [
+          {
+            "node": "Build Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notifications": {
+      "main": [
+        [
+          {
+            "node": "Notify Customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Team",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Has Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Customer": {
+      "main": [
+        [
+          {
+            "node": "Log Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Team": {
+      "main": [
+        [
+          {
+            "node": "Log Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Has Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email to Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email to Team": {
+      "main": [
+        [
+          {
+            "node": "Log Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Handoff": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "10"
+}

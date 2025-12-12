@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bem-vindo à E2 Soluções</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e3a8a;
+            margin-bottom: 20px;
+        }
+        .service-box {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .service-box h3 {
+            margin: 0 0 10px;
+            color: #1e3a8a;
+            font-size: 18px;
+        }
+        .service-box p {
+            margin: 0;
+            color: #4b5563;
+        }
+        .next-steps {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .next-steps h3 {
+            margin: 0 0 10px;
+            color: #92400e;
+            font-size: 16px;
+        }
+        .next-steps ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .next-steps li {
+            color: #78350f;
+            margin: 5px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #3b82f6;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .cta-button:hover {
+            background-color: #2563eb;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .contact-info {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9fafb;
+            border-radius: 4px;
+        }
+        .contact-info p {
+            margin: 5px 0;
+            color: #4b5563;
+        }
+        .icon {
+            display: inline-block;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Bem-vindo à E2 Soluções!</h1>
+            <p>Energia e Engenharia Elétrica de Excelência</p>
+        </div>
+
+        <div class="content">
+            <p class="greeting">Olá {{name}},</p>
+
+            <p>É um prazer receber seu contato! Agradecemos o interesse em nossos serviços de <strong>{{service_name}}</strong>.</p>
+
+            <div class="service-box">
+                <h3>📋 Sobre o Serviço Solicitado</h3>
+                <p><strong>Serviço:</strong> {{service_name}}</p>
+                {{#if phone}}
+                <p><strong>Telefone de Contato:</strong> {{phone}}</p>
+                {{/if}}
+            </div>
+
+            <div class="next-steps">
+                <h3>🚀 Próximos Passos</h3>
+                <p>Nossa equipe comercial está analisando seu pedido e em breve entraremos em contato para:</p>
+                <ul>
+                    <li>Entender melhor suas necessidades</li>
+                    <li>Apresentar soluções personalizadas</li>
+                    <li>Agendar uma visita técnica (se necessário)</li>
+                    <li>Elaborar uma proposta comercial</li>
+                </ul>
+            </div>
+
+            <p>Enquanto isso, você pode conhecer mais sobre nossos serviços e cases de sucesso em nosso site.</p>
+
+            <center>
+                <a href="https://www.e2solucoes.com.br" class="cta-button">Conhecer a E2 Soluções</a>
+            </center>
+
+            <div class="contact-info">
+                <h3 style="margin-top: 0; color: #1e3a8a;">📞 Contato Direto</h3>
+                <p><span class="icon">📱</span> WhatsApp: (62) 99999-9999</p>
+                <p><span class="icon">📧</span> Email: atendimento@e2solucoes.com.br</p>
+                <p><span class="icon">🕐</span> Horário: Segunda a Sexta, 8h às 18h</p>
+            </div>
+
+            <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
+                <strong>Dúvidas?</strong> Responda este email ou entre em contato pelo WhatsApp. Estamos à disposição!
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>E2 Soluções - Energia e Engenharia Elétrica</strong></p>
+            <p>Goiânia - GO | CREA-GO: 123456</p>
+            <p style="font-size: 12px; margin-top: 10px;">
+                © 2024 E2 Soluções. Todos os direitos reservados.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,435 @@
+{
+  "name": "08 - RD Station Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT l.*, c.phone_number, c.whatsapp_name FROM leads l JOIN conversations c ON c.id = l.conversation_id WHERE l.rdstation_contact_id IS NULL OR l.rdstation_last_sync < l.updated_at ORDER BY l.created_at DESC LIMIT 10"
+      },
+      "id": "get-pending-leads",
+      "name": "Get Pending Leads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "has-pending-leads",
+      "name": "Has Pending Leads?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.rdstation_contact_id }}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      },
+      "id": "contact-exists",
+      "name": "Contact Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RDSTATION_API_URL }}/contacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "rdStationCrmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Get Access Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $json.name }}\",\n  \"emails\": [{\"email\": \"{{ $json.email }}\"}],\n  \"phones\": [{\"phone\": \"{{ $json.phone_number }}\"}],\n  \"custom_fields\": {\n    \"cf_endereco\": \"{{ $json.address }}\",\n    \"cf_cidade\": \"{{ $json.city }}\",\n    \"cf_estado\": \"{{ $json.state }}\",\n    \"cf_origem\": \"Bot WhatsApp\"\n  }\n}"
+      },
+      "id": "create-rd-contact",
+      "name": "Create RD Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 100]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.RDSTATION_API_URL }}/contacts/{{ $json.rdstation_contact_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "rdStationCrmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Get Access Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $json.name }}\",\n  \"emails\": [{\"email\": \"{{ $json.email }}\"}],\n  \"phones\": [{\"phone\": \"{{ $json.phone_number }}\"}],\n  \"custom_fields\": {\n    \"cf_endereco\": \"{{ $json.address }}\",\n    \"cf_cidade\": \"{{ $json.city }}\",\n    \"cf_estado\": \"{{ $json.state }}\"\n  }\n}"
+      },
+      "id": "update-rd-contact",
+      "name": "Update RD Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map service type to RD Station custom fields\nconst lead = $input.first().json;\nconst serviceData = lead.service_data || {};\n\nconst dealData = {\n  name: `${lead.service_type} - ${lead.name}`,\n  contact_id: lead.rdstation_contact_id || $('Create RD Contact').first().json.id,\n  deal_stage_id: $env.RDSTATION_STAGE_NOVO_LEAD,\n  deal_source_id: $env.RDSTATION_SOURCE_BOT,\n  custom_fields: {}\n};\n\n// Map service-specific fields\nswitch(lead.service_type) {\n  case 'energia_solar':\n    dealData.custom_fields.cf_servico = 'Energia Solar';\n    dealData.custom_fields.cf_consumo_kwh = serviceData.consumo_kwh;\n    dealData.custom_fields.cf_potencia_kwp = serviceData.potencia_kwp;\n    dealData.custom_fields.cf_segmento = serviceData.segmento;\n    break;\n  case 'subestacao':\n    dealData.custom_fields.cf_servico = 'Subestação';\n    dealData.custom_fields.cf_tensao = serviceData.tensao;\n    dealData.custom_fields.cf_tipo_servico = serviceData.tipo_servico;\n    break;\n  case 'projeto_eletrico':\n    dealData.custom_fields.cf_servico = 'Projeto Elétrico';\n    dealData.custom_fields.cf_servico_subtipo = serviceData.tipo_projeto;\n    break;\n  case 'armazenamento_energia':\n    dealData.custom_fields.cf_servico = 'Armazenamento de Energia (BESS)';\n    dealData.custom_fields.cf_possui_solar = serviceData.possui_solar;\n    dealData.custom_fields.cf_consumo_kwh = serviceData.consumo_kwh;\n    break;\n  case 'analise_laudo':\n    dealData.custom_fields.cf_servico = 'Análise e Laudo';\n    dealData.custom_fields.cf_tipo_analise = serviceData.tipo_analise;\n    break;\n}\n\nreturn dealData;"
+      },
+      "id": "prepare-deal-data",
+      "name": "Prepare Deal Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Get Pending Leads').item.json.rdstation_deal_id }}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      },
+      "id": "deal-exists",
+      "name": "Deal Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RDSTATION_API_URL }}/deals",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "rdStationCrmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Get Access Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "create-rd-deal",
+      "name": "Create RD Deal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1650, 100]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.RDSTATION_API_URL }}/deals/{{ $('Get Pending Leads').item.json.rdstation_deal_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "rdStationCrmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $('Get Access Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "update-rd-deal",
+      "name": "Update RD Deal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads SET rdstation_contact_id = $1, rdstation_deal_id = $2, rdstation_last_sync = NOW() WHERE id = $3",
+        "additionalFields": {
+          "queryParameters": "={{ $json.contact_id }},={{ $json.deal_id }},={{ $('Get Pending Leads').item.json.id }}"
+        }
+      },
+      "id": "update-lead-sync",
+      "name": "Update Lead Sync",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1850, 200],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "rdstation_sync_log",
+        "columns": "entity_type, entity_id, operation, rdstation_id, sync_status, error_message",
+        "additionalFields": {
+          "values": "'{{ $json.entity_type }}', '{{ $json.entity_id }}', '{{ $json.operation }}', '{{ $json.rdstation_id }}', '{{ $json.status }}', '{{ $json.error }}'"
+        }
+      },
+      "id": "log-sync-result",
+      "name": "Log Sync Result",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2050, 200],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.rd.services/auth/token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"client_id\": \"{{ $env.RDSTATION_CLIENT_ID }}\",\n  \"client_secret\": \"{{ $env.RDSTATION_CLIENT_SECRET }}\",\n  \"refresh_token\": \"{{ $env.RDSTATION_REFRESH_TOKEN }}\"\n}"
+      },
+      "id": "get-access-token",
+      "name": "Get Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 100]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Access Token": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Leads": {
+      "main": [
+        [
+          {
+            "node": "Has Pending Leads?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Pending Leads?": {
+      "main": [
+        [
+          {
+            "node": "Contact Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Exists?": {
+      "main": [
+        [
+          {
+            "node": "Create RD Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update RD Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create RD Contact": {
+      "main": [
+        [
+          {
+            "node": "Prepare Deal Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update RD Contact": {
+      "main": [
+        [
+          {
+            "node": "Prepare Deal Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Deal Data": {
+      "main": [
+        [
+          {
+            "node": "Deal Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal Exists?": {
+      "main": [
+        [
+          {
+            "node": "Create RD Deal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update RD Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create RD Deal": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update RD Deal": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Sync": {
+      "main": [
+        [
+          {
+            "node": "Log Sync Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "8"
+}

@@ -1,0 +1,316 @@
+{
+  "name": "06 - Appointment Reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT a.*, l.name, l.email, c.phone_number, c.whatsapp_name, l.service_type\nFROM appointments a\nJOIN leads l ON l.id = a.lead_id\nJOIN conversations c ON c.id = l.conversation_id\nWHERE a.status = 'confirmed'\nAND a.scheduled_date > NOW()\nAND (\n  -- 24h reminder not sent and appointment is 24-26h away\n  (a.reminder_24h_sent = false AND a.scheduled_date BETWEEN NOW() + INTERVAL '24 hours' AND NOW() + INTERVAL '26 hours')\n  OR\n  -- 2h reminder not sent and appointment is 2-2.5h away\n  (a.reminder_2h_sent = false AND a.scheduled_date BETWEEN NOW() + INTERVAL '2 hours' AND NOW() + INTERVAL '150 minutes')\n)",
+        "additionalFields": {}
+      },
+      "id": "get-pending-reminders",
+      "name": "Get Pending Reminders",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "combineOperation": "any"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-has-reminders",
+      "name": "Check Has Reminders",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine reminder type and build message for each appointment\nconst items = $input.all();\nconst processedReminders = [];\n\nfor (const item of items) {\n  const appointment = item.json;\n  const now = new Date();\n  const scheduledDate = new Date(appointment.scheduled_date);\n  const hoursUntil = (scheduledDate - now) / (1000 * 60 * 60);\n  \n  let reminderType;\n  let updateField;\n  \n  // Determine which reminder to send\n  if (hoursUntil >= 23 && hoursUntil <= 26 && !appointment.reminder_24h_sent) {\n    reminderType = '24h';\n    updateField = 'reminder_24h_sent';\n  } else if (hoursUntil >= 2 && hoursUntil <= 2.5 && !appointment.reminder_2h_sent) {\n    reminderType = '2h';\n    updateField = 'reminder_2h_sent';\n  } else {\n    continue; // Skip if doesn't match criteria\n  }\n  \n  // Format date and time for Brazilian format\n  const dateOptions = { \n    weekday: 'long', \n    year: 'numeric', \n    month: 'long', \n    day: 'numeric',\n    timeZone: 'America/Sao_Paulo'\n  };\n  const timeOptions = { \n    hour: '2-digit', \n    minute: '2-digit',\n    timeZone: 'America/Sao_Paulo'\n  };\n  \n  const formattedDate = scheduledDate.toLocaleDateString('pt-BR', dateOptions);\n  const formattedTime = scheduledDate.toLocaleTimeString('pt-BR', timeOptions);\n  \n  // Service name mapping\n  const serviceNames = {\n    'energia_solar': 'Energia Solar',\n    'subestacao': 'Subestação',\n    'projeto_eletrico': 'Projeto Elétrico',\n    'armazenamento_energia': 'Armazenamento de Energia (BESS)',\n    'analise_laudo': 'Análise e Laudos Técnicos'\n  };\n  \n  const serviceName = serviceNames[appointment.service_type] || 'Serviço E2';\n  \n  // Build WhatsApp message based on reminder type\n  let whatsappMessage;\n  \n  if (reminderType === '24h') {\n    whatsappMessage = `🔔 *LEMBRETE - Visita Técnica E2 Soluções*\\n\\n` +\n      `Olá ${appointment.whatsapp_name || appointment.name}!\\n\\n` +\n      `Este é um lembrete que sua visita técnica está agendada para *amanhã*:\\n\\n` +\n      `📅 *Data*: ${formattedDate}\\n` +\n      `⏰ *Horário*: ${formattedTime}\\n` +\n      `🔧 *Serviço*: ${serviceName}\\n` +\n      `📍 *Local*: ${appointment.address || 'Endereço cadastrado'}\\n\\n` +\n      `Nossa equipe técnica estará presente no horário agendado.\\n\\n` +\n      `Precisa reagendar ou tem alguma dúvida? Responda esta mensagem!\\n\\n` +\n      `---\\n` +\n      `E2 Soluções - Energia e Engenharia Elétrica\\n` +\n      `📞 Contato: (62) 99999-9999`;\n  } else {\n    whatsappMessage = `⏰ *LEMBRETE URGENTE - Visita em 2 horas*\\n\\n` +\n      `Olá ${appointment.whatsapp_name || appointment.name}!\\n\\n` +\n      `Sua visita técnica da E2 Soluções está próxima:\\n\\n` +\n      `⏰ *Horário*: ${formattedTime} (em aproximadamente 2 horas)\\n` +\n      `🔧 *Serviço*: ${serviceName}\\n` +\n      `📍 *Local*: ${appointment.address || 'Endereço cadastrado'}\\n\\n` +\n      `Por favor, confirme se está tudo certo para a visita!\\n\\n` +\n      `Caso precise entrar em contato urgente: (62) 99999-9999\\n\\n` +\n      `Até breve! 👷\\u200d♂️`;\n  }\n  \n  // Build email subject and preview\n  const emailSubject = reminderType === '24h' \n    ? `Lembrete: Visita Técnica E2 amanhã (${formattedDate})`\n    : `URGENTE: Visita Técnica E2 em 2 horas (${formattedTime})`;\n  \n  processedReminders.push({\n    appointment_id: appointment.id,\n    lead_id: appointment.lead_id,\n    conversation_id: appointment.conversation_id,\n    reminder_type: reminderType,\n    update_field: updateField,\n    \n    // Contact info\n    phone_number: appointment.phone_number,\n    email: appointment.email,\n    name: appointment.name,\n    whatsapp_name: appointment.whatsapp_name,\n    \n    // Appointment details\n    scheduled_date: appointment.scheduled_date,\n    formatted_date: formattedDate,\n    formatted_time: formattedTime,\n    service_type: appointment.service_type,\n    service_name: serviceName,\n    address: appointment.address,\n    google_event_id: appointment.google_event_id,\n    \n    // Messages\n    whatsapp_message: whatsappMessage,\n    email_subject: emailSubject,\n    email_template: reminderType === '24h' ? 'lembrete_24h' : 'lembrete_2h'\n  });\n}\n\nreturn processedReminders;\n"
+      },
+      "id": "process-reminders",
+      "name": "Process Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.phone_number }}\",\n  \"text\": \"{{ $json.whatsapp_message }}\"\n}"
+      },
+      "id": "send-whatsapp-reminder",
+      "name": "Send WhatsApp Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "combineOperation": "all"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "@",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-has-email",
+      "name": "Check Has Email",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "7",
+        "options": {}
+      },
+      "id": "send-email-reminder",
+      "name": "Send Email Reminder",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE appointments\nSET {{ $json.update_field }} = true,\n    updated_at = NOW()\nWHERE id = $1",
+        "additionalFields": {
+          "queryParameters": "={{ $json.appointment_id }}"
+        }
+      },
+      "id": "mark-reminder-sent",
+      "name": "Mark Reminder Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 200],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO reminder_logs (\n  appointment_id,\n  reminder_type,\n  channel,\n  status,\n  sent_at,\n  message_preview\n) VALUES ($1, $2, $3, $4, NOW(), $5)",
+        "additionalFields": {
+          "queryParameters": "={{ $json.appointment_id }},={{ $json.reminder_type }},whatsapp,sent,={{ $json.whatsapp_message.substring(0, 100) }}"
+        }
+      },
+      "id": "log-whatsapp-reminder",
+      "name": "Log WhatsApp Reminder",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO reminder_logs (\n  appointment_id,\n  reminder_type,\n  channel,\n  status,\n  sent_at,\n  message_preview\n) VALUES ($1, $2, $3, $4, NOW(), $5)",
+        "additionalFields": {
+          "queryParameters": "={{ $json.appointment_id }},={{ $json.reminder_type }},email,sent,={{ $json.email_subject }}"
+        }
+      },
+      "id": "log-email-reminder",
+      "name": "Log Email Reminder",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Reminders": {
+      "main": [
+        [
+          {
+            "node": "Check Has Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Has Reminders": {
+      "main": [
+        [
+          {
+            "node": "Process Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Reminders": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reminder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Has Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Reminder": {
+      "main": [
+        [
+          {
+            "node": "Log WhatsApp Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Has Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Reminder": {
+      "main": [
+        [
+          {
+            "node": "Log Email Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log WhatsApp Reminder": {
+      "main": [
+        [
+          {
+            "node": "Mark Reminder Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Email Reminder": {
+      "main": [
+        [
+          {
+            "node": "Mark Reminder Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "6"
+}
