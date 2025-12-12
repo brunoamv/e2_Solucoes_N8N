@@ -72,3 +72,6 @@ test-data/
 
 # Claude docs (generated documentation)
 claudedocs/
+
+# Serena MCP (parent directory config)
+../.serena/
