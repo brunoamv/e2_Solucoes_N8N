@@ -1,0 +1,16 @@
+✅ *Dados confirmados!*
+
+👤 *Nome:* {{lead_name}}
+📱 *Telefone:* {{phone}}
+📧 *Email:* {{email}}
+📍 *Cidade:* {{city}}
+{{emoji}} *Serviço:* {{service_name}}
+
+━━━━━━━━━━━━━━━
+
+🗓️ Deseja agendar uma *visita técnica gratuita*?
+
+1️⃣ Sim, quero agendar
+2️⃣ Não, prefiro falar com especialista
+
+_Digite 1 ou 2:_

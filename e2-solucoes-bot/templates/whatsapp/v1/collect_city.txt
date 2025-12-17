@@ -1,0 +1,3 @@
+📍 *Em qual cidade você está?*
+
+_Exemplo: Goiânia_

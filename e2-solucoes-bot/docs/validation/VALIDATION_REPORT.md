@@ -147,7 +147,7 @@ Validate Input (IF query_text presente)
 
 ### Documentação de Validação
 - ✅ `QUICKSTART.md` - Guia rápido de validação (~5KB)
-- ✅ `docs/validation/IMPORT_N8N_WORKFLOW.md` - Guia importação workflow (578 linhas)
+- ✅ `docs/Setups/IMPORT_N8N_WORKFLOW.md` - Guia importação workflow (578 linhas)
 - ✅ `docs/validation/IMPORT_N8N_WORKFLOW_GUIDE.md` - Guia detalhado (backup)
 - ✅ `docs/validation/VALIDATE_STRUCTURE_NO_DATA.md` - Validação estrutural (~400 linhas)
 - ✅ `VALIDATION_REPORT.md` - Este relatório
@@ -178,7 +178,7 @@ Validate Input (IF query_text presente)
    ```
 6. Ativar workflow (toggle verde)
 
-**Referência**: `docs/validation/IMPORT_N8N_WORKFLOW.md`
+**Referência**: `docs/Setups/IMPORT_N8N_WORKFLOW.md`
 
 ---
 

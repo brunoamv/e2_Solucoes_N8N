@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obrigado pela Visita - E2 Soluções</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 16px; opacity: 0.95; }
+        .content { padding: 40px 30px; }
+        .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
+        .thank-you-box { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 5px solid #4caf50; padding: 25px; margin: 25px 0; border-radius: 8px; text-align: center; }
+        .thank-you-box h2 { color: #2e7d32; font-size: 24px; margin-bottom: 15px; }
+        .thank-you-box p { font-size: 16px; color: #555; line-height: 1.6; }
+        .visit-summary { background-color: #f8f9fa; padding: 20px; margin: 25px 0; border-radius: 5px; border-left: 4px solid #4caf50; }
+        .visit-summary h3 { color: #2e7d32; margin-bottom: 15px; }
+        .info-row { margin: 12px 0; color: #555; }
+        .next-steps { background-color: #fff3e0; border-left: 5px solid #ff9800; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        .next-steps h3 { color: #e65100; margin-bottom: 15px; }
+        .next-steps ul { padding-left: 20px; color: #666; line-height: 1.8; }
+        .feedback-box { background-color: #e3f2fd; border-left: 5px solid #2196f3; padding: 25px; margin: 25px 0; border-radius: 5px; text-align: center; }
+        .feedback-box h3 { color: #1565c0; margin-bottom: 15px; }
+        .rating { font-size: 32px; margin: 15px 0; }
+        .cta-buttons { text-align: center; margin: 30px 0; }
+        .cta-button { display: inline-block; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 10px 5px; }
+        .btn-feedback { background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%); color: white; }
+        .btn-proposal { background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; }
+        .footer { background-color: #2c3e50; color: #ecf0f1; padding: 30px; text-align: center; font-size: 14px; }
+        .footer a { color: #4caf50; text-decoration: none; }
+        @media only screen and (max-width: 600px) {
+            .content { padding: 20px 15px; }
+            .cta-button { display: block; margin: 10px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Obrigado pela Confiança!</h1>
+            <p>Sua visita técnica foi concluída</p>
+        </div>
+
+        <div class="content">
+            <p class="greeting">Olá <strong>{{ $json.lead_name }}</strong>,</p>
+
+            <div class="thank-you-box">
+                <h2>✅ Visita Realizada com Sucesso</h2>
+                <p>
+                    Agradecemos por nos receber! Foi um prazer conhecer suas necessidades e
+                    poder apresentar as soluções que a E2 Soluções pode oferecer para você.
+                </p>
+            </div>
+
+            <div class="visit-summary">
+                <h3>📋 Resumo da Visita</h3>
+                <div class="info-row">
+                    <strong>📅 Data:</strong> {{ $json.appointment_date }}
+                </div>
+                <div class="info-row">
+                    <strong>🔧 Serviço Avaliado:</strong> {{ $json.service_name }}
+                </div>
+                <div class="info-row">
+                    <strong>👷 Técnico Responsável:</strong> {{ $json.technician_name || 'A definir' }}
+                </div>
+                <div class="info-row">
+                    <strong>📍 Local:</strong> {{ $json.address }}, {{ $json.city }}/{{ $json.state }}
+                </div>
+            </div>
+
+            <div class="next-steps">
+                <h3>📌 Próximos Passos</h3>
+                <ul>
+                    <li><strong>Proposta Comercial:</strong> Será enviada em até 24-48 horas úteis</li>
+                    <li><strong>Análise Técnica:</strong> Revisão completa dos dados coletados</li>
+                    <li><strong>Projeto Detalhado:</strong> Dimensionamento e especificações técnicas</li>
+                    <li><strong>Orçamento:</strong> Valores, prazos e condições de pagamento</li>
+                    <li><strong>Atendimento Comercial:</strong> Nossa equipe entrará em contato</li>
+                </ul>
+            </div>
+
+            <div class="feedback-box">
+                <h3>⭐ Sua Opinião é Muito Importante!</h3>
+                <p>Como foi sua experiência com nossa equipe técnica?</p>
+                <div class="rating">⭐⭐⭐⭐⭐</div>
+                <p style="color: #666; margin-top: 10px;">
+                    Clique abaixo para avaliar nosso atendimento
+                </p>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="{{FEEDBACK_URL}}" class="cta-button btn-feedback">
+                    💬 Avaliar Atendimento
+                </a>
+                <a href="{{PROPOSAL_URL}}" class="cta-button btn-proposal">
+                    📄 Acompanhar Proposta
+                </a>
+            </div>
+
+            <div style="background-color: #f1f8e9; border-left: 4px solid #8bc34a; padding: 20px; margin: 25px 0; border-radius: 5px;">
+                <strong style="color: #558b2f;">💡 Dúvidas sobre a proposta?</strong>
+                <p style="color: #666; margin-top: 10px;">
+                    Nossa equipe comercial está à disposição para esclarecer qualquer ponto
+                    e ajustar a solução às suas necessidades específicas.
+                </p>
+            </div>
+
+            <p style="margin-top: 30px; color: #666; text-align: center;">
+                <strong>Agradecemos pela oportunidade de atendê-lo!</strong><br>
+                Estamos à disposição via WhatsApp, email ou telefone.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>E2 Soluções</strong></p>
+            <p>Energia e Elétrica com Inteligência</p>
+            <p style="margin-top: 15px;">
+                📱 WhatsApp: (62) 3092-2900<br>
+                📧 Email: contato@e2solucoes.com<br>
+                🌐 Site: <a href="https://www.e2solucoes.com">https://www.e2solucoes.com</a>
+            </p>
+            <div style="margin-top: 15px;">
+                <a href="https://instagram.com/e2solucoes">Instagram</a> •
+                <a href="https://linkedin.com/company/e2solucoes">LinkedIn</a> •
+                <a href="https://facebook.com/e2solucoes">Facebook</a>
+            </div>
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
+                © 2025 E2 Soluções. Todos os direitos reservados.<br>
+                <a href="{{ $env.BASE_URL }}/unsubscribe?email={{ $json.email }}&token={{ $json.unsubscribe_token }}" style="color: #4caf50;">Cancelar inscrição</a> • <a href="{{ $env.BASE_URL }}/privacy" style="color: #4caf50;">Política de Privacidade (LGPD)</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

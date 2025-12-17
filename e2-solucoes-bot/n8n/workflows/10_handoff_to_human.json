@@ -73,6 +73,26 @@
     },
     {
       "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT create_notification(\n  $1,\n  NULL,\n  'discord',\n  'handoff_urgent',\n  $2,\n  'HANDOFF URGENTE - Atendimento Humano Solicitado',\n  'Cliente solicitou atendimento humano com prioridade',\n  json_build_object(\n    'lead_name', $3,\n    'phone', $4,\n    'handoff_reason', $5,\n    'priority', $6,\n    'service_type', $7,\n    'conversation_summary', $8\n  )::jsonb,\n  10,\n  NOW()\n);",
+        "additionalFields": {
+          "queryParameters": "={{ $json.lead_id }},={{ $env.DISCORD_WEBHOOK_ALERTS }},={{ $json.customer_name }},={{ $json.customer_phone }},={{ $json.reason_label }},={{ $json.priority }},={{ $json.context.service_type }},={{ $json.user_message }}"
+        }
+      },
+      "id": "create-discord-alert",
+      "name": "Create Discord Alert",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME }}",
         "sendHeaders": true,
@@ -252,6 +272,11 @@
       "main": [
         [
           {
+            "node": "Create Discord Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Notify Customer",
             "type": "main",
             "index": 0
@@ -263,6 +288,17 @@
           },
           {
             "node": "Check Has Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Discord Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Handoff",
             "type": "main",
             "index": 0
           }

@@ -1,315 +1,396 @@
 # 🤖 E2 Soluções AI Bot v3
 
-Bot de WhatsApp inteligente com Claude AI, RAG e integração completa com RD Station CRM para automação de atendimento e qualificação de leads.
+> **Status**: ✅ Sprints 1.1 e 1.2 Completos (75% Funcional) | 🧪 Aguardando Validação
+> **Última Atualização**: 2025-12-15
+
+Bot inteligente de WhatsApp com Claude AI, RAG e integração completa com RD Station CRM para automação de atendimento e qualificação de leads da E2 Soluções (empresa brasileira de engenharia elétrica).
+
+---
 
 ## ⚡ Quick Start (5 minutos)
 
 ### Pré-requisitos
-- Docker e Docker Compose instalados
-- Git
-- Conta RD Station CRM (Basic, Pro ou Advanced)
-- APIs: Anthropic Claude, Evolution API (WhatsApp)
+```bash
+✓ Docker e Docker Compose instalados
+✓ Git
+✓ Credenciais configuradas (ver docs/QUICKSTART.md)
+```
 
 ### Instalação Rápida
-
 ```bash
 # Clonar repositório
 git clone <repo-url>
 cd e2-solucoes-bot
 
-# Copiar configuração de desenvolvimento
+# Configurar ambiente de desenvolvimento
 cp docker/.env.dev.example docker/.env.dev
+nano docker/.env.dev  # Configurar API keys
 
-# Editar variáveis (API keys obrigatórias)
-nano docker/.env.dev
-
-# Iniciar ambiente de desenvolvimento
+# Iniciar ambiente
 ./scripts/start-dev.sh
 ```
 
 ### Acessar Serviços
-
 | Serviço | URL | Descrição |
 |---------|-----|-----------|
 | **n8n** | http://localhost:5678 | Workflows e configuração |
-| **Supabase Studio** | http://localhost:3000 | Interface visual do banco |
+| **Supabase Studio** | http://localhost:3000 | Interface do banco de dados |
+| **PostgreSQL** | localhost:5432 | Banco principal (e2_bot) |
 | **Traefik Dashboard** | http://localhost:8080 | Status dos serviços |
-| **Mailhog** | http://localhost:8025 | Emails de teste |
-| **PostgreSQL** | localhost:5432 | Banco de dados principal |
 
-## 🏗️ Arquitetura do Sistema
+📘 **Documentação Completa**: `docs/QUICKSTART.md` (guia detalhado)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     WHATSAPP (Evolution API)                │
-└───────────────────────────┬─────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                   n8n WORKFLOW ORCHESTRATOR                 │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │           🤖 CLAUDE AI AGENT (3.5 Sonnet)           │    │
-│  │  • Conversação natural em português                 │    │
-│  │  • RAG: Consulta base de conhecimento E2           │    │
-│  │  • Vision AI: Análise de fotos (conta luz, local)  │    │
-│  │  • Memória persistente de conversa                 │    │
-│  └─────────────────────────────────────────────────────┘    │
-│         ↓              ↓              ↓             ↓        │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐  ┌──────────┐  │
-│  │ Supabase │   │PostgreSQL│   │  Google  │  │RD Station│  │
-│  │  Vector  │   │  Memory  │   │ Services │  │   CRM    │  │
-│  │   RAG    │   │  + Leads │   │Cal/Drive │  │ Pipeline │  │
-│  └──────────┘   └──────────┘   └──────────┘  └──────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+---
 
-## 📋 Funcionalidades Principais
+## 🎯 O Que o Bot Faz
 
-### 🧠 IA Conversacional
-- **Entendimento Natural**: Detecta intenção sem menus rígidos
-- **RAG Integrado**: Consulta automática base de conhecimento E2
-- **Memória Persistente**: Contexto mantido entre conversas
-- **Multimodal**: Processa texto, imagens, áudio, localização
+### Funcionalidades Implementadas ✅
 
-### 🔍 Análise Inteligente
-- **Vision AI**: Analisa contas de energia, fotos de instalações
-- **Extração de Dados**: Consumo kWh, tensão, tipo de instalação
-- **Dimensionamento**: Calcula potência solar necessária (kWp)
-- **Estimativas**: Economia mensal, número de painéis
+**Conversação Inteligente**:
+- 🤖 Processamento de linguagem natural com Claude 3.5 Sonnet
+- 💬 Conversas contextualizadas sem menus rígidos
+- 🧠 Memória persistente de conversas
+- 🔍 Consulta automática à base de conhecimento (RAG)
 
-### 📅 Agendamento Automatizado
-- **Google Calendar**: Sincronização de disponibilidade
-- **Lembretes**: 24h e 2h antes da visita
-- **Gestão de Técnicos**: Alocação por especialidade
-- **Reagendamento**: Automático via chat
+**Análise Inteligente**:
+- 👁️ Vision AI: analisa fotos de contas de energia e locais de instalação
+- 📊 Extração de dados: consumo kWh, tensão, tipo de instalação
+- ⚡ Dimensionamento automático: calcula potência solar necessária (kWp)
+- 💰 Estimativas: economia mensal, número de painéis
 
-### 🔄 Integração RD Station CRM
+**Agendamento Automatizado**:
+- 📅 Integração completa com Google Calendar
+- 🔄 Verificação automática de disponibilidade
+- ⏰ Lembretes 24h e 2h antes da visita (WhatsApp + Email)
+- 📧 Confirmações por email com template profissional
+- ♻️ Sistema de reagendamento automático
 
-#### Sincronização Automática
-1. **Criar Contato** quando novo lead identificado
-2. **Criar Negociação** no pipeline configurado
-3. **Atualizar Dados** em tempo real durante coleta
-4. **Mover Etapas** conforme progresso (Novo → Qualificando → Agendado)
-5. **Criar Tarefas** para técnicos na data da visita
-6. **Registrar Notas** com análise da IA e observações
+**CRM Integrado (RD Station)**:
+- 👤 Criação automática de contatos
+- 💼 Gestão de deals no pipeline
+- 🔄 Sincronização bidirecional
+- 📝 Registro automático de notas e tarefas
+- 📊 Auditoria completa de sincronizações
 
-#### Pipeline Sugerido
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Novo Lead → Qualificando → Agendado → Proposta → Ganho     │
-│  (automático)  (bot coleta)  (visita)   (comercial) (venda) │
-└─────────────────────────────────────────────────────────────┘
-                                    ↓
-                            [Perdido] (motivo registrado)
-```
+**Notificações Multi-canal**:
+- ✉️ Emails automatizados (5 templates HTML responsivos)
+- 💬 Discord webhooks para equipe comercial
+- 📱 WhatsApp para cliente (confirmações e lembretes)
 
-## 🎯 Serviços da E2 Soluções
+### Serviços E2 Soluções (5 tipos)
 
 | Serviço | Descrição | Dados Coletados |
 |---------|-----------|-----------------|
 | ☀️ **Energia Solar** | Projetos residenciais, comerciais, industriais | Consumo kWh, fotos conta/local, interesse em bateria |
 | ⚡ **Subestação** | Reformas, manutenção, construção | Tensão, tipo de serviço, urgência, fotos |
-| 📐 **Projetos Elétricos** | Projetos e regularizações | Tipo, carga estimada, planta |
-| 🔋 **BESS (Armazenamento)** | Sistemas de baterias | Objetivo, potência necessária, possui solar |
+| 📐 **Projetos Elétricos** | Projetos e regularizações | Tipo, carga estimada, documentação |
+| 🔋 **BESS (Armazenamento)** | Sistemas de baterias | Objetivo, potência necessária, integração solar |
 | 📊 **Análise e Laudos** | Análise de consumo, qualidade, perícia | Tipo análise, histórico, descrição problema |
 
-## 🛠️ Stack Tecnológica
+---
 
-| Camada | Tecnologia | Versão |
-|--------|------------|--------|
-| **Orquestração** | n8n | latest |
-| **IA Principal** | Claude 3.5 Sonnet | 20241022 |
-| **Vision AI** | Claude Vision | 3.5 |
-| **Embeddings** | OpenAI | ada-002 |
-| **Vector DB** | Supabase + pgvector | 15.1 |
-| **Database** | PostgreSQL | 15 |
-| **CRM** | RD Station CRM | API v1 |
-| **WhatsApp** | Evolution API | - |
-| **Cache** | Redis | 7 |
-| **Gateway** | Traefik | 2.10 |
-| **Storage** | Google Drive | API v3 |
-| **Agenda** | Google Calendar | API v3 |
+## 🏗️ Arquitetura do Sistema
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  WHATSAPP (Evolution API)                   │
+└───────────────────────┬─────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────────┐
+│               n8n WORKFLOW ORCHESTRATOR                     │
+│                    (10 workflows)                           │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │         🤖 CLAUDE AI AGENT (3.5 Sonnet)             │    │
+│  │  • Conversação natural em português                 │    │
+│  │  • RAG: Base de conhecimento E2 (5 serviços)      │    │
+│  │  • Vision AI: Análise de imagens                   │    │
+│  │  • Memória persistente                             │    │
+│  └─────────────────────────────────────────────────────┘    │
+│         ↓              ↓              ↓             ↓        │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐  ┌──────────┐  │
+│  │PostgreSQL│   │ Supabase │   │  Google  │  │RD Station│  │
+│  │  State   │   │  Vector  │   │ Services │  │   CRM    │  │
+│  │ + Leads  │   │   RAG    │   │Cal+Drive │  │ Pipeline │  │
+│  └──────────┘   └──────────┘   └──────────┘  └──────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Fluxo de Dados Crítico
+1. **Recepção**: WhatsApp → Evolution API webhook → n8n workflow 01
+2. **Processamento**: Máquina de estados → Claude AI → RAG query
+3. **Coleta**: Dados estruturados por serviço → PostgreSQL
+4. **Sincronização**: Auto-criação contato + deal no RD Station
+5. **Agendamento**: Verificar disponibilidade → Criar evento → Lembretes
+6. **Notificações**: Multi-canal (WhatsApp + Email + Discord)
+
+---
+
+## 📊 Status de Implementação
+
+### ✅ Sprint 1.1 - RAG e Base de Conhecimento (100%)
+**Status**: Implementado | **Validação**: Pendente (aguarda token OpenAI)
+
+**Componentes**:
+- ✅ Base de conhecimento (5 serviços, 1.380+ linhas)
+- ✅ Script de ingestão (`scripts/ingest-knowledge.sh`, 515 linhas)
+- ✅ Funções Supabase otimizadas (221 linhas SQL)
+- ✅ Workflow n8n RAG (232 linhas JSON)
+- ✅ Documentação de validação completa
+
+📄 **Relatório**: `docs/SPRINT_1.1_COMPLETE.md`
+🧪 **Validação**: `docs/validation/README.md` (guia 5 passos)
+
+---
+
+### ✅ Sprint 1.2 - Sistema de Agendamento (100%)
+**Status**: Implementado | **Validação**: Pendente (testes end-to-end)
+
+**Componentes**:
+- ✅ Integração Google Calendar API
+- ✅ Lógica de disponibilidade e conflitos (9 funções SQL)
+- ✅ Sistema de lembretes (24h + 2h antes)
+- ✅ Sincronização RD Station CRM (bidirecional)
+- ✅ Notificações multi-canal (5 templates email)
+- ✅ Workflow de reagendamento
+- ✅ Follow-up pós-visita
+
+📄 **Planejamento**: `docs/sprints/SPRINT_1.2_PLANNING.md`
+🧪 **Validação**: `docs/validation/SPRINT_1.2_VALIDATION.md`
+
+---
 
 ## 📂 Estrutura do Projeto
 
 ```
 e2-solucoes-bot/
-├── docker/                  # Infraestrutura containerizada
-│   ├── docker-compose-dev.yml
-│   ├── docker-compose.yml
-│   └── configs/
-├── database/                # Schema e migrations
-│   ├── migrations/
-│   ├── seeds/
-│   └── schema.sql
-├── n8n/                     # Workflows n8n
-│   ├── workflows/           # 10 workflows JSON
-│   └── credentials/
-├── knowledge/               # Base de conhecimento RAG
-│   ├── servicos/            # 5 serviços E2
-│   ├── faq/
-│   └── tecnicos/
-├── docs/                    # Documentação completa
-│   ├── PLAN/
-│   ├── Setups/
-│   ├── development/
-│   └── deployment/
-├── scripts/                 # Automação
-└── templates/               # Email, Sheets, CRM
+├── CLAUDE.md                    # ⭐ Contexto otimizado para Claude Code
+├── README.md                    # Este arquivo - Overview geral
+│
+├── docker/                      # Infraestrutura containerizada
+│   ├── docker-compose-dev.yml   # Ambiente de desenvolvimento
+│   ├── .env.dev.example         # Template de configuração
+│   ├── README.md                # Documentação Docker
+│   └── configs/                 # Configurações dos serviços
+│
+├── database/                    # Schema e funções SQL
+│   ├── schema.sql               # Schema principal (6 tabelas)
+│   ├── appointment_functions.sql # 9 funções de agendamento
+│   └── supabase_functions.sql   # Funções RAG e vector search
+│
+├── n8n/workflows/               # 10 workflows n8n
+│   ├── 01_main_whatsapp_handler.json
+│   ├── 02_ai_agent_conversation.json
+│   ├── 03_rag_knowledge_query.json
+│   ├── 04_image_analysis.json
+│   ├── 05_appointment_scheduler.json
+│   ├── 06_appointment_reminders.json
+│   ├── 07_send_email.json
+│   ├── 08_rdstation_sync.json
+│   ├── 09_rdstation_webhook_handler.json
+│   └── 10_handoff_to_human.json
+│
+├── knowledge/                   # Base de conhecimento RAG
+│   └── servicos/                # 5 arquivos de serviços E2
+│       ├── energia_solar.md
+│       ├── subestacao.md
+│       ├── projetos_eletricos.md
+│       ├── armazenamento_energia.md
+│       └── analise_laudos.md
+│
+├── templates/emails/            # 5 templates HTML responsivos
+│   ├── novo_lead.html
+│   ├── confirmacao_agendamento.html
+│   ├── lembrete_24h.html
+│   ├── lembrete_2h.html
+│   └── apos_visita.html
+│
+├── scripts/                     # Scripts de automação
+│   ├── start-dev.sh             # Iniciar ambiente
+│   ├── ingest-knowledge.sh      # Gerar embeddings
+│   ├── logs.sh                  # Ver logs
+│   ├── health-check.sh          # Validar sistema
+│   └── [backup, restore, migrate]
+│
+└── docs/                        # 📚 Documentação organizada
+    ├── QUICKSTART.md            # Guia rápido
+    ├── PROJECT_STATUS.md        # Status consolidado
+    ├── SPRINT_1.1_COMPLETE.md   # Relatório Sprint 1.1
+    │
+    ├── sprints/                 # Documentação por sprint
+    │   ├── README.md            # Índice de sprints
+    │   ├── SPRINT_1.2_PLANNING.md
+    │   └── SPRINT_1.2_COMPLETE.md
+    │
+    ├── validation/              # Guias de validação
+    │   ├── README.md            # Índice validação
+    │   ├── SETUP_CREDENTIALS.md
+    │   ├── DEPLOY_SQL.md
+    │   ├── EXECUTE_INGEST.md
+    │   ├── IMPORT_N8N_WORKFLOW.md
+    │   ├── RUN_VALIDATION_TESTS.md
+    │   ├── SPRINT_1.2_VALIDATION.md
+    │   └── VALIDATION_REPORT.md
+    │
+    ├── status/                  # Relatórios de status
+    │   └── IMPLEMENTATION_STATUS.md
+    │
+    ├── Setups/                  # Guias de configuração
+    │   └── SETUP_RDSTATION.md   # RD Station CRM (462 linhas)
+    │
+    └── PLAN/                    # Planejamento e arquitetura
+        └── implementation_plan.md
 ```
 
-## 📖 Documentação Completa
+---
 
-| Seção | Conteúdo |
-|-------|----------|
-| [Planejamento](docs/PLAN/README.md) | Arquitetura, roadmap, decisões técnicas |
-| [Setup Geral](docs/Setups/README.md) | Guias configuração de todos os serviços |
-| [Setup RD Station](docs/Setups/SETUP_RDSTATION.md) | **Integração CRM detalhada** |
-| [Desenvolvimento](docs/development/README.md) | Como desenvolver e debugar |
-| [Deploy](docs/deployment/README.md) | Deploy em produção |
-| [Workflows](docs/implementation/README.md) | Detalhes dos 10 workflows |
-| [Monitoramento](docs/monitoring/README.md) | Logs, métricas, alertas |
+## 🛠️ Stack Tecnológica
 
-## 🚀 Guias de Início Rápido
+| Camada | Tecnologia | Versão | Função |
+|--------|------------|--------|--------|
+| **Orquestração** | n8n | latest | Workflow automation |
+| **IA Principal** | Claude 3.5 Sonnet | 20241022 | Conversação e análise |
+| **Vision AI** | Claude Vision | 3.5 | Análise de imagens |
+| **Embeddings** | OpenAI ada-002 | - | RAG embeddings |
+| **Vector DB** | Supabase + pgvector | 15.1 | Busca semântica |
+| **Database** | PostgreSQL | 15 | Estado e dados |
+| **CRM** | RD Station CRM | API v1 | Gestão de leads |
+| **WhatsApp** | Evolution API | - | Mensageria |
+| **Gateway** | Traefik | 2.10 | Reverse proxy |
+| **Storage** | Google Drive | API v3 | Armazenamento |
+| **Agenda** | Google Calendar | API v3 | Agendamentos |
 
-### Desenvolvedor
-```bash
-# Setup completo de desenvolvimento
-./scripts/start-dev.sh
-
-# Ver logs de todos os serviços
-./scripts/logs.sh
-
-# Rodar migrations
-./scripts/migrate.sh
-
-# Carregar base de conhecimento
-./scripts/ingest-knowledge.sh
-```
-
-### Administrador
-```bash
-# Deploy produção
-./scripts/start-prod.sh
-
-# Backup completo
-./scripts/backup.sh
-
-# Health check
-./scripts/health-check.sh
-```
+---
 
 ## 🔐 Variáveis de Ambiente Críticas
 
-**Mínimo para rodar DEV:**
+**Mínimo para DEV:**
 ```bash
-# APIs obrigatórias
-ANTHROPIC_API_KEY=sk-ant-xxx
-EVOLUTION_API_URL=https://evolution.seudominio.com.br
+# APIs Essenciais
+ANTHROPIC_API_KEY=sk-ant-xxx      # Claude AI
+OPENAI_API_KEY=sk-xxx             # Embeddings (ada-002)
+EVOLUTION_API_URL=https://xxx
 EVOLUTION_API_KEY=xxx
 
 # RD Station CRM
 RDSTATION_CLIENT_ID=xxx
 RDSTATION_CLIENT_SECRET=xxx
 RDSTATION_REFRESH_TOKEN=xxx
+
+# Databases
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=xxx
+DATABASE_URL=postgresql://xxx
+
+# Google Services
+GOOGLE_SERVICE_ACCOUNT_EMAIL=xxx
+GOOGLE_CALENDAR_ID=xxx
 ```
 
-Ver `.env.dev.example` para lista completa.
+📄 Ver lista completa: `docker/.env.dev.example`
 
-## ⚙️ Configuração Inicial
+---
 
-### 1. Configurar RD Station CRM
+## 📚 Documentação Completa
+
+### Para Começar
+| Documento | Descrição | Tempo |
+|-----------|-----------|-------|
+| [QUICKSTART.md](docs/QUICKSTART.md) | Guia rápido de início | 15 min |
+| [CLAUDE.md](CLAUDE.md) | Contexto para Claude Code | 10 min leitura |
+| [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Status consolidado | 5 min |
+
+### Validação e Testes
+| Documento | Descrição | Tempo |
+|-----------|-----------|-------|
+| [Validação Sprint 1.1](docs/validation/README.md) | 5 passos detalhados | 2-3 horas |
+| [Validação Sprint 1.2](docs/validation/SPRINT_1.2_VALIDATION.md) | Testes agendamento | 1-2 horas |
+
+### Implementação
+| Documento | Descrição |
+|-----------|-----------|
+| [Sprint 1.1 Completo](docs/SPRINT_1.1_COMPLETE.md) | Relatório RAG (100%) |
+| [Sprint 1.2 Planning](docs/sprints/SPRINT_1.2_PLANNING.md) | Agendamento (100%) |
+| [Setup RD Station](docs/Setups/SETUP_RDSTATION.md) | Integração CRM completa |
+| [Implementation Plan](docs/PLAN/implementation_plan.md) | Plano geral do projeto |
+
+---
+
+## 🧪 Como Validar o Sistema
+
+### Sprint 1.1 - RAG (Pendente)
 ```bash
-# Seguir guia completo
-docs/Setups/SETUP_RDSTATION.md
+# Seguir guia de 5 passos
+cat docs/validation/README.md
 
-# Criar campos customizados no CRM
-# Configurar pipeline "Bot WhatsApp E2 Soluções"
-# Obter credenciais OAuth2
+# Etapas:
+# 1. Configurar credenciais (30-45 min)
+# 2. Deploy funções SQL (10-15 min)
+# 3. Executar ingest (15-20 min) ⚠️ Aguarda token OpenAI
+# 4. Importar workflow n8n (10-15 min)
+# 5. Validar sistema (20-30 min)
 ```
 
-### 2. Importar Workflows n8n
+### Sprint 1.2 - Agendamento (Pendente)
 ```bash
-# Acessar http://localhost:5678
-# Importar workflows de n8n/workflows/
-# Configurar credenciais:
-#   - Anthropic API
-#   - Evolution API
-#   - RD Station CRM
-#   - Google Services
+# Seguir guia detalhado
+cat docs/validation/SPRINT_1.2_VALIDATION.md
+
+# Testes end-to-end:
+# - Verificar disponibilidade
+# - Criar agendamento
+# - Validar lembretes
+# - Testar reagendamento
 ```
 
-### 3. Carregar Base de Conhecimento
-```bash
-./scripts/ingest-knowledge.sh
-```
+---
 
-## 🧪 Testando o Bot
+## 🚀 Próximos Passos
 
-### Teste 1: Fluxo Energia Solar
-```
-Você: Oi, quero colocar energia solar
-Bot: [Identifica serviço, cria contato RD Station]
-     Olá! Que ótimo que você está interessado em energia solar! ☀️
-     Para preparar um orçamento personalizado, qual é o seu nome?
+### Imediato (Prioridade ALTA)
+1. ✅ **Validar Sprint 1.1**: Executar `docs/validation/README.md` (aguarda OpenAI token)
+2. ✅ **Validar Sprint 1.2**: Testes end-to-end do sistema de agendamento
+3. 📋 **Deploy Produção**: Criar `docker-compose.yml` com SSL/Traefik
 
-Você: João Silva
-Bot: [Atualiza contato no CRM, move para "Qualificando"]
-     Prazer, João! Qual o seu melhor email?
+### Backlog (Prioridade MÉDIA)
+- Expandir base de conhecimento (FAQ, specs técnicas, portfolio)
+- Scripts de backup/restore automatizados
+- Dashboard de métricas e analytics
+- Testes automatizados (unit + E2E)
 
-[... fluxo continua até agendamento]
-
-Bot: ✅ Visita confirmada!
-     [CRM: Move para "Agendado", cria tarefa para técnico]
-```
-
-### Teste 2: Handoff para Comercial
-```
-Você: Quero falar com alguém
-Bot: [CRM: Marca prioridade alta, notifica owner]
-     Entendi! Vou te conectar com nosso time comercial.
-```
-
-## 📊 Métricas e Monitoramento
-
-### Health Checks
-```bash
-./scripts/health-check.sh
-
-# Saída:
-✓ PostgreSQL: UP (5432)
-✓ Supabase: UP (3000)
-✓ n8n: UP (5678)
-✓ Redis: UP (6379)
-✓ RD Station API: UP (200ms latency)
-```
-
-### Logs
-```bash
-# Todos os serviços
-docker-compose -f docker/docker-compose-dev.yml logs -f
-
-# Apenas n8n
-docker logs -f e2-n8n-dev
-
-# Apenas conversações (PostgreSQL)
-docker exec -it e2-postgres-dev psql -U e2solucoes -d e2_bot \
-  -c "SELECT * FROM conversations ORDER BY created_at DESC LIMIT 10;"
-```
-
-## 🐛 Troubleshooting
-
-| Problema | Solução |
-|----------|---------|
-| n8n não conecta no banco | Verificar credenciais em `.env.dev`, aguardar health check |
-| Bot não responde | Verificar Evolution API conectada, webhook configurado |
-| RAG não retorna resultados | Rodar `./scripts/ingest-knowledge.sh` |
-| Erro sync RD Station | Verificar tokens OAuth2, `rdstation_sync_log` table |
-
-Ver [docs/development/debugging.md](docs/development/debugging.md) para guia completo.
+---
 
 ## 🤝 Contribuindo
 
-Veja [docs/development/contributing.md](docs/development/contributing.md)
+Para desenvolvimento local:
+```bash
+# 1. Configurar ambiente
+./scripts/start-dev.sh
+
+# 2. Acessar n8n
+# http://localhost:5678
+
+# 3. Editar workflows
+# Modificar JSONs em n8n/workflows/
+# Re-importar no n8n UI
+
+# 4. Validar mudanças
+./scripts/health-check.sh
+```
+
+---
+
+## 📞 Suporte e Recursos
+
+### Documentação Técnica
+- **Claude Code Context**: `CLAUDE.md` (contexto otimizado)
+- **Quick Start**: `docs/QUICKSTART.md`
+- **Validação Completa**: `docs/validation/` (10 guias)
+- **Status do Projeto**: `docs/PROJECT_STATUS.md`
+
+### Troubleshooting
+Cada guia de validação contém seção dedicada de troubleshooting com problemas comuns e soluções.
+
+---
 
 ## 📄 Licença
 
@@ -317,12 +398,6 @@ Proprietário - E2 Soluções
 
 ---
 
-## 🎯 Próximos Passos
-
-1. ✅ Leia [docs/Setups/README.md](docs/Setups/README.md)
-2. ✅ Configure [RD Station CRM](docs/Setups/SETUP_RDSTATION.md)
-3. ✅ Suba ambiente dev: `./scripts/start-dev.sh`
-4. ✅ Importe workflows n8n
-5. ✅ Teste fluxo completo com WhatsApp
-
-**Dúvidas?** Consulte a [documentação completa](docs/) ou abra uma issue.
+**Última Atualização**: 2025-12-15
+**Versão**: 3.0
+**Status**: ✅ Sprints 1.1 e 1.2 Implementados | 🧪 Aguardando Validação

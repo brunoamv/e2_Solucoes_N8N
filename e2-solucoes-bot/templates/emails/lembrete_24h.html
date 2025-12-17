@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lembrete: Visita Técnica Amanhã - E2 Soluções</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 16px; opacity: 0.95; }
+        .content { padding: 40px 30px; }
+        .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
+        .reminder-box { background: linear-gradient(135deg, #fff9e6 0%, #fff4cc 100%); border-left: 5px solid #ffc107; padding: 25px; margin: 25px 0; border-radius: 5px; text-align: center; }
+        .reminder-box .time-left { font-size: 48px; font-weight: bold; color: #e67e22; margin: 15px 0; }
+        .reminder-box p { font-size: 18px; color: #555; }
+        .appointment-details { background-color: #f8f9fa; padding: 20px; margin: 25px 0; border-radius: 5px; border-left: 4px solid #3498db; }
+        .info-row { display: flex; align-items: center; margin: 12px 0; color: #555; }
+        .info-label { font-weight: bold; min-width: 100px; color: #333; }
+        .checklist { background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 20px; margin: 25px 0; border-radius: 5px; }
+        .checklist h3 { color: #2e7d32; margin-bottom: 15px; }
+        .checklist ul { list-style: none; padding-left: 0; }
+        .checklist li { padding: 8px 0; color: #555; }
+        .checklist li:before { content: "✓ "; color: #4caf50; font-weight: bold; margin-right: 10px; }
+        .cta-buttons { text-align: center; margin: 30px 0; }
+        .cta-button { display: inline-block; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 10px 5px; }
+        .btn-confirm { background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; }
+        .btn-reschedule { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white; }
+        .footer { background-color: #2c3e50; color: #ecf0f1; padding: 30px; text-align: center; font-size: 14px; }
+        .footer a { color: #3498db; text-decoration: none; }
+        @media only screen and (max-width: 600px) {
+            .content { padding: 20px 15px; }
+            .reminder-box .time-left { font-size: 36px; }
+            .cta-button { display: block; margin: 10px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏰ Lembrete: Visita Amanhã!</h1>
+            <p>Sua visita técnica está próxima</p>
+        </div>
+
+        <div class="content">
+            <p class="greeting">Olá <strong>{{ $json.lead_name }}</strong>,</p>
+
+            <p>Este é um lembrete de que sua <strong>visita técnica está agendada para amanhã</strong>!</p>
+
+            <div class="reminder-box">
+                <p>⏰ Faltam apenas</p>
+                <div class="time-left">24 HORAS</div>
+                <p>para sua visita técnica</p>
+            </div>
+
+            <div class="appointment-details">
+                <h2 style="color: #3498db; margin-bottom: 15px;">📋 Detalhes da Visita</h2>
+
+                <div class="info-row">
+                    <span class="info-label">📅 Data:</span>
+                    <span>{{ $json.appointment_date }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">⏰ Horário:</span>
+                    <span>{{ $json.appointment_time }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">🔧 Serviço:</span>
+                    <span>{{ $json.service_name }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">👷 Técnico:</span>
+                    <span>{{ $json.technician_name || 'A definir' }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">📍 Local:</span>
+                    <span>{{ $json.address }}, {{ $json.city }}/{{ $json.state }}</span>
+                </div>
+            </div>
+
+            <div class="checklist">
+                <h3>✓ Checklist de Preparação</h3>
+                <ul>
+                    <li>Documentos relacionados ao serviço (contas de luz, projetos, etc.)</li>
+                    <li>Acesso garantido ao local (avisar portaria, disponibilizar chaves)</li>
+                    <li>Área de trabalho acessível e livre</li>
+                    <li>Presença de um responsável no local</li>
+                    <li>Água e banheiro disponíveis para equipe técnica</li>
+                </ul>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="{{ $json.confirm_url }}" class="cta-button btn-confirm">
+                    ✓ Confirmar Presença
+                </a>
+                <a href="{{ $json.reschedule_url }}" class="cta-button btn-reschedule">
+                    📅 Reagendar
+                </a>
+            </div>
+
+            <p style="margin-top: 30px; color: #666; text-align: center;">
+                <strong>Precisa cancelar ou reagendar?</strong><br>
+                Entre em contato o quanto antes via WhatsApp: <strong>(62) 3092-2900</strong>
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>E2 Soluções</strong></p>
+            <p>Energia e Elétrica com Inteligência</p>
+            <p style="margin-top: 15px;">
+                📱 (62) 3092-2900 • 📧 contato@e2solucoes.com<br>
+                🌐 <a href="https://www.e2solucoes.com">www.e2solucoes.com</a>
+            </p>
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
+                © 2025 E2 Soluções. Todos os direitos reservados.<br>
+                <a href="{{ $env.BASE_URL }}/unsubscribe?email={{ $json.email }}&token={{ $json.unsubscribe_token }}" style="color: #3498db;">Cancelar inscrição</a> • <a href="{{ $env.BASE_URL }}/privacy" style="color: #3498db;">Política de Privacidade (LGPD)</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

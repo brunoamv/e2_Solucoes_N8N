@@ -1,0 +1,13 @@
+🤖 Olá! Bem-vindo à *E2 Soluções*!
+
+Somos especialistas em engenharia elétrica.
+
+*Escolha o serviço desejado:*
+
+☀️ 1 - Energia Solar
+⚡ 2 - Subestação
+📐 3 - Projetos Elétricos
+🔋 4 - BESS (Armazenamento)
+📊 5 - Análise e Laudos
+
+_Digite o número de 1 a 5:_

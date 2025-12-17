@@ -24,7 +24,7 @@ O usuário agora possui **guias passo a passo completos** para:
 
 ### 1. SETUP_CREDENTIALS.md (400+ linhas) ✅
 
-**Localização**: `docs/validation/SETUP_CREDENTIALS.md`
+**Localização**: `docs/Setups/SETUP_CREDENTIALS.md`
 
 **Conteúdo**:
 - Passo a passo para obter OpenAI API Key (5 min)
@@ -40,7 +40,7 @@ O usuário agora possui **guias passo a passo completos** para:
 
 ### 2. DEPLOY_SQL.md (400+ linhas) ✅
 
-**Localização**: `docs/validation/DEPLOY_SQL.md`
+**Localização**: `docs/Setups/DEPLOY_SQL.md`
 
 **Conteúdo**:
 - Detalhamento completo do que será deployado (tabela, índices, funções, trigger)
@@ -57,7 +57,7 @@ O usuário agora possui **guias passo a passo completos** para:
 
 ### 3. EXECUTE_INGEST.md (500+ linhas) ✅
 
-**Localização**: `docs/validation/EXECUTE_INGEST.md`
+**Localização**: `docs/Setups/EXECUTE_INGEST.md`
 
 **Conteúdo**:
 - Explicação completa do que o script faz (validações, chunking, embeddings, inserção)
@@ -76,7 +76,7 @@ O usuário agora possui **guias passo a passo completos** para:
 
 ### 4. IMPORT_N8N_WORKFLOW.md (450+ linhas) ✅
 
-**Localização**: `docs/validation/IMPORT_N8N_WORKFLOW.md`
+**Localização**: `docs/Setups/IMPORT_N8N_WORKFLOW.md`
 
 **Conteúdo**:
 - Arquitetura completa do workflow (7 nós com diagrama ASCII)
@@ -97,7 +97,7 @@ O usuário agora possui **guias passo a passo completos** para:
 
 ### 5. RUN_VALIDATION_TESTS.md (600+ linhas) ✅
 
-**Localização**: `docs/validation/RUN_VALIDATION_TESTS.md`
+**Localização**: `docs/Setups/RUN_VALIDATION_TESTS.md`
 
 **Conteúdo**:
 - Plano de testes completo (10 testes de validação)
@@ -295,11 +295,11 @@ TOTAL:                   24 problemas documentados
 cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
 
 # Seguir guias na ordem:
-# 1. docs/validation/SETUP_CREDENTIALS.md
-# 2. docs/validation/DEPLOY_SQL.md
-# 3. docs/validation/EXECUTE_INGEST.md
-# 4. docs/validation/IMPORT_N8N_WORKFLOW.md
-# 5. docs/validation/RUN_VALIDATION_TESTS.md
+# 1. docs/Setups/SETUP_CREDENTIALS.md
+# 2. docs/Setups/DEPLOY_SQL.md
+# 3. docs/Setups/EXECUTE_INGEST.md
+# 4. docs/Setups/IMPORT_N8N_WORKFLOW.md
+# 5. docs/Setups/RUN_VALIDATION_TESTS.md
 ```
 
 ### Passo 2: Executar Relatório Final
@@ -380,7 +380,7 @@ O usuário agora possui:
 - Checklists de verificação
 - Estimativas de tempo realistas
 
-**Próxima Ação do Usuário**: Executar `docs/validation/SETUP_CREDENTIALS.md` e seguir guias sequencialmente
+**Próxima Ação do Usuário**: Executar `docs/Setups/SETUP_CREDENTIALS.md` e seguir guias sequencialmente
 
 ---
 

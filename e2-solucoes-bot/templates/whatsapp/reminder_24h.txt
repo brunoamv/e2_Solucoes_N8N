@@ -1,0 +1,26 @@
+🔔 *Lembrete de Visita Técnica - E2 Soluções*
+
+Olá, {{lead_name}}! 👋
+
+Lembramos que sua visita técnica está agendada para *amanhã*:
+
+📅 *Data:* {{appointment_date}}
+🕐 *Horário:* {{appointment_time}}
+📍 *Local:* {{appointment_location}}
+
+🔧 *Serviço:* {{service_name}}
+
+*O que levar preparado:*
+• Conta de energia recente (se aplicável)
+• Acesso ao local da instalação
+• Dúvidas ou requisitos específicos
+
+*Precisa reagendar?*
+Entre em contato conosco:
+📞 Telefone: (62) 3092-2900
+📧 Email: contato@e2solucoes.com
+
+Estamos ansiosos para atendê-lo! ⚡
+
+---
+_E2 Soluções - Engenharia Elétrica de Excelência_

@@ -1,0 +1,5 @@
+📧 *Qual seu email?*
+
+_Ou digite "pular" para não informar_
+
+_Exemplo: seuemail@provedor.com_

@@ -1,0 +1,199 @@
+{
+  "name": "13 - Discord Notification Sender",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "discord-notification",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "discord-notification"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format Discord embed based on category\nconst data = $input.item.json;\nconst category = data.category || 'general';\nconst metadata = typeof data.metadata === 'string' ? JSON.parse(data.metadata) : (data.metadata || {});\n\n// Base embed structure\nlet embed = {\n  title: '',\n  color: 5814783, // Default color\n  fields: [],\n  footer: { text: 'E2 Soluções Bot' },\n  timestamp: new Date().toISOString()\n};\n\n// Customize embed based on category\nif (category === 'new_lead' || category === 'qualification_complete') {\n  embed.title = '🔔 Novo Lead Qualificado';\n  embed.color = 6077645; // Verde #5CDBAD\n  embed.fields = [\n    { name: 'Nome', value: metadata.lead_name || 'N/A', inline: true },\n    { name: 'Telefone', value: metadata.phone || 'N/A', inline: true },\n    { name: 'Serviço', value: metadata.service_type || metadata.service_name || 'N/A', inline: false },\n    { name: 'Estágio', value: metadata.stage || 'qualificado', inline: true }\n  ];\n  \n  if (metadata.rdstation_deal_url) {\n    embed.fields.push({\n      name: 'RD Station',\n      value: `[Ver Deal](${metadata.rdstation_deal_url})`,\n      inline: true\n    });\n  }\n}\nelse if (category === 'appointment_confirmed' || category === 'appointment_created') {\n  embed.title = '📅 Agendamento Confirmado';\n  embed.color = 5814242; // Azul #5865F2\n  embed.fields = [\n    { name: 'Lead', value: metadata.lead_name || 'N/A', inline: true },\n    { name: 'Telefone', value: metadata.phone || 'N/A', inline: true },\n    { name: 'Data', value: metadata.appointment_date || 'N/A', inline: true },\n    { name: 'Horário', value: metadata.appointment_time || 'N/A', inline: true },\n    { name: 'Local', value: metadata.appointment_location || 'Virtual', inline: false }\n  ];\n  \n  if (metadata.google_calendar_link) {\n    embed.fields.push({\n      name: 'Google Calendar',\n      value: `[Abrir Evento](${metadata.google_calendar_link})`,\n      inline: false\n    });\n  }\n}\nelse if (category === 'handoff_alert' || category === 'handoff_urgent') {\n  embed.title = '🚨 HANDOFF URGENTE - Atendimento Humano Solicitado';\n  embed.color = 15548997; // Vermelho #ED4245\n  embed.fields = [\n    { name: 'Lead', value: metadata.lead_name || 'N/A', inline: true },\n    { name: 'Telefone', value: metadata.phone || 'N/A', inline: true },\n    { name: 'Motivo', value: metadata.handoff_reason || 'Solicitação do lead', inline: false },\n    { name: 'Resumo', value: metadata.conversation_summary || 'Veja histórico completo no sistema', inline: false }\n  ];\n  \n  if (metadata.rdstation_deal_url) {\n    embed.fields.push({\n      name: 'RD Station',\n      value: `[Ver Deal](${metadata.rdstation_deal_url})`,\n      inline: true\n    });\n  }\n}\nelse if (category === 'system_alert' || category === 'notification_failed') {\n  embed.title = '⚠️ Alerta do Sistema';\n  embed.color = 16705372; // Laranja #FEE75C\n  embed.description = data.body || 'Falha no sistema de notificações';\n  embed.fields = [\n    { name: 'Tipo', value: metadata.error_type || 'notification_failure', inline: true },\n    { name: 'Timestamp', value: new Date().toLocaleString('pt-BR'), inline: true }\n  ];\n  \n  if (metadata.error_details) {\n    embed.fields.push({\n      name: 'Detalhes',\n      value: metadata.error_details.substring(0, 1024), // Discord limit\n      inline: false\n    });\n  }\n}\nelse {\n  // Generic embed\n  embed.title = data.subject || '📬 Nova Notificação';\n  embed.description = data.body || '';\n}\n\nreturn {\n  ...data,\n  discord_embed: embed\n};"
+      },
+      "id": "format-embed",
+      "name": "Format Discord Embed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.recipient }}",
+        "sendBody": true,
+        "contentType": "application/json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "embeds",
+              "value": "={{ JSON.stringify([$json.discord_embed]) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-discord-webhook",
+      "name": "Discord Webhook: Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.statusCode }}",
+              "operation": "equals",
+              "value2": 204
+            }
+          ]
+        }
+      },
+      "id": "check-send-success",
+      "name": "Send Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  status: 'sent',\n  sent_at: new Date().toISOString(),\n  notification_id: $('Webhook Trigger').item.json.notification_id\n};"
+      },
+      "id": "return-success",
+      "name": "Return Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.item.json.error || 'Unknown error';\nconst statusCode = $input.item.json.statusCode || 500;\n\nreturn {\n  status: 'failed',\n  error: `Discord webhook error (${statusCode}): ${error}`,\n  notification_id: $('Webhook Trigger').item.json.notification_id,\n  retry_count: ($('Webhook Trigger').item.json.retry_count || 0) + 1,\n  max_retries: $('Webhook Trigger').item.json.max_retries || 3\n};"
+      },
+      "id": "return-failure",
+      "name": "Return Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "webhook-response-success",
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "webhook-response-failure",
+      "name": "Response Failure",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Discord Embed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Discord Embed": {
+      "main": [
+        [
+          {
+            "node": "Discord Webhook: Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Webhook: Send": {
+      "main": [
+        [
+          {
+            "node": "Send Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Successful?": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Success": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Failure": {
+      "main": [
+        [
+          {
+            "node": "Response Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-15T00:00:00.000Z",
+  "versionId": "1"
+}

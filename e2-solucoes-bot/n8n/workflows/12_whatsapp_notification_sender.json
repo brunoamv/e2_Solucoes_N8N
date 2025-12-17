@@ -1,0 +1,234 @@
+{
+  "name": "12 - WhatsApp Notification Sender",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-notification",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "whatsapp-notification"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Brazilian phone number format\nconst recipient = $input.item.json.recipient || '';\n\n// Expected format: 55 + DDD (2 digits) + phone (8-9 digits)\nconst phoneRegex = /^55\\d{10,11}$/;\n\nif (!phoneRegex.test(recipient)) {\n  throw new Error(`Invalid phone number format: ${recipient}. Expected: 55XXXXXXXXXXX`);\n}\n\n// Validate message length (WhatsApp limit: 4096 chars)\nconst body = $input.item.json.body || '';\nif (body.length > 4096) {\n  throw new Error(`Message too long: ${body.length} chars. Max: 4096`);\n}\n\nreturn {\n  ...$input.item.json,\n  phone_validated: recipient,\n  message_length: body.length\n};"
+      },
+      "id": "validate-phone",
+      "name": "Validate Phone Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format message based on category\nconst data = $input.item.json;\nconst category = data.category || 'general';\nconst body = data.body || '';\n\n// Check if body already has template variables\n// If yes, return as-is (template was already processed)\nif (!body.includes('{{')) {\n  return { formatted_message: body };\n}\n\n// Otherwise, format based on category\nlet formatted_message = body;\n\n// Common replacements (if metadata exists)\nconst metadata = typeof data.metadata === 'string' ? JSON.parse(data.metadata) : (data.metadata || {});\n\nif (metadata.lead_name) {\n  formatted_message = formatted_message.replace(/{{lead\\.name}}/g, metadata.lead_name);\n}\n\nif (metadata.appointment_datetime) {\n  const date = new Date(metadata.appointment_datetime);\n  const dateStr = date.toLocaleDateString('pt-BR');\n  const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });\n  \n  formatted_message = formatted_message\n    .replace(/{{appointment\\.date}}/g, dateStr)\n    .replace(/{{appointment\\.time}}/g, timeStr);\n}\n\nif (metadata.appointment_location) {\n  formatted_message = formatted_message.replace(/{{appointment\\.location}}/g, metadata.appointment_location);\n}\n\nif (metadata.service_name) {\n  formatted_message = formatted_message.replace(/{{service\\.name}}/g, metadata.service_name);\n}\n\nreturn {\n  ...data,\n  formatted_message: formatted_message\n};"
+      },
+      "id": "format-message",
+      "name": "Format Message by Category",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.phone_validated }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.formatted_message }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-whatsapp-message",
+      "name": "Evolution API: Send Text Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.statusCode }}",
+              "operation": "equals",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "id": "check-send-success",
+      "name": "Send Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  status: 'sent',\n  sent_at: new Date().toISOString(),\n  notification_id: $('Webhook Trigger').item.json.notification_id\n};"
+      },
+      "id": "return-success",
+      "name": "Return Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.item.json.error || 'Unknown error';\nconst statusCode = $input.item.json.statusCode || 500;\n\nreturn {\n  status: 'failed',\n  error: `WhatsApp API error (${statusCode}): ${error}`,\n  notification_id: $('Webhook Trigger').item.json.notification_id,\n  retry_count: ($('Webhook Trigger').item.json.retry_count || 0) + 1,\n  max_retries: $('Webhook Trigger').item.json.max_retries || 3\n};"
+      },
+      "id": "return-failure",
+      "name": "Return Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "webhook-response-success",
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "webhook-response-failure",
+      "name": "Response Failure",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Phone Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Phone Number": {
+      "main": [
+        [
+          {
+            "node": "Format Message by Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Message by Category": {
+      "main": [
+        [
+          {
+            "node": "Evolution API: Send Text Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API: Send Text Message": {
+      "main": [
+        [
+          {
+            "node": "Send Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Successful?": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Success": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Failure": {
+      "main": [
+        [
+          {
+            "node": "Response Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-15T00:00:00.000Z",
+  "versionId": "1"
+}

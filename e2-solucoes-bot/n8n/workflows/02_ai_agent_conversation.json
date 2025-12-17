@@ -164,6 +164,64 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.next_stage }}",
+              "operation": "equals",
+              "value2": "scheduling"
+            }
+          ]
+        }
+      },
+      "id": "check-qualification-complete",
+      "name": "Check Qualification Complete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT create_notification(\n  (SELECT id FROM leads WHERE phone = $1 ORDER BY created_at DESC LIMIT 1),\n  NULL,\n  'email',\n  'qualification_complete',\n  (SELECT email FROM leads WHERE phone = $1 ORDER BY created_at DESC LIMIT 1),\n  'Confirmação de Atendimento - E2 Soluções',\n  'Obrigado por entrar em contato com a E2 Soluções! Recebemos seus dados e em breve nossa equipe entrará em contato.',\n  json_build_object(\n    'lead_name', (SELECT nome FROM leads WHERE phone = $1 ORDER BY created_at DESC LIMIT 1),\n    'service_type', $2,\n    'phone', $1\n  )::jsonb,\n  5,\n  NOW()\n);",
+        "additionalFields": {
+          "queryParameters": "={{ $('Execute Workflow Trigger').item.json.phone_number }},={{ $json.detected_service }}"
+        }
+      },
+      "id": "create-email-notification",
+      "name": "Create Email Notification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT create_notification(\n  (SELECT id FROM leads WHERE phone = $1 ORDER BY created_at DESC LIMIT 1),\n  NULL,\n  'discord',\n  'qualification_complete',\n  $2,\n  'Novo Lead Qualificado',\n  'Lead completou qualificação e está pronto para agendamento',\n  json_build_object(\n    'lead_name', (SELECT nome FROM leads WHERE phone = $1 ORDER BY created_at DESC LIMIT 1),\n    'phone', $1,\n    'service_type', $3,\n    'service_name', $3,\n    'stage', 'qualificado'\n  )::jsonb,\n  8,\n  NOW()\n);",
+        "additionalFields": {
+          "queryParameters": "={{ $('Execute Workflow Trigger').item.json.phone_number }},={{ $env.DISCORD_WEBHOOK_LEADS }},={{ $json.detected_service }}"
+        }
+      },
+      "id": "create-discord-notification",
+      "name": "Create Discord Notification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE conversations SET stage = $1, service_type = $2, updated_at = NOW() WHERE id = $3",
         "additionalFields": {
@@ -174,7 +232,7 @@
       "name": "Update Conversation Stage",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [1650, 300],
+      "position": [2050, 300],
       "credentials": {
         "postgres": {
           "id": "1",
@@ -195,7 +253,7 @@
       "name": "Save Outbound Message",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2,
-      "position": [1850, 300],
+      "position": [2250, 300],
       "credentials": {
         "postgres": {
           "id": "1",
@@ -240,7 +298,7 @@
       "name": "Send WhatsApp Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [2050, 300]
+      "position": [2450, 300]
     }
   ],
   "connections": {
@@ -318,6 +376,46 @@
       ]
     },
     "Analyze Response": {
+      "main": [
+        [
+          {
+            "node": "Check Qualification Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Qualification Complete": {
+      "main": [
+        [
+          {
+            "node": "Create Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Conversation Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Email Notification": {
+      "main": [
+        [
+          {
+            "node": "Create Discord Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Discord Notification": {
       "main": [
         [
           {

@@ -1,0 +1,22 @@
+⏰ *Lembrete Urgente - Visita Hoje!*
+
+{{lead_name}}, sua visita técnica da E2 Soluções é *HOJE* em breve! ⚡
+
+🕐 *Horário:* {{appointment_time}}
+📍 *Local:* {{appointment_location}}
+🔧 *Serviço:* {{service_name}}
+
+*Nosso técnico está a caminho!*
+
+Certifique-se de que:
+✅ Alguém estará presente no local
+✅ O acesso ao local de instalação está liberado
+✅ Documentos solicitados estão disponíveis
+
+*Algum imprevisto?*
+Ligue AGORA: (62) 3092-2900
+
+Até já! 👷‍♂️⚡
+
+---
+_E2 Soluções - Engenharia Elétrica de Excelência_

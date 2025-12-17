@@ -1,0 +1,437 @@
+{
+  "name": "02 - AI Agent Conversation V1 (Menu-Based)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-ai-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node_webhook",
+      "name": "Webhook - Receive Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "ai-agent-conversation-v1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM conversations WHERE lead_id = '{{ $json.from }}' ORDER BY updated_at DESC LIMIT 1;",
+        "options": {}
+      },
+      "id": "node_get_conversation",
+      "name": "Get Conversation State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL E2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.count }}",
+              "operation": "equal",
+              "value2": "0"
+            }
+          ]
+        }
+      },
+      "id": "node_check_new_user",
+      "name": "Check If New User",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "conversations",
+        "columns": "lead_id, current_stage, stage_data",
+        "values": "={{ $json.from }}, greeting, '{}'",
+        "options": {}
+      },
+      "id": "node_create_conversation",
+      "name": "Create New Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// ============================================================================\n// E2 Soluções Bot v1 - Menu State Machine\n// ============================================================================\n\nconst items = $input.all();\nconst leadId = items[0].json.from;\nconst message = items[0].json.body || items[0].json.text || '';\n\n// Get conversation state\nlet conversation;\nif (items.length > 1 && items[1].json) {\n  conversation = items[1].json;\n} else {\n  conversation = {\n    lead_id: leadId,\n    current_stage: 'greeting',\n    stage_data: {}\n  };\n}\n\nconst currentStage = conversation.current_stage || 'greeting';\nconst stageData = conversation.stage_data || {};\n\n// ============================================================================\n// Service Mapping\n// ============================================================================\n\nconst serviceMapping = {\n  '1': {\n    id: 'energia_solar',\n    name: 'Energia Solar',\n    description: 'Projetos fotovoltaicos residenciais, comerciais e industriais',\n    emoji: '☀️'\n  },\n  '2': {\n    id: 'subestacao',\n    name: 'Subestação',\n    description: 'Reforma, manutenção e construção de subestações',\n    emoji: '⚡'\n  },\n  '3': {\n    id: 'projetos_eletricos',\n    name: 'Projetos Elétricos',\n    description: 'Projetos elétricos, adequações e laudos de conformidade',\n    emoji: '📐'\n  },\n  '4': {\n    id: 'bess',\n    name: 'BESS (Armazenamento)',\n    description: 'Sistemas de armazenamento de energia com baterias',\n    emoji: '🔋'\n  },\n  '5': {\n    id: 'analise_laudos',\n    name: 'Análise e Laudos',\n    description: 'Análise de qualidade de energia e laudos técnicos',\n    emoji: '📊'\n  }\n};\n\n// ============================================================================\n// Validators\n// ============================================================================\n\nconst validators = {\n  number_1_to_5: (input) => {\n    const num = parseInt(input.trim());\n    return num >= 1 && num <= 5;\n  },\n  \n  text_min_3_chars: (input) => {\n    return input.trim().length >= 3;\n  },\n  \n  phone_brazil: (input) => {\n    const cleaned = input.replace(/\\D/g, '');\n    const regex = /^(\\d{2})(\\d{4,5})(\\d{4})$/;\n    return regex.test(cleaned) && cleaned.length >= 10 && cleaned.length <= 11;\n  },\n  \n  email_or_skip: (input) => {\n    const trimmed = input.trim().toLowerCase();\n    if (trimmed === 'pular') return true;\n    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n    return emailRegex.test(trimmed);\n  },\n  \n  city_name: (input) => {\n    return input.trim().length >= 3;\n  },\n  \n  confirmation_1_or_2: (input) => {\n    const num = parseInt(input.trim());\n    return num === 1 || num === 2;\n  }\n};\n\n// ============================================================================\n// Message Templates\n// ============================================================================\n\nconst templates = {\n  greeting: {\n    text: '🤖 Olá! Bem-vindo à *E2 Soluções*!\\n\\nSomos especialistas em engenharia elétrica.\\n\\n*Escolha o serviço desejado:*\\n\\n☀️ 1 - Energia Solar\\n⚡ 2 - Subestação\\n📐 3 - Projetos Elétricos\\n🔋 4 - BESS (Armazenamento)\\n📊 5 - Análise e Laudos\\n\\n_Digite o número de 1 a 5:_',\n    footer: 'E2 Soluções Engenharia'\n  },\n  \n  service_selected: {\n    template: '{{emoji}} *{{service_name}}*\\n\\n{{description}}\\n\\n━━━━━━━━━━━━━━━\\n\\nPerfeito! Vou coletar alguns dados para melhor atendê-lo.\\n\\n👤 *Qual seu nome completo?*'\n  },\n  \n  collect_phone: {\n    text: '📱 *Qual seu telefone com DDD?*\\n\\n_Exemplo: (62) 99988-7766_'\n  },\n  \n  collect_email: {\n    text: '📧 *Qual seu email?*\\n\\n_Ou digite \"pular\" para não informar_'\n  },\n  \n  collect_city: {\n    text: '📍 *Em qual cidade você está?*\\n\\n_Exemplo: Goiânia_'\n  },\n  \n  confirmation: {\n    template: '✅ *Dados confirmados!*\\n\\n👤 *Nome:* {{lead_name}}\\n📱 *Telefone:* {{phone}}\\n📧 *Email:* {{email}}\\n📍 *Cidade:* {{city}}\\n{{emoji}} *Serviço:* {{service_name}}\\n\\n━━━━━━━━━━━━━━━\\n\\n🗓️ Deseja agendar uma *visita técnica gratuita*?\\n\\n1️⃣ Sim, quero agendar\\n2️⃣ Não, prefiro falar com especialista\\n\\n_Digite 1 ou 2:_'\n  },\n  \n  invalid_option: {\n    text: '❌ Opção inválida. Por favor, escolha uma opção válida.'\n  },\n  \n  invalid_phone: {\n    text: '❌ Telefone inválido.\\n\\n📱 Digite um telefone válido com DDD:\\n_Exemplo: (62) 99988-7766_'\n  },\n  \n  invalid_email: {\n    text: '❌ Email inválido.\\n\\n📧 Digite um email válido ou \"pular\":\\n_Exemplo: seu@email.com_'\n  },\n  \n  error_generic: {\n    text: '⚠️ Ops! Algo deu errado.\\n\\nPor favor, tente novamente ou digite *AJUDA* para falar com um especialista.'\n  }\n};\n\n// ============================================================================\n// Template Filler\n// ============================================================================\n\nfunction fillTemplate(template, data) {\n  let text = template;\n  for (const [key, value] of Object.entries(data)) {\n    text = text.replace(new RegExp(`{{${key}}}`, 'g'), value);\n  }\n  return text;\n}\n\n// ============================================================================\n// State Machine Logic\n// ============================================================================\n\nlet nextStage = currentStage;\nlet responseText = '';\nlet updateData = { ...stageData };\nlet errorCount = stageData.error_count || 0;\nconst MAX_ERRORS = 3;\n\nswitch (currentStage) {\n  case 'greeting':\n    responseText = templates.greeting.text;\n    nextStage = 'service_selection';\n    break;\n  \n  case 'service_selection':\n    if (validators.number_1_to_5(message)) {\n      const service = serviceMapping[message];\n      updateData.service_type = service.id;\n      updateData.service_name = service.name;\n      updateData.service_emoji = service.emoji;\n      \n      responseText = fillTemplate(templates.service_selected.template, {\n        emoji: service.emoji,\n        service_name: service.name,\n        description: service.description\n      });\n      \n      nextStage = 'collect_name';\n      errorCount = 0;\n    } else {\n      responseText = templates.invalid_option.text + '\\n\\n' + templates.greeting.text;\n      errorCount++;\n      \n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Percebi dificuldades. Vou transferir você para um especialista.\\n\\nAguarde um momento...';\n      }\n    }\n    break;\n  \n  case 'collect_name':\n    if (validators.text_min_3_chars(message)) {\n      updateData.lead_name = message.trim();\n      responseText = templates.collect_phone.text;\n      nextStage = 'collect_phone';\n      errorCount = 0;\n    } else {\n      responseText = '❌ Nome muito curto.\\n\\n👤 Digite seu nome completo:';\n      errorCount++;\n      \n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n  \n  case 'collect_phone':\n    if (validators.phone_brazil(message)) {\n      const cleaned = message.replace(/\\D/g, '');\n      const formatted = cleaned.replace(/(\\d{2})(\\d{4,5})(\\d{4})/, '($1) $2-$3');\n      updateData.phone = formatted;\n      responseText = templates.collect_email.text;\n      nextStage = 'collect_email';\n      errorCount = 0;\n    } else {\n      responseText = templates.invalid_phone.text;\n      errorCount++;\n      \n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n  \n  case 'collect_email':\n    if (validators.email_or_skip(message)) {\n      const trimmed = message.trim().toLowerCase();\n      updateData.email = trimmed === 'pular' ? 'Não informado' : trimmed;\n      responseText = templates.collect_city.text;\n      nextStage = 'collect_city';\n      errorCount = 0;\n    } else {\n      responseText = templates.invalid_email.text;\n      errorCount++;\n      \n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n  \n  case 'collect_city':\n    if (validators.city_name(message)) {\n      updateData.city = message.trim();\n      \n      responseText = fillTemplate(templates.confirmation.template, {\n        lead_name: updateData.lead_name,\n        phone: updateData.phone,\n        email: updateData.email,\n        city: updateData.city,\n        emoji: updateData.service_emoji,\n        service_name: updateData.service_name\n      });\n      \n      nextStage = 'confirmation';\n      errorCount = 0;\n    } else {\n      responseText = '❌ Cidade inválida.\\n\\n📍 Digite o nome da cidade:';\n      errorCount++;\n      \n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n  \n  case 'confirmation':\n    if (validators.confirmation_1_or_2(message)) {\n      const choice = parseInt(message);\n      \n      if (choice === 1) {\n        // User wants to schedule\n        nextStage = 'scheduling';\n        updateData.wants_appointment = true;\n        responseText = '🗓️ Perfeito! Vou verificar os horários disponíveis...\\n\\n⏳ Aguarde um momento.';\n      } else {\n        // User wants to speak with specialist\n        nextStage = 'handoff_comercial';\n        updateData.wants_appointment = false;\n        responseText = '👨‍💼 Entendi! Vou transferir você para um especialista da equipe.\\n\\n⏳ Aguarde um momento...';\n      }\n      \n      errorCount = 0;\n    } else {\n      responseText = '❌ Opção inválida.\\n\\n_Digite 1 para agendar ou 2 para falar com especialista:_';\n      errorCount++;\n      \n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n  \n  case 'handoff_comercial':\n    responseText = '👨‍💼 Você foi transferido para nossa equipe comercial.\\n\\nEm breve um especialista entrará em contato!\\n\\n_Horário de atendimento: Segunda a Sexta, 8h às 18h_';\n    nextStage = 'completed';\n    break;\n  \n  case 'completed':\n    responseText = '✅ Seu atendimento já foi finalizado.\\n\\nPara iniciar uma nova conversa, digite *NOVO*.';\n    \n    if (message.toLowerCase().includes('novo')) {\n      responseText = templates.greeting.text;\n      nextStage = 'service_selection';\n      updateData = {};\n    }\n    break;\n  \n  default:\n    responseText = templates.error_generic.text;\n    nextStage = 'greeting';\n}\n\n// Update error count\nupdateData.error_count = errorCount;\n\n// ============================================================================\n// Return Output\n// ============================================================================\n\nreturn [\n  {\n    json: {\n      lead_id: leadId,\n      message: message,\n      current_stage: currentStage,\n      next_stage: nextStage,\n      stage_data: updateData,\n      response_text: responseText,\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "node_state_machine",
+      "name": "State Machine Logic",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "conversations",
+        "updateKey": "lead_id",
+        "columns": "current_stage, stage_data, updated_at",
+        "values": "={{ $json.next_stage }}, '{{ $json.stage_data }}', NOW()",
+        "options": {}
+      },
+      "id": "node_update_conversation",
+      "name": "Update Conversation State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "messages",
+        "columns": "lead_id, message_type, content, direction, created_at",
+        "values": "={{ $json.lead_id }}, 'text', '{{ $json.message }}', 'inbound', NOW()",
+        "options": {}
+      },
+      "id": "node_save_inbound_message",
+      "name": "Save Inbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "messages",
+        "columns": "lead_id, message_type, content, direction, created_at",
+        "values": "={{ $json.lead_id }}, 'text', '{{ $json.response_text }}', 'outbound', NOW()",
+        "options": {}
+      },
+      "id": "node_save_outbound_message",
+      "name": "Save Outbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE_NAME }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.lead_id }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.response_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node_send_whatsapp",
+      "name": "Send WhatsApp Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "Evolution API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.next_stage }}",
+              "operation": "equal",
+              "value2": "scheduling"
+            }
+          ]
+        }
+      },
+      "id": "node_check_scheduling",
+      "name": "Check If Scheduling",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.next_stage }}",
+              "operation": "equal",
+              "value2": "handoff_comercial"
+            }
+          ]
+        }
+      },
+      "id": "node_check_handoff",
+      "name": "Check If Handoff",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1850, 500]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $workflow.id + 3 }}",
+        "options": {}
+      },
+      "id": "node_trigger_scheduling",
+      "name": "Trigger Appointment Scheduler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2050, 200]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $workflow.id + 8 }}",
+        "options": {}
+      },
+      "id": "node_trigger_handoff",
+      "name": "Trigger Human Handoff",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2050, 500]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "table": "leads",
+        "updateKey": "whatsapp_number",
+        "columns": "whatsapp_number, lead_name, phone, email, city, service_type, stage",
+        "values": "={{ $json.lead_id }}, '{{ $json.stage_data.lead_name }}', '{{ $json.stage_data.phone }}', '{{ $json.stage_data.email }}', '{{ $json.stage_data.city }}', '{{ $json.stage_data.service_type }}', '{{ $json.next_stage }}'",
+        "options": {}
+      },
+      "id": "node_upsert_lead",
+      "name": "Upsert Lead Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ { success: true, stage: $json.next_stage } }}"
+      },
+      "id": "node_respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2250, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Message": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation State": {
+      "main": [
+        [
+          {
+            "node": "Check If New User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If New User": {
+      "main": [
+        [
+          {
+            "node": "Create New Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Conversation": {
+      "main": [
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State Machine Logic": {
+      "main": [
+        [
+          {
+            "node": "Update Conversation State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Conversation State": {
+      "main": [
+        [
+          {
+            "node": "Save Inbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Inbound Message": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Outbound Message": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Response": {
+      "main": [
+        [
+          {
+            "node": "Upsert Lead Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check If Scheduling",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check If Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Scheduling": {
+      "main": [
+        [
+          {
+            "node": "Trigger Appointment Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Handoff": {
+      "main": [
+        [
+          {
+            "node": "Trigger Human Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Appointment Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Human Handoff": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "id": "2",
+  "meta": {
+    "instanceId": "e2-solucoes-bot-dev"
+  },
+  "tags": [
+    {
+      "name": "v1",
+      "createdAt": "2025-12-16T00:00:00.000Z",
+      "updatedAt": "2025-12-16T00:00:00.000Z",
+      "id": "1"
+    },
+    {
+      "name": "menu-based",
+      "createdAt": "2025-12-16T00:00:00.000Z",
+      "updatedAt": "2025-12-16T00:00:00.000Z",
+      "id": "2"
+    }
+  ]
+}

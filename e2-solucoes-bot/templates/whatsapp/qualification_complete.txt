@@ -1,0 +1,32 @@
+✅ *Obrigado por Entrar em Contato!*
+
+Olá, {{lead_name}}! 👋
+
+Recebemos suas informações sobre *{{service_name}}* e estamos processando sua solicitação! 🚀
+
+*📋 Resumo do Seu Interesse:*
+🔧 Serviço: {{service_name}}
+📞 Contato: {{phone}}
+{{#if email}}📧 Email: {{email}}{{/if}}
+
+*📌 Próximos Passos:*
+
+1️⃣ Nossa equipe comercial analisará seu caso
+2️⃣ Você receberá um contato em até 24 horas úteis
+3️⃣ Agendaremos uma visita técnica (se necessário)
+4️⃣ Elaboraremos uma proposta personalizada
+
+*💡 Enquanto Isso:*
+• Separe suas contas de energia recentes
+• Anote suas dúvidas e requisitos
+• Prepare fotos do local (se possível)
+
+*Dúvidas Urgentes?*
+📞 Telefone: (62) 3092-2900
+📧 Email: contato@e2solucoes.com
+🌐 Site: www.e2solucoes.com
+
+Estamos animados para trabalhar com você! ⚡
+
+---
+_E2 Soluções - Transformando Energia em Soluções_

@@ -1,0 +1,411 @@
+{
+  "name": "11 - Notification Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Every 1 Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM get_pending_notifications(10);",
+        "options": {}
+      },
+      "id": "get-pending-notifications",
+      "name": "Get Pending Notifications",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "largerEqual",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "has-notifications",
+      "name": "Has Notifications?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-in-batches",
+      "name": "Split in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "mode": "multiplex",
+        "output": "input1",
+        "rules": {
+          "rules": [
+            {
+              "operation": "equal",
+              "value1": "={{ $json.notification_type }}",
+              "value2": "email",
+              "output": 0
+            },
+            {
+              "operation": "equal",
+              "value1": "={{ $json.notification_type }}",
+              "value2": "whatsapp",
+              "output": 1
+            },
+            {
+              "operation": "equal",
+              "value1": "={{ $json.notification_type }}",
+              "value2": "discord",
+              "output": 2
+            }
+          ]
+        }
+      },
+      "id": "switch-notification-type",
+      "name": "Switch: Notification Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "workflowId": "7",
+        "options": {}
+      },
+      "id": "call-email-workflow",
+      "name": "Call Email Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1250, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": "12",
+        "options": {}
+      },
+      "id": "call-whatsapp-workflow",
+      "name": "Call WhatsApp Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "workflowId": "13",
+        "options": {}
+      },
+      "id": "call-discord-workflow",
+      "name": "Call Discord Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT update_notification_status(\n  '{{ $json.notification_id }}'::uuid,\n  'sent',\n  NULL\n);",
+        "options": {}
+      },
+      "id": "update-status-sent",
+      "name": "Update Status: Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 200],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT update_notification_status(\n  '{{ $json.notification_id }}'::uuid,\n  CASE \n    WHEN {{ $json.retry_count }} < {{ $json.max_retries }} THEN 'retrying'\n    ELSE 'failed'\n  END,\n  '{{ $json.error }}'\n);",
+        "options": {}
+      },
+      "id": "update-status-failed",
+      "name": "Update Status: Failed/Retrying",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 600],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.retry_count }}",
+              "operation": "largerEqual",
+              "value2": "={{ $json.max_retries }}"
+            }
+          ]
+        }
+      },
+      "id": "check-max-retries",
+      "name": "Max Retries Reached?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create Discord alert for failed notification\nconst notification = $input.item.json;\n\nreturn {\n  notification_type: 'discord',\n  category: 'system_alert',\n  recipient: $env.DISCORD_WEBHOOK_ALERTS || '',\n  body: `⚠️ **Falha de Notificação** (Max retries: ${notification.max_retries})\\n\\n**ID**: ${notification.notification_id}\\n**Tipo**: ${notification.notification_type}\\n**Categoria**: ${notification.category}\\n**Lead ID**: ${notification.lead_id}\\n**Erro**: ${notification.error || 'Unknown'}`,\n  priority: 10,\n  scheduled_for: new Date().toISOString()\n};"
+      },
+      "id": "create-alert-notification",
+      "name": "Create Alert Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 500]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "notifications",
+        "columns": "notification_type, category, recipient, body, priority, scheduled_for, status",
+        "additionalFields": {
+          "values": "'{{ $json.notification_type }}', '{{ $json.category }}', '{{ $json.recipient }}', '{{ $json.body }}', {{ $json.priority }}, '{{ $json.scheduled_for }}', 'pending'"
+        }
+      },
+      "id": "insert-alert",
+      "name": "Insert Alert",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2050, 500],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'completed', processed: $runIndex } }}",
+        "options": {}
+      },
+      "id": "end-response",
+      "name": "End Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Every 1 Minute": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Notifications": {
+      "main": [
+        [
+          {
+            "node": "Has Notifications?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Notifications?": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "End Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Batches": {
+      "main": [
+        [
+          {
+            "node": "Switch: Notification Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Notification Type": {
+      "main": [
+        [
+          {
+            "node": "Call Email Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call WhatsApp Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Discord Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Email Workflow": {
+      "main": [
+        [
+          {
+            "node": "Update Status: Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call WhatsApp Workflow": {
+      "main": [
+        [
+          {
+            "node": "Update Status: Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Discord Workflow": {
+      "main": [
+        [
+          {
+            "node": "Update Status: Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status: Sent": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status: Failed/Retrying": {
+      "main": [
+        [
+          {
+            "node": "Check Max Retries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Max Retries": {
+      "main": [
+        [
+          {
+            "node": "Create Alert Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Alert Notification": {
+      "main": [
+        [
+          {
+            "node": "Insert Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Alert": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-15T00:00:00.000Z",
+  "versionId": "1"
+}

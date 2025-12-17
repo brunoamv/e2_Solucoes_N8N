@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novo Lead - E2 Soluções</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .container { max-width: 700px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header .badge { background-color: rgba(255,255,255,0.2); display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 14px; margin-top: 10px; }
+        .content { padding: 30px; }
+        .alert-box { background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border-left: 5px solid #ff9800; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .alert-box strong { color: #e65100; font-size: 18px; }
+        .lead-card { background-color: #f8f9fa; border: 2px solid #dee2e6; padding: 25px; margin: 20px 0; border-radius: 8px; }
+        .lead-card h2 { color: #7b1fa2; margin-bottom: 20px; border-bottom: 2px solid #9c27b0; padding-bottom: 10px; }
+        .info-section { margin: 20px 0; }
+        .info-section h3 { color: #555; font-size: 16px; margin-bottom: 10px; background-color: #e9ecef; padding: 8px 12px; border-radius: 4px; }
+        .info-row { display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid #e9ecef; }
+        .info-label { font-weight: bold; color: #495057; }
+        .info-value { color: #212529; }
+        .priority-high { color: #e74c3c; font-weight: bold; }
+        .priority-normal { color: #3498db; }
+        .service-badge { background-color: #9c27b0; color: white; padding: 5px 12px; border-radius: 15px; font-size: 13px; display: inline-block; margin: 3px; }
+        .action-buttons { text-align: center; margin: 30px 0; padding: 20px; background-color: #f1f3f4; border-radius: 8px; }
+        .cta-button { display: inline-block; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 5px; color: white; }
+        .btn-rd { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); }
+        .btn-whatsapp { background: linear-gradient(135deg, #25d366 0%, #128c7e 100%); }
+        .btn-calendar { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); }
+        .data-collected { background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 15px 0; border-radius: 4px; }
+        .data-collected pre { background-color: #f1f8e9; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; color: #33691e; }
+        .footer { background-color: #37474f; color: #eceff1; padding: 20px; text-align: center; font-size: 13px; }
+        @media only screen and (max-width: 600px) {
+            .info-row { grid-template-columns: 1fr; gap: 5px; }
+            .cta-button { display: block; margin: 10px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 NOVO LEAD CAPTURADO!</h1>
+            <div class="badge">WhatsApp Bot • {{ $json.timestamp || new Date().toLocaleString("pt-BR") }}</div>
+        </div>
+
+        <div class="content">
+            <div class="alert-box">
+                <strong>⚡ AÇÃO NECESSÁRIA</strong><br>
+                Um novo lead foi qualificado via bot WhatsApp e requer atendimento comercial.
+            </div>
+
+            <div class="lead-card">
+                <h2>👤 Informações do Lead</h2>
+
+                <div class="info-section">
+                    <h3>📋 Dados Pessoais</h3>
+                    <div class="info-row">
+                        <span class="info-label">Nome:</span>
+                        <span class="info-value"><strong>{{ $json.lead_name }}</strong></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Telefone:</span>
+                        <span class="info-value">{{ $json.phone }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email:</span>
+                        <span class="info-value">{{ $json.email || "Não informado" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Endereço:</span>
+                        <span class="info-value">{{ $json.address }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cidade/UF:</span>
+                        <span class="info-value">{{ $json.city }}/{{ $json.state }}</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>🔧 Serviço Solicitado</h3>
+                    <div class="info-row">
+                        <span class="info-label">Tipo:</span>
+                        <span class="info-value"><span class="service-badge">{{ $json.service_name }}</span></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Segmento:</span>
+                        <span class="info-value">{{ $json.segment || "Residencial" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Prioridade:</span>
+                        <span class="info-value priority-{{ $json.priority_level || "normal" }}">{{ $json.priority || "Normal" }}</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>📅 Disponibilidade</h3>
+                    <div class="info-row">
+                        <span class="info-label">Dias Preferidos:</span>
+                        <span class="info-value">{{ $json.preferred_days || "Não especificado" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Período:</span>
+                        <span class="info-value">{{ $json.preferred_shift || "Qualquer período" }}</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>📊 Análise IA</h3>
+                    <div class="info-row">
+                        <span class="info-label">Consumo Estimado:</span>
+                        <span class="info-value">{{ $json.estimated_kwh || "N/A" }} kWh/mês</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Potência Sugerida:</span>
+                        <span class="info-value">{{ $json.estimated_kwp || "N/A" }} kWp</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Valor Estimado:</span>
+                        <span class="info-value"><strong>R$ {{ $json.estimated_value || "A calcular" }}</strong></span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>🔗 Integrações</h3>
+                    <div class="info-row">
+                        <span class="info-label">RD Station Contact ID:</span>
+                        <span class="info-value"><code>{{ $json.rdstation_contact_id }}</code></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">RD Station Deal ID:</span>
+                        <span class="info-value"><code>{{ $json.rdstation_deal_id }}</code></span>
+                    </div>
+                </div>
+
+                {{#if OBSERVATIONS}}
+                <div class="info-section">
+                    <h3>📝 Observações do Cliente</h3>
+                    <p style="color: #555; padding: 10px; background-color: #fff; border-left: 3px solid #9c27b0;">
+                        {{ $json.observations }}
+                    </p>
+                </div>
+                {{/if}}
+
+                {{#if AI_ANALYSIS}}
+                <div class="data-collected">
+                    <h3 style="color: #2e7d32; margin-bottom: 10px;">🤖 Análise Completa IA</h3>
+                    <pre>{{ $json.ai_analysis }}</pre>
+                </div>
+                {{/if}}
+            </div>
+
+            <div class="action-buttons">
+                <h3 style="color: #555; margin-bottom: 15px;">⚡ Ações Rápidas</h3>
+                <a href="{{ $json.rdstation_deal_url }}" class="cta-button btn-rd" target="_blank">
+                    📊 Abrir no RD Station
+                </a>
+                <a href="https://wa.me/{{ $json.phone }}" class="cta-button btn-whatsapp" target="_blank">
+                    💬 Contatar via WhatsApp
+                </a>
+                <a href="{{ $json.calendar_link }}" class="cta-button btn-calendar" target="_blank">
+                    📅 Agendar Visita
+                </a>
+            </div>
+
+            <div style="background-color: #ffebee; border-left: 4px solid #e74c3c; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                <strong style="color: #c62828;">⏰ TEMPO DE RESPOSTA</strong>
+                <p style="color: #666; margin-top: 8px;">
+                    Recomendado: <strong>Entrar em contato em até 2 horas</strong> para maximizar taxa de conversão.
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>E2 Soluções Bot</strong> • Sistema de Qualificação Automática</p>
+            <p style="margin-top: 10px; font-size: 11px; opacity: 0.8;">
+                Este lead foi qualificado automaticamente pelo bot WhatsApp da E2 Soluções<br>
+                © 2025 E2 Soluções • <a href="{{ $env.BASE_URL }}/privacy" style="color: #9c27b0;">Política de Privacidade (LGPD)</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

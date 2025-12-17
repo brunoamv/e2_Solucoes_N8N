@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmação de Agendamento - E2 Soluções</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 16px;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .appointment-card {
+            background-color: #f8f9fa;
+            border-left: 4px solid #FFA500;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        .appointment-card h2 {
+            color: #FF8C00;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+        .info-row {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+            color: #555;
+        }
+        .info-label {
+            font-weight: bold;
+            min-width: 120px;
+            color: #333;
+        }
+        .info-value {
+            color: #666;
+        }
+        .icon {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+        .important-note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .important-note strong {
+            color: #856404;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 30px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #FFA500;
+            text-decoration: none;
+        }
+        .footer .social-links {
+            margin-top: 15px;
+        }
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 20px 15px;
+            }
+            .info-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .info-label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Visita Técnica Confirmada!</h1>
+            <p>Sua visita foi agendada com sucesso</p>
+        </div>
+
+        <div class="content">
+            <p class="greeting">Olá <strong>{{ $json.lead_name }}</strong>,</p>
+
+            <p>Sua visita técnica foi <strong>confirmada</strong> e já está em nossa agenda. Nossa equipe entrará em contato com você próximo da data agendada.</p>
+
+            <div class="appointment-card">
+                <h2>📅 Detalhes do Agendamento</h2>
+
+                <div class="info-row">
+                    <span class="icon">🔧</span>
+                    <span class="info-label">Serviço:</span>
+                    <span class="info-value">{{ $json.service_name }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="icon">📅</span>
+                    <span class="info-label">Data:</span>
+                    <span class="info-value">{{ $json.appointment_date }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="icon">⏰</span>
+                    <span class="info-label">Horário:</span>
+                    <span class="info-value">{{ $json.appointment_time }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="icon">👷</span>
+                    <span class="info-label">Técnico:</span>
+                    <span class="info-value">{{ $json.technician_name || 'A definir' }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="icon">📍</span>
+                    <span class="info-label">Local:</span>
+                    <span class="info-value">{{ $json.address }}, {{ $json.city }}/{{ $json.state }}</span>
+                </div>
+            </div>
+
+            <div class="important-note">
+                <strong>⚠️ Importante:</strong><br>
+                • Você receberá lembretes 24h e 2h antes da visita<br>
+                • Tenha em mãos documentos relacionados ao serviço<br>
+                • Garanta acesso ao local (portaria, chaves, etc.)<br>
+                • Em caso de imprevistos, entre em contato imediatamente
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{ $json.calendar_link }}" class="cta-button">
+                    📅 Adicionar ao Calendário
+                </a>
+            </div>
+
+            <p style="margin-top: 30px; color: #666;">
+                <strong>Dúvidas?</strong> Nossa equipe está à disposição via WhatsApp ou email.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>E2 Soluções</strong></p>
+            <p>Energia e Elétrica com Inteligência</p>
+            <p style="margin-top: 15px;">
+                📱 WhatsApp: (62) 3092-2900<br>
+                📧 Email: contato@e2solucoes.com<br>
+                🌐 Site: <a href="https://www.e2solucoes.com">www.e2solucoes.com</a>
+            </p>
+            <div class="social-links">
+                <a href="https://instagram.com/e2solucoes">Instagram</a> •
+                <a href="https://linkedin.com/company/e2solucoes">LinkedIn</a> •
+                <a href="https://facebook.com/e2solucoes">Facebook</a>
+            </div>
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
+                © 2025 E2 Soluções. Todos os direitos reservados.<br>
+                <a href="{{ $env.BASE_URL }}/unsubscribe?email={{ $json.email }}&token={{ $json.unsubscribe_token }}" style="color: #FFA500;">Cancelar inscrição</a> • <a href="{{ $env.BASE_URL }}/privacy" style="color: #FFA500;">Política de Privacidade (LGPD)</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

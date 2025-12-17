@@ -110,6 +110,26 @@
     },
     {
       "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT create_appointment_reminders($1);",
+        "additionalFields": {
+          "queryParameters": "={{ $('Build Calendar Event').item.json.appointment_id }}"
+        }
+      },
+      "id": "create-appointment-reminders",
+      "name": "Create Appointment Reminders",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1350, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "={{ $env.RDSTATION_API_URL }}/tasks",
         "sendHeaders": true,
@@ -204,6 +224,17 @@
       ]
     },
     "Update Appointment": {
+      "main": [
+        [
+          {
+            "node": "Create Appointment Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Appointment Reminders": {
       "main": [
         [
           {

@@ -1,9 +1,10 @@
 # Sprint 1.1 - Validation Documentation Index
 
 **Sprint**: RAG e Base de Conhecimento
-**Status**: ✅ PRONTO PARA EXECUÇÃO
-**Tempo Estimado**: 2-3 horas
-**Data de Criação**: 2025-01-12
+**Status**: ✅ IMPLEMENTAÇÃO COMPLETA - Aguardando Validação
+**Implementação**: `docs/SPRINT_1.1_COMPLETE.md` (100% concluído)
+**Validação**: Executar procedimentos abaixo (2-3 horas)
+**Última Atualização**: 2025-01-12
 
 ---
 
@@ -27,7 +28,7 @@
 
 ### Guias de Validação (Executar em Ordem)
 
-#### [1. SETUP_CREDENTIALS.md](./SETUP_CREDENTIALS.md)
+#### [1. SETUP_CREDENTIALS.md](../Setups/SETUP_CREDENTIALS.md)
 **Objetivo**: Configurar todas as credenciais necessárias
 **Tempo**: 30-45 minutos
 **Pré-requisitos**: Nenhum
@@ -43,7 +44,7 @@
 
 ---
 
-#### [2. DEPLOY_SQL.md](./DEPLOY_SQL.md)
+#### [2. DEPLOY_SQL.md](../Setups/DEPLOY_SQL.md)
 **Objetivo**: Fazer deploy das funções SQL no Supabase
 **Tempo**: 10-15 minutos
 **Pré-requisitos**: SETUP_CREDENTIALS.md completo
@@ -59,7 +60,7 @@
 
 ---
 
-#### [3. EXECUTE_INGEST.md](./EXECUTE_INGEST.md)
+#### [3. EXECUTE_INGEST.md](../Setups/EXECUTE_INGEST.md)
 **Objetivo**: Popular banco de dados com embeddings da base de conhecimento
 **Tempo**: 15-20 minutos
 **Pré-requisitos**: DEPLOY_SQL.md completo
@@ -75,7 +76,7 @@
 
 ---
 
-#### [4. IMPORT_N8N_WORKFLOW.md](./IMPORT_N8N_WORKFLOW.md)
+#### [4. IMPORT_N8N_WORKFLOW.md](../Setups/IMPORT_N8N_WORKFLOW.md)
 **Objetivo**: Importar e configurar workflow RAG no n8n
 **Tempo**: 10-15 minutos
 **Pré-requisitos**: EXECUTE_INGEST.md completo
@@ -91,7 +92,7 @@
 
 ---
 
-#### [5. RUN_VALIDATION_TESTS.md](./RUN_VALIDATION_TESTS.md)
+#### [5. RUN_VALIDATION_TESTS.md](../Setups/RUN_VALIDATION_TESTS.md)
 **Objetivo**: Executar testes completos de validação end-to-end
 **Tempo**: 20-30 minutos
 **Pré-requisitos**: IMPORT_N8N_WORKFLOW.md completo
@@ -137,7 +138,7 @@ Resumo da documentação criada e checklist de entrega.
 
 ```bash
 # Passo 1: Ler guia completo
-less docs/validation/SETUP_CREDENTIALS.md
+less docs/Setups/SETUP_CREDENTIALS.md
 
 # Passo 2: Executar comandos do guia
 # Seguir instruções passo a passo
@@ -344,11 +345,12 @@ docker-compose logs -f n8n
 
 ### Próximos Sprints
 
-**Sprint 1.2**: Sistema de Agendamento Completo
+**Sprint 1.2**: Sistema de Agendamento Completo (📋 Planejamento em `docs/sprints/SPRINT_1.2_PLANNING.md`)
 - Google Calendar integration
 - RD Station CRM sync
 - Appointment scheduling logic
 - Reminder automation
+- **Aguardando**: Validação Sprint 1.1 completa
 
 **Sprint 1.3**: Sistema de Notificações
 - Email templates
