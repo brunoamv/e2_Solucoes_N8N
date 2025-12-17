@@ -224,21 +224,146 @@ evolution_send "5561981755748" "🤖 Teste do Bot E2 Soluções!\n\nSe você rec
 
 ---
 
-### Passo 9: Atualizar Workflow v1
+### Passo 9: Configurar Credencial PostgreSQL no n8n
 
-Seu workflow já importado precisa usar essa credencial:
+**🚨 CRÍTICO**: Os workflows precisam de acesso ao banco de dados!
+
+1. **Acesse o n8n**: http://localhost:5678
+
+2. **Vá em Credentials** (menu lateral)
+
+3. **Clique em "Add Credential"**
+
+4. **Busque por**: "Postgres"
+
+5. **Configure**:
+   - **Credential Name**: `PostgreSQL - E2 Bot`
+   - **Host**: `localhost`
+   - **Database**: `e2_bot`
+   - **User**: `postgres`
+   - **Password**: `CHANGE_ME_TO_STRONG_PASSWORD`
+     *(Copie do `docker/.env` → `POSTGRES_PASSWORD`)*
+   - **Port**: `5432`
+   - **SSL Mode**: `disable` (para desenvolvimento)
+
+6. **Clique em "Save"**
+
+7. **Teste a conexão**: Clique no botão "Test" para verificar
+
+**✅ Resultado esperado**: "Connection successful"
+
+**❌ Se falhar**: Verifique se o container PostgreSQL está rodando:
+```bash
+docker ps | grep postgres
+# Deve mostrar: e2bot-postgres-dev
+```
+
+---
+
+### Passo 10: Atualizar Workflows com Credenciais
+
+Agora vamos configurar TODOS os workflows importados:
+
+#### 10.1 - Workflow "01 - WhatsApp Handler"
+
+1. **Abra o workflow** "01_main_whatsapp_handler"
+
+2. **Encontre os nodes PostgreSQL** (ícone de elefante 🐘):
+   - "Check Duplicate"
+   - "Save Inbound Message"
+
+3. **Para cada node PostgreSQL**:
+   - Clique no node
+   - Em "Credential to connect with"
+   - Selecione: **PostgreSQL - E2 Bot**
+   - Salve o node
+
+4. **Salve o workflow**
+
+#### 10.2 - Workflow "02 - AI Agent Conversation V1 (Menu-Based)"
 
 1. **Abra o workflow** "02_ai_agent_conversation_V1_MENU"
 
-2. **Encontre os nodes HTTP Request** que fazem chamadas para Evolution API
+2. **Encontre os nodes PostgreSQL** (ícone 🐘):
+   - "Get Conversation State"
+   - "Create New Conversation"
+   - "Update Conversation State"
+   - "Save Inbound Message"
+   - "Save Outbound Message"
+   - "Upsert Lead Data"
 
-3. **Para cada node HTTP Request**:
+3. **Para cada node PostgreSQL**:
+   - Clique no node
+   - Em "Credential to connect with"
+   - Selecione: **PostgreSQL - E2 Bot**
+   - Salve o node
+
+4. **Encontre os nodes HTTP Request** (ícone 🌐):
+   - "Send WhatsApp Response"
+
+5. **Para cada node HTTP Request**:
    - Clique no node
    - Em "Credential for HTTP Request Header Auth"
    - Selecione: **Evolution API**
    - Salve o node
 
-4. **Salve o workflow**
+6. **Salve o workflow**
+
+#### 10.3 - Ativar os Workflows
+
+**IMPORTANTE**: Os workflows precisam estar ATIVOS para receberem webhooks!
+
+1. **Workflow "01 - WhatsApp Handler"**:
+   - Abra o workflow
+   - No canto superior direito, ative o toggle "Active"
+   - ✅ Deve ficar verde
+
+2. **Workflow "02 - AI Agent Conversation V1"**:
+   - Abra o workflow
+   - Ative o toggle "Active"
+   - ✅ Deve ficar verde
+
+---
+
+### Passo 11: Configurar Webhook na Evolution API
+
+Agora precisamos conectar a Evolution API ao n8n:
+
+```bash
+# Obter URL do webhook do n8n
+echo "Webhook URL: http://localhost:5678/webhook/whatsapp-evolution"
+
+# Configurar webhook na Evolution API
+source ./scripts/evolution-helper.sh
+
+curl -X POST "http://localhost:8080/webhook/set/e2-solucoes-bot" \
+  -H "apikey: $EVOLUTION_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "http://n8n-dev:5678/webhook/whatsapp-evolution",
+    "webhook_by_events": false,
+    "webhook_base64": false,
+    "events": [
+      "MESSAGES_UPSERT",
+      "MESSAGES_UPDATE",
+      "MESSAGES_DELETE",
+      "SEND_MESSAGE",
+      "CONNECTION_UPDATE"
+    ]
+  }'
+```
+
+**✅ Resultado esperado**:
+```json
+{
+  "webhook": {
+    "url": "http://n8n-dev:5678/webhook/whatsapp-evolution",
+    "enabled": true
+  }
+}
+```
+
+**💡 Nota**: Usamos `n8n-dev:5678` (nome do container) ao invés de `localhost:5678` porque a Evolution API precisa se comunicar com n8n pela rede Docker interna.
 
 ---
 
