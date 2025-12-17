@@ -4,6 +4,18 @@
 
 **Tempo estimado**: 10-15 minutos
 
+> **⚠️ PRÉ-REQUISITO IMPORTANTE**
+>
+> Este guia assume que você **JÁ COMPLETOU** o setup inicial do ambiente:
+> - ✅ n8n rodando em `http://localhost:5678`
+> - ✅ PostgreSQL e Supabase configurados
+> - ✅ Credenciais no `docker/.env`
+>
+> **Se você ainda NÃO tem o n8n rodando**, siga primeiro:
+> 📘 **[QUICKSTART.md](QUICKSTART.md)** - Setup completo do ambiente (n8n + PostgreSQL + Supabase)
+>
+> **Depois volte aqui** para configurar apenas o WhatsApp (Evolution API).
+
 > **⚠️ DESCOBERTA CRÍTICA (2025-12-17)**
 >
 > Evolution API v2.2.3 possui bug (Issue #1474) que afeta:
@@ -18,7 +30,31 @@
 
 ## 📝 Passo a Passo Completo (TESTADO E FUNCIONAL)
 
-### Passo 1: Iniciar Containers via Docker Compose
+### Passo 0: Verificar Pré-Requisitos
+
+**Verificar se n8n está rodando**:
+```bash
+docker ps | grep n8n
+curl -I http://localhost:5678
+```
+
+**Resultado esperado**:
+- Container `n8n-dev` com status "Up"
+- HTTP 200 OK ou página do n8n carregando
+
+**❌ Se n8n NÃO está rodando**:
+```bash
+# Volte para o QUICKSTART principal
+cat docs/QUICKSTART.md
+
+# Ou inicie todo o ambiente de desenvolvimento
+cd docker
+docker-compose -f docker-compose-dev.yml up -d
+```
+
+---
+
+### Passo 1: Iniciar APENAS Containers Evolution API
 
 ```bash
 cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/docker
@@ -80,6 +116,7 @@ O helper script facilita todas as operações e auto-carrega EVOLUTION_API_KEY:
 ```bash
 cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
 source ./scripts/evolution-helper.sh
+evolution_status
 ```
 
 **Verificar status da instância**:
@@ -159,7 +196,8 @@ Envie uma mensagem de teste:
 
 ```bash
 # Substituir pelo SEU número (DDI + DDD + número)
-evolution_send "5562999999999" "🤖 Teste do Bot E2 Soluções!\n\nSe você recebeu esta mensagem, o WhatsApp está funcionando! ✅"
+source ./scripts/evolution-helper.sh
+evolution_send "5561981755748" "🤖 Teste do Bot E2 Soluções!\n\nSe você recebeu esta mensagem, o WhatsApp está funcionando! ✅"
 ```
 
 **Você deve receber a mensagem no WhatsApp em 2-3 segundos.**
@@ -254,7 +292,7 @@ evolution_delete
 evolution_create
 
 # Enviar mensagem
-evolution_send "556299999999" "Mensagem de teste"
+evolution_send "5561981755748" "Mensagem de teste"
 ```
 
 ---

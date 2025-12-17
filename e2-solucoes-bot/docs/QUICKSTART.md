@@ -176,9 +176,35 @@ docker-compose -f docker/docker-compose-dev.yml restart
 
 ## 🎉 Próximos Passos
 
+### ✅ Ambiente Base Configurado!
+
+Você completou o setup do ambiente de desenvolvimento:
+- ✅ n8n rodando em `http://localhost:5678`
+- ✅ PostgreSQL/Supabase configurados
+- ✅ Credenciais no `docker/.env`
+
+### 📱 Configurar WhatsApp (Evolution API)
+
+Para adicionar integração WhatsApp ao projeto:
+
+**👉 Siga agora**: **[QUICKSTART_EVOLUTION_API.md](QUICKSTART_EVOLUTION_API.md)**
+
+Este guia específico ensina como:
+- Iniciar Evolution API (containers separados)
+- Aplicar workaround da Issue #1474
+- Gerar QR Code e conectar WhatsApp
+- Configurar credenciais no n8n
+- Testar envio/recebimento de mensagens
+
+**Tempo estimado**: 10-15 minutos
+
+---
+
+### 🚀 Roadmap Completo
+
 Após validação Sprint 1.1:
 - **Sprint 1.2**: Anthropic Claude API integration
-- **Sprint 1.3**: Evolution API (WhatsApp)
+- **Sprint 1.3**: ✅ Evolution API (WhatsApp) - **[Ver QUICKSTART_EVOLUTION_API.md](QUICKSTART_EVOLUTION_API.md)**
 - **Sprint 1.4**: Google Calendar + Drive
 - **Sprint 1.5**: RD Station CRM
 
