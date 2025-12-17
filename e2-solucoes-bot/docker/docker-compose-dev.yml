@@ -77,6 +77,38 @@ services:
       - e2bot-dev
 
   # ============================================================================
+  # PostgreSQL - E2 Bot Database (conversas, leads, mensagens)
+  # ============================================================================
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: e2bot-postgres-dev
+    restart: unless-stopped
+
+    ports:
+      - "5432:5432"
+
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-CoraRosa}
+      - POSTGRES_DB=e2_bot
+
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      # Inicialização do schema (será executado na primeira vez)
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ../database/appointment_functions.sql:/docker-entrypoint-initdb.d/02_appointment_functions.sql:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d e2_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - e2bot-dev
+
+  # ============================================================================
   # PostgreSQL - Evolution API Database
   # ============================================================================
   evolution-postgres:
@@ -205,6 +237,10 @@ volumes:
   n8n_dev_data:
     driver: local
     name: e2bot_n8n_dev_data
+
+  postgres_dev_data:
+    driver: local
+    name: e2bot_postgres_dev_data
 
   evolution_postgres_data:
     driver: local

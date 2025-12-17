@@ -224,7 +224,37 @@ evolution_send "5561981755748" "🤖 Teste do Bot E2 Soluções!\n\nSe você rec
 
 ---
 
-### Passo 9: Configurar Credencial PostgreSQL no n8n
+### Passo 9: Iniciar PostgreSQL Local
+
+Agora precisamos iniciar o banco de dados PostgreSQL para o bot E2:
+
+```bash
+cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/docker
+docker-compose -f docker-compose-dev.yml up -d postgres-dev
+```
+
+**Aguardar inicialização (10 segundos)**:
+```bash
+sleep 10
+```
+
+**Verificar se está rodando**:
+```bash
+docker ps | grep e2bot-postgres-dev
+```
+
+**✅ Resultado esperado**: Container `e2bot-postgres-dev` com status "Up"
+
+**Testar conexão**:
+```bash
+docker exec e2bot-postgres-dev psql -U postgres -d e2_bot -c "SELECT version();"
+```
+
+**✅ Deve mostrar**: Versão do PostgreSQL 15
+
+---
+
+### Passo 10: Configurar Credencial PostgreSQL no n8n
 
 **🚨 CRÍTICO**: Os workflows precisam de acesso ao banco de dados!
 
@@ -238,13 +268,20 @@ evolution_send "5561981755748" "🤖 Teste do Bot E2 Soluções!\n\nSe você rec
 
 5. **Configure**:
    - **Credential Name**: `PostgreSQL - E2 Bot`
-   - **Host**: `localhost`
+   - **Host**: `postgres-dev`
+     * **IMPORTANTE**: Use o nome do container Docker, NÃO `localhost`!
+     * O n8n está dentro do Docker e se comunica via rede interna
+
    - **Database**: `e2_bot`
+
    - **User**: `postgres`
-   - **Password**: `CHANGE_ME_TO_STRONG_PASSWORD`
+
+   - **Password**: `CoraRosa`
      *(Copie do `docker/.env` → `POSTGRES_PASSWORD`)*
+
    - **Port**: `5432`
-   - **SSL Mode**: `disable` (para desenvolvimento)
+
+   - **SSL Mode**: `disable` (para desenvolvimento local)
 
 6. **Clique em "Save"**
 
@@ -252,10 +289,24 @@ evolution_send "5561981755748" "🤖 Teste do Bot E2 Soluções!\n\nSe você rec
 
 **✅ Resultado esperado**: "Connection successful"
 
-**❌ Se falhar**: Verifique se o container PostgreSQL está rodando:
+**❌ Se falhar "Connection refused"**:
+
+Você usou `localhost` ao invés do nome do container. Corrija:
+- ❌ **ERRADO**: `Host: localhost`
+- ✅ **CORRETO**: `Host: postgres-dev`
+
+**💡 Por quê `postgres-dev` e não `localhost`?**
+
+O n8n está rodando **dentro do Docker**. Dentro da rede Docker:
+- `localhost` = próprio container n8n (não funciona)
+- `postgres-dev` = nome do container PostgreSQL na mesma rede (funciona!)
+
+**❌ Se falhar "Authentication failed"**:
+
+Senha incorreta. Verifique:
 ```bash
-docker ps | grep postgres
-# Deve mostrar: e2bot-postgres-dev
+grep POSTGRES_PASSWORD docker/.env
+# Use o valor que aparecer
 ```
 
 ---
