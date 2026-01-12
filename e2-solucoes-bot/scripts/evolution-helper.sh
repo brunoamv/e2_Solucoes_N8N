@@ -147,19 +147,42 @@ evolution_send() {
 evolution_recreate() {
     echo "🔄 Recriando instância: $INSTANCE_NAME"
     echo ""
-    echo "1/3 - Deletando instância antiga..."
+    echo "1/5 - Deletando instância antiga..."
     evolution_delete
     echo ""
     echo "⏳ Aguardando 3 segundos..."
     sleep 3
     echo ""
-    echo "2/3 - Criando nova instância..."
+    echo "2/5 - Criando nova instância..."
     evolution_create
     echo ""
-    echo "⏳ Aguardando Evolution gerar QR Code (5 segundos)..."
+    echo "⏳ Aguardando Evolution API inicializar (5 segundos)..."
     sleep 5
     echo ""
-    echo "3/3 - Buscando QR Code..."
+    echo "3/5 - Configurando webhook para n8n..."
+    curl -s -X POST "$EVOLUTION_URL/webhook/set/$INSTANCE_NAME" \
+        -H "apikey: $EVOLUTION_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "webhook": {
+                "url": "http://e2bot-n8n-dev:5678/webhook/whatsapp-evolution",
+                "enabled": true,
+                "webhook_by_events": false,
+                "webhook_base64": false,
+                "events": [
+                    "MESSAGES_UPSERT",
+                    "MESSAGES_UPDATE",
+                    "CONNECTION_UPDATE",
+                    "QRCODE_UPDATED"
+                ]
+            }
+        }' | jq '.webhook' 2>/dev/null || echo "   ✅ Webhook configurado"
+    echo ""
+    echo "4/5 - Verificando configuração do webhook..."
+    curl -s "$EVOLUTION_URL/webhook/find/$INSTANCE_NAME" \
+        -H "apikey: $EVOLUTION_API_KEY" | jq -r '.url' 2>/dev/null
+    echo ""
+    echo "5/5 - Buscando QR Code..."
     evolution_qrcode
 }
 

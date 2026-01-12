@@ -210,29 +210,65 @@ Após validação Sprint 1.1:
 
 ---
 
-## 📊 Status Atual (2025-12-12)
+## 🚨 Atualizações Críticas (2025-01-06)
 
-**Validação Estrutural**: ✅ **100% COMPLETA**
+### ⚠️ Evolution API - Versão Crítica
+**IMPORTANTE**: Usar Evolution API v2.3.7 ou superior
+- **Docker Image Correta**: `evoapicloud/evolution-api:latest`
+- **NÃO USAR**: `atendai/evolution-api:v2.2.3` (quebrado - duplica phone numbers)
+- **Documentação do Issue**: `docs/EVOLUTION_API_ISSUE.md`
+
+### ✅ Workflows Corrigidos
+Importar versões corrigidas dos workflows:
+- `02_ai_agent_conversation_V1_MENU_FIXED_v3.json` - Todas correções aplicadas
+- Correções incluem: phone_number extraction, collected_data handling, state updates
+
+### 🔧 Scripts de Correção Disponíveis
+Se encontrar problemas, executar:
+```bash
+# Fix JSON para importação
+python scripts/escape-json-for-n8n.py
+
+# Fix workflow connections
+python scripts/fix-workflow-02-connections.py
+
+# Fix collected data handling
+python scripts/fix-collected-data-handling.py
+```
+
+---
+
+## 📊 Status Atual (2025-01-06)
+
+**Sistema**: ✅ **90% OPERACIONAL**
+
+**Correções Aplicadas**:
+- ✅ Evolution API v2.2.3 → v2.3.7 migration
+- ✅ JSON import issues resolvidos
+- ✅ Phone number extraction corrigido
+- ✅ Collected data handling implementado
+- ✅ Update Conversation State node corrigido
 
 **Passos Concluídos**:
 - ✅ Passo 1: Credenciais configuradas e validadas
 - ✅ Passo 2: n8n rodando (localhost:5678, healthy)
 - ✅ Passo 3: SQL functions deployadas no Supabase
-- ✅ Passo 5: Documentação de importação workflow criada
-- ✅ Passo 6: Infraestrutura 100% validada
+- ✅ Evolution API v2.3.7 configurada e funcionando
+- ✅ Workflows corrigidos e validados
 
 **Pendente**:
 - ⏸️ Passo 4: Ingest - **AGUARDANDO novo token OpenAI** (equipe comercial)
-- ⏳ Passo 5: Importação manual do workflow no n8n UI (10-15 min)
+- ⏳ Validação E2E completa com token OpenAI
 
 **Próximos Passos** (quando token disponível):
 1. Atualizar `docker/.env` com novo token OpenAI
-2. Importar workflow via n8n UI (manual)
-3. Configurar credenciais OpenAI e PostgreSQL
-4. Executar `scripts/ingest-simple.sh`
-5. Testar RAG query completo
+2. Executar `scripts/ingest-simple.sh`
+3. Testar RAG query completo
+4. Validação E2E do sistema completo
 
 **Tempo Estimado**: ~15 minutos após token disponível
 
-**Relatório Detalhado**: `VALIDATION_REPORT.md`
-**Documentação Completa**: `docker/README.md` e `docs/validation/`
+**Documentação Crítica**:
+- **Evolution API Issue**: `docs/EVOLUTION_API_ISSUE.md`
+- **Correções Aplicadas**: `docs/PLAN/` (múltiplos fix reports)
+- **Documentação Completa**: `/CLAUDE.md` (atualizado 2025-01-06)

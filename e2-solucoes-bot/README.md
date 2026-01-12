@@ -1,7 +1,7 @@
 # 🤖 E2 Soluções AI Bot v3
 
-> **Status**: ✅ Sprints 1.1 e 1.2 Completos (75% Funcional) | 🧪 Aguardando Validação
-> **Última Atualização**: 2025-12-15
+> **Status**: ✅ PostgreSQL Queries Corrigidas (V17) | 95% Funcional | 🧪 Aguardando Validação
+> **Última Atualização**: 2025-01-12
 
 Bot inteligente de WhatsApp com Claude AI, RAG e integração completa com RD Station CRM para automação de atendimento e qualificação de leads da E2 Soluções (empresa brasileira de engenharia elétrica).
 
@@ -125,6 +125,22 @@ nano docker/.env.dev  # Configurar API keys
 
 ---
 
+## 🚨 Correções Críticas Aplicadas (2025-01-12)
+
+### ✅ PostgreSQL Query Interpolation - V16/V17
+**Problema**: n8n não processava interpolação JavaScript em queries SQL (`{{ $node["name"].json.field }}`)
+**Solução V16**: Node "Build SQL Queries" constrói queries como strings puras
+**Solução V17**: Node "Merge Queries Data" preserva campos através do IF node
+**Status**: ✅ RESOLVIDO - Count e Get Details funcionando corretamente
+**Documentação**: `docs/PLAN/complete_postgres_query_solution.md`
+
+### Outras Correções Recentes
+- ✅ **Evolution API v2.3.7**: Migração resolveu problemas de extração de telefone
+- ✅ **JSON Import**: Scripts corrigem problemas de importação no n8n
+- ✅ **collected_data**: Handling seguro com PostgreSQL JSONB
+
+---
+
 ## 📊 Status de Implementação
 
 ### ✅ Sprint 1.1 - RAG e Base de Conhecimento (100%)
@@ -177,9 +193,10 @@ e2-solucoes-bot/
 │   ├── appointment_functions.sql # 9 funções de agendamento
 │   └── supabase_functions.sql   # Funções RAG e vector search
 │
-├── n8n/workflows/               # 10 workflows n8n
+├── n8n/workflows/               # 10+ workflows n8n (V17 atual)
 │   ├── 01_main_whatsapp_handler.json
-│   ├── 02_ai_agent_conversation.json
+│   ├── 02_ai_agent_conversation_V17.json  # ⭐ VERSÃO ATUAL
+│   ├── 02_ai_agent_conversation_V16.json  # Build SQL Queries
 │   ├── 03_rag_knowledge_query.json
 │   ├── 04_image_analysis.json
 │   ├── 05_appointment_scheduler.json
@@ -207,6 +224,9 @@ e2-solucoes-bot/
 ├── scripts/                     # Scripts de automação
 │   ├── start-dev.sh             # Iniciar ambiente
 │   ├── ingest-knowledge.sh      # Gerar embeddings
+│   ├── fix-postgres-query-interpolation.py  # Fix V16
+│   ├── fix-query-details-propagation.py     # Fix V17
+│   ├── validate-postgres-fix.sh  # Validar correções
 │   ├── logs.sh                  # Ver logs
 │   ├── health-check.sh          # Validar sistema
 │   └── [backup, restore, migrate]
@@ -398,6 +418,6 @@ Proprietário - E2 Soluções
 
 ---
 
-**Última Atualização**: 2025-12-15
-**Versão**: 3.0
-**Status**: ✅ Sprints 1.1 e 1.2 Implementados | 🧪 Aguardando Validação
+**Última Atualização**: 2025-01-12
+**Versão**: 3.1
+**Status**: ✅ PostgreSQL Queries Corrigidas (V17) | Sprints 1.1 e 1.2 Implementados | 🧪 Aguardando Validação

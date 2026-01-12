@@ -16,15 +16,21 @@
 >
 > **Depois volte aqui** para configurar apenas o WhatsApp (Evolution API).
 
-> **⚠️ DESCOBERTA CRÍTICA (2025-12-17)**
+> **🚨 ATUALIZAÇÃO CRÍTICA (2025-01-06)**
 >
-> Evolution API v2.2.3 possui bug (Issue #1474) que afeta:
-> 1. ✅ Inicialização do Baileys
-> 2. ✅ **Geração de QR Code** (descoberta nova!)
+> Evolution API v2.2.3 tinha bugs críticos que impediam funcionamento:
+> 1. ❌ Phone number duplicado (55629817554855629817@s.whatsapp.net)
+> 2. ❌ Issue #1474 - QR Code não gerava sem workaround
 >
-> **SOLUÇÃO VALIDADA**: Copiar `.env` para dentro do container + reiniciar
+> **SOLUÇÃO DEFINITIVA**: Migração para Evolution API v2.3.7
+> - ✅ Campo `senderPn` com phone number limpo
+> - ✅ Extração correta de números
+> - ✅ Sistema 100% funcional
 >
-> **Referência**: `docs/EVOLUTION_API_ISSUE_1474_WORKAROUND.md`
+> **Docker Image**: `evoapicloud/evolution-api:latest` (v2.3.7+)
+> **NÃO USAR**: `atendai/evolution-api:v2.2.3` (deprecated)
+>
+> **Referência Completa**: `docs/EVOLUTION_API_ISSUE.md`
 
 ---
 
@@ -150,6 +156,7 @@ evolution_status
 
 **Opção A: Recriar do zero (recomendado se já existe)**
 ```bash
+source ./scripts/evolution-helper.sh
 evolution_recreate
 ```
 
@@ -197,7 +204,7 @@ Envie uma mensagem de teste:
 ```bash
 # Substituir pelo SEU número (DDI + DDD + número)
 source ./scripts/evolution-helper.sh
-evolution_send "5561981755748" "🤖 Teste do Bot E2 Soluções!\n\nSe você recebeu esta mensagem, o WhatsApp está funcionando! ✅"
+evolution_send "5561981755748" "🤖 Teste do Bot E2 SoluçõesSe você recebeu esta mensagem, o WhatsApp está funcionando! ✅"
 ```
 
 **Você deve receber a mensagem no WhatsApp em 2-3 segundos.**
@@ -362,59 +369,162 @@ Agora vamos configurar TODOS os workflows importados:
 
 #### 10.3 - Ativar os Workflows
 
-**IMPORTANTE**: Os workflows precisam estar ATIVOS para receberem webhooks!
+**🚨 CRÍTICO**: Os workflows precisam estar ATIVOS para receberem webhooks!
+
+Workflows inativos retornam **HTTP 403 Forbidden** quando recebem requisições.
 
 1. **Workflow "01 - WhatsApp Handler"**:
-   - Abra o workflow
-   - No canto superior direito, ative o toggle "Active"
-   - ✅ Deve ficar verde
+   - Acesse: http://localhost:5678/workflows
+   - Clique no workflow "01_main_whatsapp_handler"
+   - No canto superior direito, procure o toggle "**Inactive**" (vermelho/cinza)
+   - Clique para ativar → deve mudar para "**Active**" (verde)
+   - ✅ Confirmação visual: toggle verde + texto "Active"
 
 2. **Workflow "02 - AI Agent Conversation V1"**:
-   - Abra o workflow
-   - Ative o toggle "Active"
-   - ✅ Deve ficar verde
+   - Clique no workflow "02_ai_agent_conversation_V1_MENU"
+   - Ative o toggle "Inactive" → "Active"
+   - ✅ Confirmação visual: toggle verde
+
+**Verificar se ambos estão ativos**:
+```bash
+# Via browser, acesse http://localhost:5678/workflows
+# Você deve ver AMBOS workflows com status "Active" (verde)
+```
+
+**❌ Se esquecer de ativar**:
+- Evolution API enviará webhooks para n8n
+- n8n retornará **403 Forbidden**
+- Mensagens não serão processadas
+- Bot não responderá
 
 ---
 
 ### Passo 11: Configurar Webhook na Evolution API
 
-Agora precisamos conectar a Evolution API ao n8n:
+**⚠️ PRÉ-REQUISITO**: Evolution API precisa estar rodando!
+
+Se você seguiu apenas os Passos 8-10 (configuração n8n + PostgreSQL), a Evolution API ainda **NÃO está rodando**.
+
+**Verificar se Evolution API está rodando**:
+```bash
+curl -I http://localhost:8080/manager/instances 2>&1 | grep "HTTP"
+```
+
+**❌ Se retornar erro "Failed to connect"**:
+
+A Evolution API não está rodando. Execute os Passos 1-3 primeiro:
 
 ```bash
-# Obter URL do webhook do n8n
-echo "Webhook URL: http://localhost:5678/webhook/whatsapp-evolution"
+cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/docker
 
-# Configurar webhook na Evolution API
+# Passo 1: Iniciar containers Evolution
+docker-compose -f docker-compose-dev.yml up -d evolution-postgres evolution-redis evolution-api
+sleep 20
+
+# Passo 2: Aplicar workaround Issue #1474
+docker cp /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/docker/.env e2bot-evolution-dev:/evolution/.env
+docker restart e2bot-evolution-dev
+sleep 20
+
+# Passo 3: Verificar status
+docker ps | grep evolution
+curl -I http://localhost:8080/manager/instances
+```
+
+**✅ Se retornar "HTTP/1.1 200 OK"**: Evolution API está pronta!
+
+---
+
+**🚨 IMPORTANTE**: Antes de configurar o webhook, você precisa ter a **instância WhatsApp conectada**!
+
+Se você ainda não criou/conectou a instância WhatsApp, volte e execute os **Passos 4-6**:
+
+```bash
+cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
 source ./scripts/evolution-helper.sh
 
+# Verificar se instância existe e está conectada
+evolution_status
+
+# Se retornar 404 ou "state": "close", crie a instância:
+evolution_recreate
+
+# Escaneie o QR Code com WhatsApp
+# Depois verifique novamente:
+evolution_status
+# Deve retornar: "state": "open"
+```
+
+---
+
+**Configurar webhook na Evolution API**:
+
+```bash
+cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
+
+# Carregar helper com EVOLUTION_API_KEY
+source ./scripts/evolution-helper.sh
+
+# Configurar webhook (payload correto para Evolution API v2.2.3)
 curl -X POST "http://localhost:8080/webhook/set/e2-solucoes-bot" \
   -H "apikey: $EVOLUTION_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "http://n8n-dev:5678/webhook/whatsapp-evolution",
-    "webhook_by_events": false,
-    "webhook_base64": false,
-    "events": [
-      "MESSAGES_UPSERT",
-      "MESSAGES_UPDATE",
-      "MESSAGES_DELETE",
-      "SEND_MESSAGE",
-      "CONNECTION_UPDATE"
-    ]
+    "webhook": {
+      "url": "http://n8n-dev:5678/webhook/whatsapp-evolution",
+      "enabled": true,
+      "webhook_by_events": false,
+      "webhook_base64": false,
+      "events": [
+        "MESSAGES_UPSERT",
+        "MESSAGES_UPDATE",
+        "MESSAGES_DELETE",
+        "SEND_MESSAGE",
+        "CONNECTION_UPDATE"
+      ]
+    }
   }'
 ```
 
 **✅ Resultado esperado**:
 ```json
 {
-  "webhook": {
-    "url": "http://n8n-dev:5678/webhook/whatsapp-evolution",
-    "enabled": true
-  }
+  "id": "cmj...",
+  "url": "http://n8n-dev:5678/webhook/whatsapp-evolution",
+  "enabled": true,
+  "events": ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "SEND_MESSAGE", "CONNECTION_UPDATE"],
+  "webhookByEvents": false,
+  "webhookBase64": false
 }
 ```
 
+**❌ Se retornar erro 400 "instance requires property webhook"**:
+
+A instância não existe ou não está conectada. Execute:
+```bash
+evolution_status  # Verificar estado
+evolution_recreate  # Se necessário, recriar + conectar
+```
+
 **💡 Nota**: Usamos `n8n-dev:5678` (nome do container) ao invés de `localhost:5678` porque a Evolution API precisa se comunicar com n8n pela rede Docker interna.
+
+---
+
+**Verificar webhook configurado**:
+```bash
+curl -X GET "http://localhost:8080/webhook/find/e2-solucoes-bot" \
+  -H "apikey: $EVOLUTION_API_KEY" | python3 -m json.tool
+```
+
+**✅ Deve mostrar**:
+```json
+{
+  "id": "...",
+  "url": "http://n8n-dev:5678/webhook/whatsapp-evolution",
+  "enabled": true,
+  "events": ["MESSAGES_UPSERT", "MESSAGES_UPDATE", ...]
+}
+```
 
 ---
 

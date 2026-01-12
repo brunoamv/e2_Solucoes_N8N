@@ -53,11 +53,6 @@ services:
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
 
-      # === Evolution API Integration (Sprint 0.1) ===
-      - EVOLUTION_API_URL=http://e2bot-evolution-dev:8080
-      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-e2-solucoes-bot}
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
-
       # === Performance (Dev) ===
       - N8N_PAYLOAD_SIZE_MAX=16
       - EXECUTIONS_DATA_SAVE_ON_ERROR=all
@@ -138,7 +133,7 @@ services:
   # Evolution API - WhatsApp Integration (Sprint 0.1)
   # ============================================================================
   evolution-api:
-    image: evoapicloud/evolution-api:latest
+    image: atendai/evolution-api:latest
     container_name: e2bot-evolution-dev
     restart: unless-stopped
     depends_on:

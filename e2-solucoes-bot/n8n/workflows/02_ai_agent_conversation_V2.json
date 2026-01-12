@@ -1,0 +1,273 @@
+{
+  "name": "02 - AI Agent Conversation V2",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validar entrada do Workflow 01\nconst inputData = $input.first().json;\n\n// Validação crítica\nif (!inputData.phone_number) {\n    throw new Error('phone_number is required');\n}\n\n// Limpar phone_number\nlet phone_number = String(inputData.phone_number).replace(/[^0-9]/g, '');\n\n// Adicionar 55 se necessário\nif (phone_number && !phone_number.startsWith('55')) {\n    phone_number = '55' + phone_number;\n}\n\nconsole.log('Validated:', {\n    phone_number: phone_number,\n    message: inputData.message\n});\n\nreturn {\n    phone_number: phone_number,\n    message: inputData.message || '',\n    whatsapp_name: inputData.whatsapp_name || '',\n    message_type: inputData.message_type || 'text',\n    timestamp: new Date().toISOString()\n};"
+      },
+      "id": "validate",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM conversations WHERE phone_number = '{{ $json.phone_number }}' ORDER BY updated_at DESC LIMIT 1;",
+        "options": {}
+      },
+      "id": "get_conversation",
+      "name": "Get Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        650,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL E2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "check_new",
+      "name": "Check New User",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO conversations (phone_number, whatsapp_name, current_state, created_at, updated_at)\nVALUES ('{{ $node[\"Validate Input\"].json.phone_number }}', '{{ $node[\"Validate Input\"].json.whatsapp_name }}', 'greeting', NOW(), NOW())\nON CONFLICT (phone_number) DO UPDATE SET updated_at = NOW()\nRETURNING *;",
+        "options": {}
+      },
+      "id": "create_conversation",
+      "name": "Create Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1050,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL E2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple State Machine for testing\nconst phone_number = $node[\"Validate Input\"].json.phone_number;\nconst message = $node[\"Validate Input\"].json.message || '';\nconst conversation = $input.first().json;\nconst currentState = conversation.current_state || 'greeting';\n\nlet response = '';\nlet nextState = currentState;\n\n// Simple logic for testing\nif (currentState === 'greeting') {\n    response = '🤖 Olá! Bem-vindo à E2 Soluções!\\n\\nEscolha o serviço:\\n1 - Energia Solar\\n2 - Subestação\\n3 - Projetos Elétricos';\n    nextState = 'service_selection';\n} else if (currentState === 'service_selection') {\n    if (message === '1' || message === '2' || message === '3') {\n        response = '✅ Serviço selecionado! Qual seu nome completo?';\n        nextState = 'collect_name';\n    } else {\n        response = '❌ Por favor, escolha 1, 2 ou 3';\n    }\n} else {\n    response = 'Digite NOVO para recomeçar';\n    nextState = 'greeting';\n}\n\nreturn {\n    phone_number: phone_number,\n    response: response,\n    nextState: nextState,\n    currentState: currentState\n};"
+      },
+      "id": "state_machine",
+      "name": "State Machine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE conversations\nSET current_state = '{{ $json.nextState }}', updated_at = NOW()\nWHERE phone_number = '{{ $json.phone_number }}'\nRETURNING *;",
+        "options": {}
+      },
+      "id": "update_db",
+      "name": "Update Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1450,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL E2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://e2bot-evolution-dev:8080/message/sendText/e2-solucoes-bot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $node[\"State Machine\"].json[\"phone_number\"] }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $node[\"State Machine\"].json[\"response\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send_whatsapp",
+      "name": "Send WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1650,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation": {
+      "main": [
+        [
+          {
+            "node": "Check New User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check New User": {
+      "main": [
+        [
+          {
+            "node": "Create Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "State Machine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Conversation": {
+      "main": [
+        [
+          {
+            "node": "State Machine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State Machine": {
+      "main": [
+        [
+          {
+            "node": "Update Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Database": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "v2-definitive-fix",
+  "id": "2",
+  "meta": {
+    "instanceId": "e2-solucoes-bot"
+  },
+  "tags": [
+    {
+      "name": "v2",
+      "createdAt": "2026-01-08T00:00:00.000Z",
+      "updatedAt": "2026-01-08T00:00:00.000Z",
+      "id": "1"
+    }
+  ]
+}

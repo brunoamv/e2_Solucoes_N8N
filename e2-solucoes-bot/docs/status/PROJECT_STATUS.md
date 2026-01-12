@@ -1,7 +1,32 @@
 # E2 Soluções Bot - Project Status
 
 **Última Atualização**: 2025-01-12
-**Fase Atual**: Sprint 1.1 Completo → Validação → Sprint 1.2 Planejamento
+**Fase Atual**: PostgreSQL Queries Corrigidas (V17) → Sprint 1.2 Ready
+**Status Sistema**: ✅ OPERACIONAL (95% funcional)
+
+---
+
+## 🚨 Atualizações Críticas (2025-01-12)
+
+### Nova Correção - PostgreSQL Query Interpolation (V16/V17)
+| Issue | Status | Impacto | Documentação |
+|-------|--------|---------|--------------|
+| **PostgreSQL Queries com JavaScript** | ✅ RESOLVIDO (V16) | CRÍTICO - Count retornava 0 | `docs/PLAN/postgres_query_fix_implementation.md` |
+| **Propagação de query_details** | ✅ RESOLVIDO (V17) | CRÍTICO - Get Details falhava | `docs/PLAN/query_details_propagation_fix.md` |
+
+**Solução Completa V17**:
+- Node "Build SQL Queries" constrói queries como strings puras (V16)
+- Node "Merge Queries Data" preserva campos através do IF node (V17)
+- Documentação completa: `docs/PLAN/complete_postgres_query_solution.md`
+
+### Correções Anteriores (2025-01-06)
+| Issue | Status | Impacto | Documentação |
+|-------|--------|---------|--------------|
+| **Evolution API v2.2.3 → v2.3.7** | ✅ RESOLVIDO | CRÍTICO - Sistema não funcionava | `docs/EVOLUTION_API_ISSUE.md` |
+| **JSON Import Workflows** | ✅ RESOLVIDO | ALTO - Workflows não importavam | `docs/PLAN/workflow_json_fix_analysis.md` |
+| **Phone Number Undefined** | ✅ RESOLVIDO | CRÍTICO - Sem identificação usuários | `docs/PLAN/workflow_02_phone_fix_report.md` |
+| **Collected Data Handling** | ✅ RESOLVIDO | ALTO - Perda de dados coletados | `docs/PLAN/collected_data_fix_complete.md` |
+| **Update State Node** | ✅ RESOLVIDO | ALTO - Workflow parava no meio | `docs/PLAN/workflow_02_update_state_fix.md` |
 
 ---
 
@@ -9,15 +34,46 @@
 
 | Componente | Status | Documentação |
 |-----------|--------|--------------|
+| **Sprint 0.1 - Bot v1 Menu** | ✅ VALIDADO 100% | `docs/sprints/SPRINT_0.1_V1_SIMPLES.md` |
 | **Sprint 1.1 - RAG** | ✅ IMPLEMENTAÇÃO COMPLETA | `docs/SPRINT_1.1_COMPLETE.md` |
 | **Sprint 1.1 - Setup** | 📋 GUIAS DISPONÍVEIS | `docs/Setups/` (5 guias) |
-| **Sprint 1.1 - Validação** | ⏳ AGUARDANDO EXECUÇÃO | `docs/validation/README.md` |
+| **Sprint 1.1 - Validação** | ⏳ AGUARDANDO TOKEN OPENAI | `docs/validation/README.md` |
 | **Sprint 1.1 - Status** | 📊 TRACKING | `docs/status/SPRINT_1.1_STATUS.md` |
-| **Sprint 1.2 - Agendamento** | 📋 PLANEJAMENTO | `docs/sprints/SPRINT_1.2_PLANNING.md` |
+| **Sprint 1.2 - Agendamento** | 📋 PRONTO PARA IMPLEMENTAÇÃO | `docs/sprints/SPRINT_1.2_PLANNING.md` |
+| **Sprint 1.3 - Notificações** | ✅ IMPLEMENTADO | `docs/status/SPRINT_1.3_IMPLEMENTATION_STATUS.md` |
 
 ---
 
 ## ✅ O Que Está Pronto
+
+### Sprint 0.1 - Bot v1 Menu-Based (100% VALIDADO)
+
+**Status**: ✅ VALIDAÇÃO COMPLETA - 2025-12-30
+
+**Implementação**:
+- ✅ Workflow 02 v1 menu-based (15 nodes, 22KB)
+- ✅ Templates WhatsApp (9 arquivos + README)
+- ✅ Validadores JavaScript (telefone, email, cidade)
+- ✅ State machine com 8 estados
+- ✅ Integração com agendamento (Workflow 05)
+- ✅ Integração com handoff (Workflow 10)
+- ✅ Scripts de deploy e testes automatizados
+
+**Resultados de Validação**:
+- ✅ 3/3 testes de validadores (100%)
+- ✅ 3/3 testes de database estrutura (100%)
+- ✅ Workflow JSON válido (15 nodes)
+- ✅ Templates formatados corretamente
+- ✅ Schema PostgreSQL completo
+
+**Custo Operacional**: R$ 50/mês (sem Claude AI)
+
+**Documentação**:
+- Implementação: `docs/sprints/SPRINT_0.1_V1_SIMPLES.md` (1.287 linhas)
+- Validação: `docs/validation/SPRINT_0.1_VALIDATION.md` (680 linhas)
+- Scripts: `scripts/deploy-v1.sh`, `scripts/test-v1-menu.sh`
+
+---
 
 ### Sprint 1.1 - RAG e Base de Conhecimento (100%)
 
@@ -212,9 +268,68 @@ cat docs/sprints/README.md
 - [x] Planejamento criado
 - [x] Objetivos definidos
 - [x] Documentação estruturada
-- [ ] Pré-requisitos validados
+- [x] Pré-requisitos validados (Evolution API v2.3.7 funcionando)
 - [ ] Desenvolvimento iniciado
+
+### Correções Críticas
+- [x] Evolution API v2.2.3 → v2.3.7 migration
+- [x] JSON import issues resolved
+- [x] Phone number extraction fixed
+- [x] Collected data handling implemented
+- [x] Update Conversation State node fixed
+- [x] All workflows validated and working
 
 ---
 
-**Próxima Ação Recomendada**: Executar setup Sprint 1.1 conforme guias em `docs/Setups/` e validação conforme `docs/validation/README.md`
+## 🔧 Scripts de Correção Disponíveis
+
+### Scripts Python para Fixes
+```bash
+# Fix PostgreSQL query interpolation (V16)
+python scripts/fix-postgres-query-interpolation.py
+
+# Fix query_details propagation (V17)
+python scripts/fix-query-details-propagation.py
+
+# Script de validação das correções
+./scripts/validate-postgres-fix.sh
+
+# Fix Update Conversation State node
+python scripts/fix-update-conversation-node.py
+
+# Fix collected data handling
+python scripts/fix-collected-data-handling.py
+
+# Fix workflow connections
+python scripts/fix-workflow-02-connections.py
+
+# Escape JSON for n8n import
+python scripts/escape-json-for-n8n.py
+```
+
+### Workflows Corrigidos
+- `02_ai_agent_conversation_V17.json` - Versão FINAL com todas correções (PostgreSQL queries + propagação)
+- `02_ai_agent_conversation_V16.json` - Versão com Build SQL Queries
+- `02_ai_agent_conversation_V1_MENU_FIXED_v3.json` - Versão anterior (substituída por V17)
+- Importar V17 via n8n UI (http://localhost:5678)
+
+---
+
+## ⚠️ Requisitos Críticos
+
+### Evolution API
+- **Versão Requerida**: v2.3.7 ou superior
+- **Docker Image**: `evoapicloud/evolution-api:latest`
+- **NÃO USAR**: `atendai/evolution-api:v2.2.3` (deprecated, quebrado)
+
+### OpenAI Token
+- **Status**: ⏳ Aguardando renovação
+- **Necessário para**: Gerar embeddings (Sprint 1.1 RAG)
+- **Modelo**: text-embedding-ada-002
+
+---
+
+**Próxima Ação Recomendada**:
+1. Verificar Evolution API v2.3.7 está rodando: `docker logs e2bot-evolution`
+2. Importar workflows corrigidos em n8n
+3. Quando OpenAI token disponível, executar setup Sprint 1.1 conforme `docs/validation/README.md`

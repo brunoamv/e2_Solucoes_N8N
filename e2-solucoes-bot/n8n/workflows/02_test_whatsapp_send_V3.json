@@ -1,0 +1,103 @@
+{
+  "name": "02 - Test WhatsApp Send V3",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "values": [
+            {
+              "name": "phone_number",
+              "value": "5561981755748"
+            },
+            {
+              "name": "text",
+              "value": "🤖 Teste V3 - Mensagem enviada com sucesso!"
+            }
+          ]
+        }
+      },
+      "id": "set_data",
+      "name": "Set Test Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://e2bot-evolution-dev:8080/message/sendText/e2-solucoes-bot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"number\": \"{{$json[\"phone_number\"]}}\", \"text\": \"{{$json[\"text\"]}}\"}"
+      },
+      "id": "http",
+      "name": "Send WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        650,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Test Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Test Data": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "v3-ultra-simple",
+  "id": "2",
+  "meta": {
+    "instanceId": "e2-solucoes-bot"
+  },
+  "tags": []
+}
