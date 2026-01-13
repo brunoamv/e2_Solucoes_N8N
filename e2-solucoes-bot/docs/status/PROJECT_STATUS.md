@@ -1,23 +1,28 @@
 # E2 Soluções Bot - Project Status
 
-**Última Atualização**: 2025-01-12
-**Fase Atual**: PostgreSQL Queries Corrigidas (V17) → Sprint 1.2 Ready
-**Status Sistema**: ✅ OPERACIONAL (95% funcional)
+**Última Atualização**: 2025-01-12 (22:30)
+**Fase Atual**: Workflow V22 Connection Pattern Fixed → 100% Operacional
+**Status Sistema**: ✅ OPERACIONAL (100% funcional - V22 completa)
 
 ---
 
 ## 🚨 Atualizações Críticas (2025-01-12)
 
-### Nova Correção - PostgreSQL Query Interpolation (V16/V17)
-| Issue | Status | Impacto | Documentação |
-|-------|--------|---------|--------------|
-| **PostgreSQL Queries com JavaScript** | ✅ RESOLVIDO (V16) | CRÍTICO - Count retornava 0 | `docs/PLAN/postgres_query_fix_implementation.md` |
-| **Propagação de query_details** | ✅ RESOLVIDO (V17) | CRÍTICO - Get Details falhava | `docs/PLAN/query_details_propagation_fix.md` |
+### ✅ EVOLUÇÃO COMPLETA V17 → V22 (RESOLVIDO)
 
-**Solução Completa V17**:
-- Node "Build SQL Queries" constrói queries como strings puras (V16)
-- Node "Merge Queries Data" preserva campos através do IF node (V17)
-- Documentação completa: `docs/PLAN/complete_postgres_query_solution.md`
+| Versão | Issue | Status | Impacto | Documentação |
+|--------|-------|--------|---------|--------------|
+| **V17-V18** | Query String Errors | ✅ RESOLVIDO | CRÍTICO - "query must be text string" | `docs/FIX_SUMMARY_V16_V17.md` |
+| **V19** | Conversation ID Null | ✅ RESOLVIDO | CRÍTICO - Menu loop infinito | `docs/FIX_CONVERSATION_ID_V19.md` |
+| **V20** | Template Strings | ✅ RESOLVIDO | ALTO - {{ }} não processados | Scripts: `fix-workflow-v20-query-format.py` |
+| **V21** | Data Flow Issues | ✅ RESOLVIDO | ALTO - Dados incompletos | `docs/FIX_DATA_FLOW_V21.md` |
+| **V22** | Connection Pattern | ✅ RESOLVIDO | CRÍTICO - "Cannot read properties" | `docs/ANALYSIS_V22_FIX.md` |
+
+**Solução Final V22** (ATUAL):
+- Build Update Queries distribui queries em PARALELO para todos os nodes
+- Save Inbound/Outbound Messages recebem queries corretas
+- Update Conversation State executa sem erros
+- Workflow: `02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json`
 
 ### Correções Anteriores (2025-01-06)
 | Issue | Status | Impacto | Documentação |
@@ -281,37 +286,41 @@ cat docs/sprints/README.md
 
 ---
 
-## 🔧 Scripts de Correção Disponíveis
+## 🔧 Scripts de Correção Disponíveis (V17 → V22)
 
-### Scripts Python para Fixes
+### Scripts Python da Evolução Completa
 ```bash
-# Fix PostgreSQL query interpolation (V16)
+# V22 - Connection Pattern Fix (ATUAL) ✅
+python scripts/fix-workflow-v22-connection-pattern.py
+
+# V21 - Data Flow Fix
+python scripts/fix-workflow-v21-data-flow.py
+
+# V20 - Template String Fix
+python scripts/fix-workflow-v20-query-format.py
+
+# V19 - Conversation ID Fix
+python scripts/fix-conversation-id-v19.py
+
+# V17-V18 - PostgreSQL Query Fix
 python scripts/fix-postgres-query-interpolation.py
 
-# Fix query_details propagation (V17)
-python scripts/fix-query-details-propagation.py
+# Scripts de Validação
+./scripts/validate-v21-fix.sh  # Valida V21 data flow
+./scripts/validate-postgres-fix.sh  # Valida PostgreSQL queries
 
-# Script de validação das correções
-./scripts/validate-postgres-fix.sh
-
-# Fix Update Conversation State node
-python scripts/fix-update-conversation-node.py
-
-# Fix collected data handling
-python scripts/fix-collected-data-handling.py
-
-# Fix workflow connections
-python scripts/fix-workflow-02-connections.py
-
-# Escape JSON for n8n import
-python scripts/escape-json-for-n8n.py
+# Outros scripts úteis
+python scripts/fix-workflow-json.py  # Fix JSON import
+python scripts/fix-collected-data-handling.py  # Fix collected_data
 ```
 
-### Workflows Corrigidos
-- `02_ai_agent_conversation_V17.json` - Versão FINAL com todas correções (PostgreSQL queries + propagação)
-- `02_ai_agent_conversation_V16.json` - Versão com Build SQL Queries
-- `02_ai_agent_conversation_V1_MENU_FIXED_v3.json` - Versão anterior (substituída por V17)
-- Importar V17 via n8n UI (http://localhost:5678)
+### Workflows Corrigidos (V22 é a versão ATUAL)
+- `02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json` - ✅ VERSÃO ATUAL (parallel query distribution)
+- `02_ai_agent_conversation_V21_DATA_FLOW_FIXED.json` - V21 (direct data flow)
+- `02_ai_agent_conversation_V20_QUERY_FIX.json` - V20 (template strings)
+- `02_ai_agent_conversation_V19_MERGE_CONVERSATION.json` - V19 (conversation ID)
+- `02_ai_agent_conversation_V17.json` - V17 (PostgreSQL queries)
+- **Para usar**: Importar V22 via n8n UI (http://localhost:5678)
 
 ---
 
@@ -329,7 +338,27 @@ python scripts/escape-json-for-n8n.py
 
 ---
 
-**Próxima Ação Recomendada**:
-1. Verificar Evolution API v2.3.7 está rodando: `docker logs e2bot-evolution`
-2. Importar workflows corrigidos em n8n
-3. Quando OpenAI token disponível, executar setup Sprint 1.1 conforme `docs/validation/README.md`
+**Próxima Ação Recomendada (V22 Implementation)**:
+1. ✅ Verificar Evolution API v2.3.7 está rodando: `docker logs e2bot-evolution-dev`
+2. ⚡ **IMPORTAR V22 WORKFLOW**:
+   ```bash
+   # No n8n UI (http://localhost:5678):
+   # a) Import: 02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json
+   # b) Desativar workflows V17-V21
+   # c) Ativar workflow V22
+   ```
+3. 🧪 **Testar fluxo completo**:
+   - Enviar mensagem WhatsApp
+   - Selecionar opção "1" no menu
+   - Verificar progressão correta (não deve repetir menu)
+   - Confirmar salvamento de mensagens no banco
+4. 📊 **Validar execução**:
+   ```bash
+   # Verificar logs sem erros
+   docker logs -f e2bot-n8n-dev | grep -E "(V22|Save.*Message|ERROR)"
+
+   # Verificar mensagens salvas
+   docker exec e2bot-postgres-dev psql -U postgres -d e2_bot \
+     -c "SELECT COUNT(*) FROM messages WHERE created_at > NOW() - INTERVAL '10 minutes';"
+   ```
+5. ⏳ Quando OpenAI token disponível, executar setup Sprint 1.1 conforme `docs/validation/README.md`

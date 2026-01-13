@@ -1,6 +1,6 @@
 # E2 Soluções WhatsApp Bot - Context for Claude Code
 
-> **Critical Development Context** | Last Updated: 2025-01-12
+> **Critical Development Context** | Last Updated: 2025-01-12 (V22 Complete)
 > This document provides essential project context optimized for Claude Code comprehension and minimal auto-compaction.
 
 ---
@@ -19,22 +19,33 @@
 
 ## 🚨 Critical Issues Resolved (2025-01-12)
 
-### PostgreSQL Query Interpolation Issues (V16 & V17)
-**Problem**: n8n não processava interpolação JavaScript em queries SQL
-- Sintaxe `{{ $node["nome"].json.campo }}` não funcionava
-- Count retornava 0 mesmo com dados existentes
-- Get Conversation Details falhava com "query must be text string"
+### Complete Workflow Evolution (V17 → V22)
+**V17-V18**: Query String Errors
+- **Problem**: "Parameter 'query' must be a text string" errors
+- **Solution**: Build SQL Queries node returning pure strings
+- **Scripts**: `scripts/fix-postgres-query-interpolation.py`
 
-**Solution V16**: Criado node "Build SQL Queries"
-- Constrói todas as queries SQL como strings puras
-- Proteção contra SQL injection
-- Scripts: `scripts/fix-postgres-query-interpolation.py`
+**V19**: Conversation ID Null
+- **Problem**: `conversation_id` sempre null causando menu loop
+- **Solution**: Merge Conversation Data node preservando ID
+- **Scripts**: `scripts/fix-conversation-id-v19.py`
 
-**Solution V17**: Adicionado node "Merge Queries Data"
-- Preserva campos query_* através de IF nodes
-- Corrige propagação de dados entre nodes condicionais
-- Scripts: `scripts/fix-query-details-propagation.py`
-- **Workflow atual**: `02_ai_agent_conversation_V17.json`
+**V20**: Template String Processing
+- **Problem**: Template strings `{{ }}` não processadas pelo PostgreSQL
+- **Solution**: Build Update Queries node com SQL puro
+- **Scripts**: `scripts/fix-workflow-v20-query-format.py`
+
+**V21**: Data Flow Issues
+- **Problem**: Build Update Queries não recebia dados completos
+- **Solution**: Conexão direta State Machine → Build Update Queries
+- **Scripts**: `scripts/fix-workflow-v21-data-flow.py`
+
+**V22 (CURRENT)**: Connection Pattern Fix ✅
+- **Problem**: Save Message nodes recebiam database rows ao invés de queries
+- **Error**: "Cannot read properties of undefined (reading 'match')"
+- **Solution**: Build Update Queries conecta em paralelo para TODOS os nodes
+- **Scripts**: `scripts/fix-workflow-v22-connection-pattern.py`
+- **Workflow atual**: `02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json`
 
 ### Evolution API v2.2.3 → v2.3.7 Migration
 **Problem**: Evolution API v2.2.3 had critical phone number extraction issues
@@ -103,26 +114,33 @@ WhatsApp User (Evolution API v2.3.7)
     ↓ [webhook with senderPn field]
 n8n Workflow 01 - WhatsApp Handler
     ↓ [phone extraction priority: senderPn → remoteJid]
-n8n Workflow 02 - AI Agent (Menu State Machine)
-    ├─→ Prepare Update Data (safe JSON handling)
-    ├─→ PostgreSQL (JSONB collected_data)
+n8n Workflow 02 - AI Agent V22 (Menu State Machine)
+    ├─→ State Machine Logic (conversation flow)
+    ├─→ Build Update Queries (parallel distribution) ⚡
+    │   ├─→ Update Conversation State (query_update_conversation)
+    │   ├─→ Save Inbound Message (query_save_inbound)
+    │   ├─→ Save Outbound Message (query_save_outbound)
+    │   └─→ Send WhatsApp Response (phone_number + response_text)
     ├─→ Claude AI Agent (Portuguese conversations)
     ├─→ Supabase (vector search for knowledge)
     ├─→ Google Calendar (appointment scheduling)
     ├─→ RD Station CRM (bidirectional sync)
-    ├─→ Email/Discord (multi-channel notifications)
-    └─→ Google Drive (file storage)
+    └─→ Email/Discord (multi-channel notifications)
 ```
 
-### Critical Data Flow (Fixed)
+### Critical Data Flow V22 (FIXED) ✅
 1. **Message Reception**: Evolution API v2.3.7 webhook → n8n workflow 01
    - Phone extraction: `data.senderPn || extractFromRemoteJid(data.key.remoteJid)`
-2. **Conversation Processing**: State machine → Prepare Update Data → Database
-   - Safe JSON handling for collected_data
-3. **Data Collection**: Service-specific structured data → PostgreSQL JSONB
-4. **CRM Sync**: Auto-create contact + deal in RD Station
-5. **Appointment**: Check availability → Create event → Send reminders
-6. **Notifications**: Multi-channel (WhatsApp + Email + Discord)
+2. **State Machine Processing**: Logic determina próximo estado e resposta
+3. **Query Building**: Build Update Queries constrói todas as SQL queries
+4. **Parallel Distribution**: Queries distribuídas em PARALELO para todos os nodes
+   - Update Conversation State recebe `query_update_conversation`
+   - Save Inbound Message recebe `query_save_inbound`
+   - Save Outbound Message recebe `query_save_outbound`
+   - Send WhatsApp Response recebe `phone_number` e `response_text`
+5. **Data Persistence**: PostgreSQL JSONB para collected_data
+6. **CRM Sync**: Auto-create contact + deal in RD Station
+7. **Notifications**: Multi-channel (WhatsApp + Email + Discord)
 
 ---
 
@@ -140,7 +158,11 @@ e2-solucoes-bot/
 │   └── supabase_functions.sql       # RAG functions
 ├── n8n/workflows/                   # Workflows principais + versões
 │   ├── 01_main_whatsapp_handler_V2.3_FIXED_IMPORT.json  # Handler principal
-│   ├── 02_ai_agent_conversation_V17.json  # ⭐ VERSÃO ATUAL - Queries SQL corrigidas
+│   ├── 02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json  # ⭐ VERSÃO ATUAL V22
+│   ├── 02_ai_agent_conversation_V21_DATA_FLOW_FIXED.json  # V21 - Data flow direto
+│   ├── 02_ai_agent_conversation_V20_QUERY_FIX.json  # V20 - Template strings
+│   ├── 02_ai_agent_conversation_V19_MERGE_CONVERSATION.json  # V19 - Conversation ID
+│   ├── 02_ai_agent_conversation_V17.json  # V17 - Build SQL Queries
 │   ├── 03_rag_knowledge_query.json
 │   ├── 04_image_analysis.json
 │   ├── 05_appointment_scheduler.json
@@ -161,13 +183,21 @@ e2-solucoes-bot/
 │   ├── fix-workflow-02-connections.py  # Fix phone_number flow
 │   ├── fix-update-conversation-node.py # Fix no output issue
 │   ├── fix-collected-data-handling.py  # Fix collected_data
-│   ├── fix-postgres-query-interpolation.py  # ✨ V16: Build SQL Queries
-│   ├── fix-query-details-propagation.py     # ✨ V17: Merge Queries Data
-│   ├── validate-postgres-fix.sh             # ✨ Validação automática
+│   ├── fix-postgres-query-interpolation.py  # ✨ V16-V18: Build SQL Queries
+│   ├── fix-conversation-id-v19.py           # ✨ V19: Merge Conversation ID
+│   ├── fix-workflow-v20-query-format.py     # ✨ V20: Template strings fix
+│   ├── fix-workflow-v21-data-flow.py        # ✨ V21: Direct data flow
+│   ├── fix-workflow-v22-connection-pattern.py # ✨ V22: Parallel connections
+│   ├── validate-v21-fix.sh                  # ✨ Validação V21
+│   ├── validate-postgres-fix.sh             # ✨ Validação PostgreSQL
 │   └── [backup, health-check, etc]
 └── docs/                            # Complete documentation
-    ├── PROJECT_STATUS.md            # High-level status
+    ├── status/PROJECT_STATUS.md     # High-level status
     ├── EVOLUTION_API_ISSUE.md       # v2.2.3 → v2.3.7 migration
+    ├── FIX_SUMMARY_V16_V17.md       # V16-V17: PostgreSQL queries
+    ├── FIX_CONVERSATION_ID_V19.md   # V19: Conversation ID fix
+    ├── FIX_DATA_FLOW_V21.md         # V21: Data flow documentation
+    ├── ANALYSIS_V22_FIX.md          # V22: Connection pattern analysis
     ├── PLAN/                        # Technical solutions
     │   ├── evolution_api_v2.3_upgrade.md
     │   ├── workflow_02_phone_fix_report.md
@@ -214,11 +244,17 @@ scheduling | handoff_comercial | completed
 - Formats Brazilian phone numbers correctly
 - Passes clean data to Workflow 02
 
-#### Workflow 02 - AI Agent (v1 Menu Fixed v3)
-- Menu-based state machine
-- "Prepare Update Data" node for safe JSON handling
-- PostgreSQL JSONB storage for collected_data
-- `alwaysOutputData: true` prevents workflow stopping
+#### Workflow 02 - AI Agent V22 (Connection Pattern Fixed) ✅
+- **Current Version**: V22 - Parallel query distribution
+- **Key Architecture**: Build Update Queries → Parallel connections to all nodes
+- **State Machine**: Menu-based conversation flow (8 states)
+- **Query Distribution**:
+  - Update Conversation State: Receives `query_update_conversation`
+  - Save Inbound Message: Receives `query_save_inbound`
+  - Save Outbound Message: Receives `query_save_outbound`
+  - Send WhatsApp Response: Receives `phone_number` + `response_text`
+- **Data Safety**: PostgreSQL JSONB for collected_data
+- **Error Prevention**: `alwaysOutputData: true` on all database nodes
 
 ### Environment Variables (Critical)
 ```bash
@@ -275,8 +311,10 @@ docker logs -f e2bot-n8n-dev
 # In n8n interface (http://localhost:5678)
 # 1. Import Workflow 01:
 #    01_main_whatsapp_handler_V2.3_FIXED_IMPORT.json
-# 2. Import Workflow 02:
-#    02_ai_agent_conversation_V1_MENU_FIXED_v3.json
+# 2. Import Workflow 02 V22 (CURRENT):
+#    02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json
+# 3. Deactivate old versions (V17-V21)
+# 4. Activate V22 workflow
 ```
 
 ### Testing & Validation
@@ -327,7 +365,11 @@ docker exec e2bot-postgres-dev psql -U postgres -d e2_bot \
 
 ## 📋 Documentation Map
 
-### Critical Technical Documents
+### Critical Technical Documents - V22 Evolution
+- **V22 Analysis**: `docs/ANALYSIS_V22_FIX.md` (Current connection pattern fix)
+- **V21 Data Flow**: `docs/FIX_DATA_FLOW_V21.md` (Direct data flow implementation)
+- **V19 Conversation ID**: `docs/FIX_CONVERSATION_ID_V19.md` (ID preservation fix)
+- **V16-V17 PostgreSQL**: `docs/FIX_SUMMARY_V16_V17.md` (Query string fixes)
 - **Evolution API Issue**: `docs/EVOLUTION_API_ISSUE.md` (v2.2.3 → v2.3.7)
 - **Phone Fix Report**: `docs/PLAN/workflow_02_phone_fix_report.md`
 - **JSON Import Fix**: `docs/PLAN/workflow_json_fix_analysis.md`
@@ -393,22 +435,41 @@ docker exec e2bot-postgres-dev psql -U postgres -d e2_bot \
 
 ## 💡 Critical Fix Scripts
 
-### Fix Evolution API Phone Extraction
+### V22 - Connection Pattern Fix (CURRENT) ✅
 ```bash
-# Already applied in workflow 01
-# Priority: senderPn → remoteJid fallback
+python3 scripts/fix-workflow-v22-connection-pattern.py
+# Fixes parallel query distribution to all nodes
+# Resolves "Cannot read properties of undefined" error
 ```
 
-### Fix JSON Import Issues
+### V21 - Data Flow Fix
 ```bash
-python3 scripts/fix-workflow-json.py
-# Fixes unescaped newlines in workflow JSON
+python3 scripts/fix-workflow-v21-data-flow.py
+# Direct connection State Machine → Build Update Queries
 ```
 
-### Fix collected_data Handling
+### V20 - Template String Fix
 ```bash
-python3 scripts/fix-collected-data-handling.py
-# Adds safe data preparation layer
+python3 scripts/fix-workflow-v20-query-format.py
+# Fixes template string processing in PostgreSQL
+```
+
+### V19 - Conversation ID Fix
+```bash
+python3 scripts/fix-conversation-id-v19.py
+# Preserves conversation_id through state transitions
+```
+
+### V17-V18 - PostgreSQL Query Fix
+```bash
+python3 scripts/fix-postgres-query-interpolation.py
+# Build SQL Queries returning pure strings
+```
+
+### Validation Scripts
+```bash
+./scripts/validate-v21-fix.sh  # Validates V21 data flow
+./scripts/validate-postgres-fix.sh  # Validates PostgreSQL queries
 ```
 
 ---

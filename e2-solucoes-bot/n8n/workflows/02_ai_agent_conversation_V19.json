@@ -1,0 +1,735 @@
+{
+  "name": "AI Agent Conversation - V18",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "d0416fed-fcc2-4c38-88ca-3096359a88fb",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validação de entrada do Workflow 01\nconst inputData = $input.first().json;\n\n// Validação crítica do phone_number\nif (!inputData.phone_number || inputData.phone_number === 'undefined') {\n    throw new Error('Phone number is required but was not received from Workflow 01');\n}\n\n// Limpar e validar formato do phone_number\nlet phone_number = String(inputData.phone_number).replace(/[^0-9]/g, '');\n\n// Remover @s.whatsapp.net se existir\nif (phone_number.includes('@')) {\n  phone_number = phone_number.split('@')[0];\n}\n\n// IMPORTANTE: Adicionar código 55 se não tiver (MOVIDO DO PREPARE UPDATE DATA)\nif (phone_number && !phone_number.startsWith('55')) {\n  // Se tem 10 ou 11 dígitos (formato brasileiro), adiciona 55\n  if (phone_number.length === 10 || phone_number.length === 11) {\n    phone_number = '55' + phone_number;\n    console.log('Adicionado código 55:', phone_number);\n  }\n  // Se tem 12 ou 13 dígitos começando com outro código, mantém\n  else if (phone_number.length >= 12) {\n    console.log('Número já tem código de país:', phone_number);\n  }\n  // Qualquer outro caso, tenta adicionar 55\n  else {\n    phone_number = '55' + phone_number;\n    console.log('Formato desconhecido, adicionado 55:', phone_number);\n  }\n}\n\n// Validação de formato brasileiro (DDD + número) - AGORA COM 55\nif (phone_number.length < 12 || phone_number.length > 13) {\n    console.warn(`Phone number format unusual: ${phone_number} (expected 12-13 digits with country code)`);\n}\n\nconsole.log('Validated input:', {\n    phone_number: phone_number,  // Agora já tem 55\n    whatsapp_name: inputData.whatsapp_name,\n    message_type: inputData.message_type\n});\n\nreturn {\n    phone_number: phone_number,  // COM código 55\n    whatsapp_name: inputData.whatsapp_name || '',\n    message: inputData.message || '',\n    message_type: inputData.message_type || 'text',\n    media_url: inputData.media_url || null,\n    message_id: inputData.message_id || '',\n    timestamp: inputData.timestamp || new Date().toISOString()\n};"
+      },
+      "id": "d6623dca-f929-47f5-8184-63106e8b177d",
+      "name": "Validate Input Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare both phone formats for SQL queries\n// This node receives data directly from WEBHOOK (not from Validate Input Data)\nconst inputData = $input.first().json;\n\n// Get phone number - could come from webhook or validate input\nlet phone_with_code = String(inputData.phone_number || '');\n\n// Clean the phone number\nphone_with_code = phone_with_code.replace(/[^0-9]/g, '');\n\n// Add country code if missing\nif (phone_with_code && !phone_with_code.startsWith('55')) {\n    if (phone_with_code.length === 10 || phone_with_code.length === 11) {\n        phone_with_code = '55' + phone_with_code;\n        console.log('Added country code 55:', phone_with_code);\n    }\n}\n\n// Create version without country code for compatibility\nlet phone_without_code = phone_with_code;\nif (phone_with_code.startsWith('55')) {\n    phone_without_code = phone_with_code.substring(2);\n}\n\nconsole.log('=== PHONE FORMAT PREPARATION ===');\nconsole.log('With code (55):', phone_with_code);\nconsole.log('Without code:', phone_without_code);\n\n// Return both formats and pass through all other data\nreturn {\n    ...inputData, // Pass through all original data\n    phone_with_code: phone_with_code,      // e.g., \"556181755748\"\n    phone_without_code: phone_without_code, // e.g., \"6181755748\"\n    // Keep original for compatibility\n    phone_number: phone_with_code,\n    // Pass through other webhook data\n    message: inputData.message || inputData.body || inputData.text || '',\n    whatsapp_name: inputData.whatsapp_name || inputData.pushName || ''\n};"
+      },
+      "id": "56307b3c-ece0-4639-8e31-c62d82455f49",
+      "name": "Prepare Phone Formats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-ai-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "0a167af2-48c4-4388-a83c-e997007fc782",
+      "name": "Webhook - Receive Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ],
+      "webhookId": "ai-agent-conversation-v1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_count}}",
+        "additionalFields": {}
+      },
+      "id": "247be196-c7b9-49c7-907e-33e711565665",
+      "name": "Get Conversation Count",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        208,
+        160
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_details}}",
+        "additionalFields": {}
+      },
+      "id": "01906f7c-3039-4cd2-a0bd-741fb5ce0821",
+      "name": "Get Conversation Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        704,
+        480
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.count }}",
+              "value2": "0"
+            }
+          ]
+        }
+      },
+      "id": "c54758a6-93e1-4dd4-97eb-39347ef3795f",
+      "name": "Check If New User",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        400,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_upsert}}",
+        "options": {}
+      },
+      "id": "5b28244c-2ffb-4c23-8308-a20fac8887dc",
+      "name": "Create New Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -528
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// ============================================================================\n// E2 Soluções Bot v1 - Menu State Machine (FIXED)\n// ============================================================================\n\nconst items = $input.all();\nconsole.log('=== INPUT DEBUG ===');\nconsole.log('Total inputs received:', items.length);\nconsole.log('Input 0:', JSON.stringify(items[0]?.json || {}));\nconsole.log('Input 1:', JSON.stringify(items[1]?.json || {}));\n\n// Get basic input data (phone, message, etc)\nconst inputData = items[0].json;\nconst leadId = inputData.phone_number;\nconst message = inputData.content || inputData.body || inputData.text || inputData.message || '';\n\nconsole.log('=== PHONE NUMBER DEBUG ===');\nconsole.log('Raw phone from input:', leadId);\nconsole.log('Message:', message);\n\n// Get conversation state from database (second input if exists)\nlet conversation;\nlet conversationId;\n\n// Check if we have conversation data from database\nif (items.length > 1 && items[1].json && items[1].json.id) {\n  conversation = items[1].json;\n  conversationId = conversation.id; // UUID from database\n  console.log('✅ Found existing conversation with ID:', conversationId);\n} else {\n  // New conversation - no ID yet\n  conversation = {\n    phone_number: leadId,\n    current_state: 'greeting',\n    state_machine_state: 'greeting',\n    collected_data: {}\n  };\n  conversationId = null;\n  console.log('⚠️ New conversation - no ID yet');\n}\n\n// Get current state and stage data\nconst currentStage = conversation.state_machine_state || conversation.state_for_machine || conversation.current_state || 'greeting';\nconst stageData = conversation.collected_data || {};\n\n// DEBUG\nconsole.log('=== STATE MACHINE DEBUG ===');\nconsole.log('Conversation ID:', conversationId);\nconsole.log('Current Stage:', currentStage);\nconsole.log('Message:', message);\nconsole.log('Stage Data:', JSON.stringify(stageData));\nconsole.log('Phone Number:', leadId);\n\n// ============================================================================\n// Service Mapping\n// ============================================================================\n\nconst serviceMapping = {\n  '1': {\n    id: 'energia_solar',\n    name: 'Energia Solar',\n    description: 'Projetos fotovoltaicos residenciais, comerciais e industriais',\n    emoji: '☀️'\n  },\n  '2': {\n    id: 'subestacao',\n    name: 'Subestação',\n    description: 'Reforma, manutenção e construção de subestações',\n    emoji: '⚡'\n  },\n  '3': {\n    id: 'projetos_eletricos',\n    name: 'Projetos Elétricos',\n    description: 'Projetos elétricos, adequações e laudos de conformidade',\n    emoji: '📐'\n  },\n  '4': {\n    id: 'bess',\n    name: 'BESS (Armazenamento)',\n    description: 'Sistemas de armazenamento de energia com baterias',\n    emoji: '🔋'\n  },\n  '5': {\n    id: 'analise_laudos',\n    name: 'Análise e Laudos',\n    description: 'Análise de qualidade de energia e laudos técnicos',\n    emoji: '📊'\n  }\n};\n\n// ============================================================================\n// Validators\n// ============================================================================\n\nconst validators = {\n  number_1_to_5: (input) => {\n    const num = parseInt(input.trim());\n    return num >= 1 && num <= 5;\n  },\n\n  text_min_3_chars: (input) => {\n    return input.trim().length >= 3;\n  },\n\n  phone_brazil: (input) => {\n    const cleaned = input.replace(/\\D/g, '');\n    const regex = /^(\\d{2})(\\d{4,5})(\\d{4})$/;\n    return regex.test(cleaned) && cleaned.length >= 10 && cleaned.length <= 11;\n  },\n\n  email_or_skip: (input) => {\n    const trimmed = input.trim().toLowerCase();\n    if (trimmed === 'pular') return true;\n    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n    return emailRegex.test(trimmed);\n  },\n\n  city_name: (input) => {\n    return input.trim().length >= 3;\n  },\n\n  confirmation_1_or_2: (input) => {\n    const num = parseInt(input.trim());\n    return num === 1 || num === 2;\n  }\n};\n\n// ============================================================================\n// Message Templates\n// ============================================================================\n\nconst templates = {\n  greeting: {\n    text: '🤖 Olá! Bem-vindo à *E2 Soluções*!\\n\\nSomos especialistas em engenharia elétrica.\\n\\n*Escolha o serviço desejado:*\\n\\n☀️ 1 - Energia Solar\\n⚡ 2 - Subestação\\n📐 3 - Projetos Elétricos\\n🔋 4 - BESS (Armazenamento)\\n📊 5 - Análise e Laudos\\n\\n_Digite o número de 1 a 5:_',\n    footer: 'E2 Soluções Engenharia'\n  },\n\n  service_selected: {\n    template: '{{emoji}} *{{service_name}}*\\n\\n{{description}}\\n\\n━━━━━━━━━━━━━━━\\n\\nPerfeito! Vou coletar alguns dados para melhor atendê-lo.\\n\\n👤 *Qual seu nome completo?*'\n  },\n\n  collect_phone: {\n    text: '📱 *Qual seu telefone com DDD?*\\n\\n_Exemplo: (62) 99988-7766_'\n  },\n\n  collect_email: {\n    text: '📧 *Qual seu email?*\\n\\n_Ou digite \"pular\" para não informar_'\n  },\n\n  collect_city: {\n    text: '📍 *Em qual cidade você está?*\\n\\n_Exemplo: Goiânia_'\n  },\n\n  confirmation: {\n    template: '✅ *Dados confirmados!*\\n\\n👤 *Nome:* {{lead_name}}\\n📱 *Telefone:* {{phone}}\\n📧 *Email:* {{email}}\\n📍 *Cidade:* {{city}}\\n{{emoji}} *Serviço:* {{service_name}}\\n\\n━━━━━━━━━━━━━━━\\n\\n🗓️ Deseja agendar uma *visita técnica gratuita*?\\n\\n1️⃣ Sim, quero agendar\\n2️⃣ Não, prefiro falar com especialista\\n\\n_Digite 1 ou 2:_'\n  },\n\n  invalid_option: {\n    text: '❌ Opção inválida. Por favor, escolha uma opção válida.'\n  },\n\n  invalid_phone: {\n    text: '❌ Telefone inválido.\\n\\n📱 Digite um telefone válido com DDD:\\n_Exemplo: (62) 99988-7766_'\n  },\n\n  invalid_email: {\n    text: '❌ Email inválido.\\n\\n📧 Digite um email válido ou \"pular\":\\n_Exemplo: seu@email.com_'\n  },\n\n  error_generic: {\n    text: '⚠️ Ops! Algo deu errado.\\n\\nPor favor, tente novamente ou digite *AJUDA* para falar com um especialista.'\n  }\n};\n\n// ============================================================================\n// Template Filler\n// ============================================================================\n\nfunction fillTemplate(template, data) {\n  let text = template;\n  for (const [key, value] of Object.entries(data)) {\n    text = text.replace(new RegExp(`{{${key}}}`, 'g'), value);\n  }\n  return text;\n}\n\n// ============================================================================\n// State Machine Logic\n// ============================================================================\n\nlet nextStage = currentStage;\nlet responseText = '';\nlet updateData = { ...stageData };\nlet errorCount = stageData.error_count || 0;\nconst MAX_ERRORS = 3;\n\n// DEBUG - Log antes do switch\nconsole.log('Processing stage:', currentStage, 'with message:', message);\n\nswitch (currentStage) {\n  case 'greeting':\n    responseText = templates.greeting.text;\n    nextStage = 'service_selection';\n    break;\n\n  case 'service_selection':\n    if (validators.number_1_to_5(message)) {\n      const service = serviceMapping[message];\n      updateData.service_type = service.id;\n      updateData.service_name = service.name;\n      updateData.service_emoji = service.emoji;\n\n      responseText = fillTemplate(templates.service_selected.template, {\n        emoji: service.emoji,\n        service_name: service.name,\n        description: service.description\n      });\n\n      nextStage = 'collect_name';\n      errorCount = 0;\n    } else {\n      responseText = templates.invalid_option.text + '\\n\\n' + templates.greeting.text;\n      errorCount++;\n\n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Percebi dificuldades. Vou transferir você para um especialista.\\n\\nAguarde um momento...';\n      }\n    }\n    break;\n\n  case 'collect_name':\n    if (validators.text_min_3_chars(message)) {\n      updateData.lead_name = message.trim();\n      responseText = templates.collect_phone.text;\n      nextStage = 'collect_phone';\n      errorCount = 0;\n    } else {\n      responseText = '❌ Nome muito curto.\\n\\n👤 Digite seu nome completo:';\n      errorCount++;\n\n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n\n  case 'collect_phone':\n    if (validators.phone_brazil(message)) {\n      const cleaned = message.replace(/\\D/g, '');\n      const formatted = cleaned.replace(/(\\d{2})(\\d{4,5})(\\d{4})/, '($1) $2-$3');\n      updateData.phone = formatted;\n      responseText = templates.collect_email.text;\n      nextStage = 'collect_email';\n      errorCount = 0;\n    } else {\n      responseText = templates.invalid_phone.text;\n      errorCount++;\n\n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n\n  case 'collect_email':\n    if (validators.email_or_skip(message)) {\n      const trimmed = message.trim().toLowerCase();\n      updateData.email = trimmed === 'pular' ? 'Não informado' : trimmed;\n      responseText = templates.collect_city.text;\n      nextStage = 'collect_city';\n      errorCount = 0;\n    } else {\n      responseText = templates.invalid_email.text;\n      errorCount++;\n\n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n\n  case 'collect_city':\n    if (validators.city_name(message)) {\n      updateData.city = message.trim();\n\n      responseText = fillTemplate(templates.confirmation.template, {\n        lead_name: updateData.lead_name,\n        phone: updateData.phone,\n        email: updateData.email,\n        city: updateData.city,\n        emoji: updateData.service_emoji,\n        service_name: updateData.service_name\n      });\n\n      nextStage = 'confirmation';\n      errorCount = 0;\n    } else {\n      responseText = '❌ Cidade inválida.\\n\\n📍 Digite o nome da cidade:';\n      errorCount++;\n\n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n\n  case 'confirmation':\n    if (validators.confirmation_1_or_2(message)) {\n      const choice = parseInt(message);\n\n      if (choice === 1) {\n        // User wants to schedule\n        nextStage = 'scheduling';\n        updateData.wants_appointment = true;\n        responseText = '🗓️ Perfeito! Vou verificar os horários disponíveis...\\n\\n⏳ Aguarde um momento.';\n      } else {\n        // User wants to speak with specialist\n        nextStage = 'handoff_comercial';\n        updateData.wants_appointment = false;\n        responseText = '👨‍💼 Entendi! Vou transferir você para um especialista da equipe.\\n\\n⏳ Aguarde um momento...';\n      }\n\n      errorCount = 0;\n    } else {\n      responseText = '❌ Opção inválida.\\n\\n_Digite 1 para agendar ou 2 para falar com especialista:_';\n      errorCount++;\n\n      if (errorCount >= MAX_ERRORS) {\n        nextStage = 'handoff_comercial';\n        responseText = '⚠️ Vou transferir você para um especialista.\\n\\nAguarde...';\n      }\n    }\n    break;\n\n  case 'handoff_comercial':\n    responseText = '👨‍💼 Você foi transferido para nossa equipe comercial.\\n\\nEm breve um especialista entrará em contato!\\n\\n_Horário de atendimento: Segunda a Sexta, 8h às 18h_';\n    nextStage = 'completed';\n    break;\n\n  case 'completed':\n    responseText = '✅ Seu atendimento já foi finalizado.\\n\\nPara iniciar uma nova conversa, digite *NOVO*.';\n\n    if (message.toLowerCase().includes('novo')) {\n      responseText = templates.greeting.text;\n      nextStage = 'service_selection';\n      updateData = {};\n    }\n    break;\n\n  default:\n    responseText = templates.error_generic.text;\n    nextStage = 'greeting';\n}\n\n// Update error count\nupdateData.error_count = errorCount;\n\n// DEBUG - Log resultado\nconsole.log('=== FINAL STATE ===');\nconsole.log('Next stage:', nextStage);\nconsole.log('Conversation ID being passed:', conversationId);\nconsole.log('Response prepared');\n\n// ============================================================================\n// Return Output\n// ============================================================================\n\nreturn [\n  {\n    json: {\n      phone_number: leadId,\n      conversation_id: conversationId, // Will be null for new conversations, UUID for existing\n      message: message,\n      current_state: currentStage,\n      next_stage: nextStage,\n      collected_data: updateData,\n      response_text: responseText,\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "b2a994c4-5a50-410e-9c29-2d57645e5f7b",
+      "name": "State Machine Logic",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        784,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare data for database update and response\nconst inputData = $input.first().json;\n\n// DEBUG - See what's coming in\nconsole.log('=== PREPARE UPDATE DATA DEBUG ===');\nconsole.log('Input phone_number:', inputData.phone_number);\nconsole.log('Input response_text:', inputData.response_text);\n\n// 1. Phone number - ALREADY HAS code 55 from Validate Input Data\nlet phone_with_code = String(inputData.phone_number || '');\nphone_with_code = phone_with_code.replace(/[^0-9]/g, '');\n\n// Create version without code for compatibility\nlet phone_without_code = phone_with_code;\nif (phone_with_code.startsWith('55')) {\n    phone_without_code = phone_with_code.substring(2);\n}\n\nconsole.log('Phone with code:', phone_with_code);\nconsole.log('Phone without code:', phone_without_code);\n\n// 2. Response and State Machine state\nconst response_text = inputData.response_text || 'Olá! Como posso ajudar?';\nconst next_stage = inputData.next_stage || inputData.current_state || 'greeting';\nconst collected_data = inputData.collected_data || {};\n\n// 3. Prepare JSON for database (PostgreSQL JSONB)\nconst collected_data_json = JSON.stringify(collected_data);\n\n// 4. RETURN structured data for next nodes\nreturn {\n  // Phone formats for SQL queries - CRITICAL!\n  phone_with_code: phone_with_code,      // \"556181755748\"\n  phone_without_code: phone_without_code, // \"6181755748\"\n\n  // For Send WhatsApp Response\n  phone_number: phone_with_code,\n  response_text: response_text,\n\n  // For Update Conversation State\n  next_stage: next_stage,\n  collected_data: collected_data,\n  collected_data_json: collected_data_json,\n\n  // Metadata\n  timestamp: new Date().toISOString(),\n\n  // Ensure output\n  alwaysOutputData: true\n};"
+      },
+      "id": "736e38f4-af45-42c5-8e29-a6884dd861bf",
+      "name": "Prepare Update Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- State mapping for database constraints\nWITH state_mapping AS (\n  SELECT\n    '{{ $node[\"Prepare Update Data\"].json.next_stage }}' as sm_state,\n    CASE '{{ $node[\"Prepare Update Data\"].json.next_stage }}'\n      WHEN 'greeting' THEN 'novo'\n      WHEN 'service_selection' THEN 'identificando_servico'\n      WHEN 'collect_name' THEN 'coletando_dados'\n      WHEN 'collect_phone' THEN 'coletando_dados'\n      WHEN 'collect_email' THEN 'coletando_dados'\n      WHEN 'collect_city' THEN 'coletando_dados'\n      WHEN 'confirmation' THEN 'coletando_dados'\n      WHEN 'scheduling' THEN 'agendando'\n      WHEN 'handoff_comercial' THEN 'handoff_comercial'\n      WHEN 'completed' THEN 'concluido'\n      ELSE 'novo'\n    END as db_state\n),\n-- Search for existing conversation using pre-prepared formats\nexisting_conversation AS (\n  SELECT id\n  FROM conversations\n  WHERE phone_number IN (\n    '{{ $node[\"Prepare Update Data\"].json.phone_with_code }}',\n    '{{ $node[\"Prepare Update Data\"].json.phone_without_code }}'\n  )\n  ORDER BY updated_at DESC\n  LIMIT 1\n),\n-- Update if exists\nupdated AS (\n  UPDATE conversations\n  SET\n    current_state = (SELECT db_state FROM state_mapping),\n    state_machine_state = (SELECT sm_state FROM state_mapping),\n    collected_data = '{{ $node[\"Prepare Update Data\"].json.collected_data_json }}'::jsonb,\n    service_type = COALESCE(\n      NULLIF('{{ $node[\"Prepare Update Data\"].json.collected_data.service_type || \"\" }}', ''),\n      service_type\n    ),\n    phone_number = '{{ $node[\"Prepare Update Data\"].json.phone_with_code }}',\n    last_message_at = NOW(),\n    updated_at = NOW()\n  WHERE id IN (SELECT id FROM existing_conversation)\n  RETURNING *, 'updated' as operation\n),\n-- Insert if not exists\ninserted AS (\n  INSERT INTO conversations (\n    phone_number,\n    whatsapp_name,\n    current_state,\n    state_machine_state,\n    collected_data,\n    service_type,\n    status,\n    created_at,\n    updated_at,\n    last_message_at\n  )\n  SELECT\n    '{{ $node[\"Prepare Update Data\"].json.phone_with_code }}',\n    '{{ $node[\"Prepare Update Data\"].json.collected_data.lead_name || \"\" }}',\n    (SELECT db_state FROM state_mapping),\n    (SELECT sm_state FROM state_mapping),\n    '{{ $node[\"Prepare Update Data\"].json.collected_data_json }}'::jsonb,\n    '{{ $node[\"Prepare Update Data\"].json.collected_data.service_type || \"\" }}',\n    'active',\n    NOW(),\n    NOW(),\n    NOW()\n  WHERE NOT EXISTS (SELECT 1 FROM existing_conversation)\n  RETURNING *, 'inserted' as operation\n)\n-- Return result\nSELECT * FROM updated\nUNION ALL\nSELECT * FROM inserted;",
+        "options": {
+          "queryBatching": "independent"
+        }
+      },
+      "id": "94bf85d1-fee3-428c-93a2-99859e9059f9",
+      "name": "Update Conversation State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1008,
+        160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO messages (conversation_id, direction, content, message_type, whatsapp_message_id)\nVALUES (\n  (SELECT id FROM conversations WHERE phone_number = '{{ $node[\"Prepare Update Data\"].json.phone_number }}' LIMIT 1),\n  'inbound',\n  '{{ ($node[\"Prepare Update Data\"].json.message || \"\").replace(/'/g, \"''\") }}',\n  '{{ $node[\"Prepare Update Data\"].json.message_type || \"text\" }}',\n  '{{ $node[\"Prepare Update Data\"].json.message_id || \"\" }}'\n)\nON CONFLICT DO NOTHING\nRETURNING *",
+        "options": {
+          "queryBatching": "independent"
+        }
+      },
+      "id": "e1748174-d711-4d1a-95a8-4827353ceb46",
+      "name": "Save Inbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        64
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO messages (conversation_id, direction, content, message_type, whatsapp_message_id)\nVALUES (\n  (SELECT id FROM conversations WHERE phone_number = '{{ $node[\"Prepare Update Data\"].json.phone_number }}' LIMIT 1),\n  'outbound',\n  '{{ ($node[\"Prepare Update Data\"].json.response_text || \"\").replace(/'/g, \"''\") }}',\n  'text',\n  'out_{{ Date.now() }}'\n)\nON CONFLICT DO NOTHING\nRETURNING *",
+        "options": {
+          "queryBatching": "independent"
+        }
+      },
+      "id": "de351665-396d-4283-a6eb-cece2777c79b",
+      "name": "Save Outbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        256
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://e2bot-evolution-dev:8080/message/sendText/e2-solucoes-bot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $node[\"Prepare Update Data\"].json[\"phone_number\"] }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $node[\"State Machine Logic\"].json[\"response_text\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b77a6d1b-40b4-44c2-bd0b-2346e2bbd8ee",
+      "name": "Send WhatsApp Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1408,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.next_stage }}",
+              "value2": "scheduling"
+            }
+          ]
+        }
+      },
+      "id": "44fd888d-81d4-4888-b013-af86a5f7f689",
+      "name": "Check If Scheduling",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.next_stage }}",
+              "value2": "handoff_comercial"
+            }
+          ]
+        }
+      },
+      "id": "21ace6be-323f-46c8-a496-6a41d5c57f68",
+      "name": "Check If Handoff",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $workflow.id + 3 }}",
+        "options": {}
+      },
+      "id": "a740e9a9-0c69-479a-84c0-249b9f36ada4",
+      "name": "Trigger Appointment Scheduler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $workflow.id + 8 }}",
+        "options": {}
+      },
+      "id": "114679ce-f689-4059-aeb9-6cca6c42dc05",
+      "name": "Trigger Human Handoff",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Primeiro, vamos verificar se já existe um lead com este phone_number\nWITH existing_lead AS (\n  SELECT id\n  FROM leads\n  WHERE phone_number = '{{ $node[\"Prepare Update Data\"].json.phone_number }}'\n  LIMIT 1\n),\n-- Se existir, fazemos UPDATE\nupdated AS (\n  UPDATE leads\n  SET\n    name = COALESCE(\n      NULLIF('{{ $node[\"Prepare Update Data\"].json.collected_data.lead_name || $node[\"Prepare Update Data\"].json.collected_data.nome || \"\" }}', ''),\n      name\n    ),\n    email = COALESCE(\n      NULLIF('{{ $node[\"Prepare Update Data\"].json.collected_data.email || \"\" }}', ''),\n      email\n    ),\n    address = COALESCE(\n      NULLIF('{{ $node[\"Prepare Update Data\"].json.collected_data.endereco || $node[\"Prepare Update Data\"].json.collected_data.address || \"\" }}', ''),\n      address\n    ),\n    city = COALESCE(\n      NULLIF('{{ $node[\"Prepare Update Data\"].json.collected_data.cidade || $node[\"Prepare Update Data\"].json.collected_data.city || \"\" }}', ''),\n      city\n    ),\n    service_type = COALESCE(\n      NULLIF('{{ $node[\"Prepare Update Data\"].json.collected_data.service_type || $node[\"Prepare Update Data\"].json.collected_data.servico || \"\" }}', ''),\n      service_type\n    ),\n    -- IMPORTANTE: Usar state_machine_state em vez de status diretamente\n    state_machine_state = '{{ $node[\"Prepare Update Data\"].json.next_stage || \"greeting\" }}',\n    -- O status será atualizado automaticamente pelo trigger\n    service_details = '{{ $node[\"Prepare Update Data\"].json.collected_data_json }}'::jsonb,\n    updated_at = NOW()\n  WHERE id IN (SELECT id FROM existing_lead)\n  RETURNING *, 'updated' as operation\n),\n-- Se não existir, fazemos INSERT\ninserted AS (\n  INSERT INTO leads (\n    phone_number,\n    name,\n    email,\n    address,\n    city,\n    service_type,\n    state_machine_state,\n    service_details,\n    created_at,\n    updated_at\n  )\n  SELECT\n    '{{ $node[\"Prepare Update Data\"].json.phone_number }}',\n    '{{ $node[\"Prepare Update Data\"].json.collected_data.lead_name || $node[\"Prepare Update Data\"].json.collected_data.nome || \"\" }}',\n    '{{ $node[\"Prepare Update Data\"].json.collected_data.email || \"\" }}',\n    '{{ $node[\"Prepare Update Data\"].json.collected_data.endereco || $node[\"Prepare Update Data\"].json.collected_data.address || \"\" }}',\n    '{{ $node[\"Prepare Update Data\"].json.collected_data.cidade || $node[\"Prepare Update Data\"].json.collected_data.city || \"\" }}',\n    '{{ $node[\"Prepare Update Data\"].json.collected_data.service_type || $node[\"Prepare Update Data\"].json.collected_data.servico || \"\" }}',\n    '{{ $node[\"Prepare Update Data\"].json.next_stage || \"greeting\" }}',\n    '{{ $node[\"Prepare Update Data\"].json.collected_data_json }}'::jsonb,\n    NOW(),\n    NOW()\n  WHERE NOT EXISTS (SELECT 1 FROM existing_lead)\n  RETURNING *, 'inserted' as operation\n)\n-- Retorna o resultado (seja UPDATE ou INSERT)\nSELECT * FROM updated\nUNION ALL\nSELECT * FROM inserted",
+        "options": {}
+      },
+      "id": "bd792de3-2d61-4f90-af92-308e16344aff",
+      "name": "Upsert Lead Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1408,
+        352
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ { success: true, stage: $json.next_stage } }}",
+        "options": {}
+      },
+      "id": "9d65b620-99e5-45bb-a475-3ebc67120a18",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build SQL Queries Node - Prepara todas as queries SQL\n// Recebe dados do node anterior\nconst data = $input.first().json;\nconst phone_with_code = data.phone_with_code || '';\nconst phone_without_code = data.phone_without_code || '';\n\n// Validação de segurança\nif (!phone_with_code || !phone_without_code) {\n  throw new Error('Phone numbers not properly formatted');\n}\n\n// Escape simples para SQL injection\nconst escapeSql = (str) => {\n  return String(str).replace(/'/g, \"''\");\n};\n\n// Query para contar conversas existentes\nconst query_count = `\n  SELECT COUNT(*) as count\n  FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n`.trim();\n\n// Query para buscar detalhes da conversa\nconst query_details = `\n  SELECT\n    *,\n    COALESCE(state_machine_state,\n      CASE current_state\n        WHEN 'novo' THEN 'greeting'\n        WHEN 'identificando_servico' THEN 'service_selection'\n        WHEN 'coletando_dados' THEN 'collect_name'\n        WHEN 'agendando' THEN 'scheduling'\n        WHEN 'handoff_comercial' THEN 'handoff_comercial'\n        WHEN 'concluido' THEN 'completed'\n        ELSE 'greeting'\n      END\n    ) as state_for_machine\n  FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n  ORDER BY updated_at DESC\n  LIMIT 1\n`.trim();\n\n// Query para criar/atualizar conversa\nconst query_upsert = `\n  -- Limpar duplicatas antigas\n  DELETE FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n  AND id NOT IN (\n    SELECT id FROM conversations\n    WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n    ORDER BY updated_at DESC\n    LIMIT 1\n  );\n\n  -- Inserir ou atualizar conversa\n  INSERT INTO conversations (\n    phone_number,\n    whatsapp_name,\n    service_id,\n    contact_name,\n    contact_email,\n    city,\n    current_state,\n    state_machine_state,\n    collected_data,\n    error_count,\n    created_at,\n    updated_at\n  ) VALUES (\n    '${escapeSql(phone_without_code)}',\n    '${escapeSql(data.whatsapp_name || '')}',\n    NULL,\n    NULL,\n    NULL,\n    NULL,\n    'novo',\n    'greeting',\n    '{}'::jsonb,\n    0,\n    CURRENT_TIMESTAMP,\n    CURRENT_TIMESTAMP\n  )\n  ON CONFLICT (phone_number) DO UPDATE SET\n    whatsapp_name = COALESCE(EXCLUDED.whatsapp_name, conversations.whatsapp_name),\n    last_message_at = CURRENT_TIMESTAMP,\n    updated_at = CURRENT_TIMESTAMP,\n    state_machine_state = CASE\n      WHEN conversations.state_machine_state IN ('completed', 'handoff_comercial')\n      THEN 'greeting'\n      ELSE conversations.state_machine_state\n    END\n  RETURNING *\n`.trim();\n\n// Log para debug\nconsole.log('=== BUILD SQL QUERIES (FIXED) ===');\nconsole.log('Phone with code:', phone_with_code);\nconsole.log('Phone without code:', phone_without_code);\nconsole.log('Queries built successfully as STRINGS');\n\n// IMPORTANTE: Retornar cada query como campo string individual\nreturn {\n  ...data,\n  query_count: query_count,        // String SQL\n  query_details: query_details,    // String SQL\n  query_upsert: query_upsert       // String SQL\n};"
+      },
+      "id": "1fccec6a-5a7b-4801-82b3-efb672acfee0",
+      "name": "Build SQL Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -256
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Queries Node - Preserva todos os campos de query\n// Este node garante que os campos query_* sejam preservados após o IF node\n\nconst inputData = $input.first().json;\nconst queryData = $node[\"Build SQL Queries\"].json;\n\n// Log para debug\nconsole.log('=== MERGE QUERIES DEBUG ===');\nconsole.log('Input has count:', inputData.count);\nconsole.log('Query data available:', !!queryData);\n\n// Merge todos os dados preservando os campos de query\nreturn {\n    ...inputData,\n    // Preservar todos os campos de query do Build SQL Queries\n    query_count: queryData.query_count,\n    query_details: queryData.query_details,\n    query_upsert: queryData.query_upsert,\n    queries: queryData.queries,\n    // Preservar dados do telefone\n    phone_with_code: queryData.phone_with_code,\n    phone_without_code: queryData.phone_without_code,\n    phone_number: queryData.phone_number,\n    // Manter o count do resultado anterior\n    count: inputData.count || 0,\n    // Pass through outros dados\n    whatsapp_name: queryData.whatsapp_name || inputData.whatsapp_name || ''\n};"
+      },
+      "id": "336dfafa-8706-49f2-b380-74d0dde97375",
+      "name": "Merge Queries Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -512
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Queries Node - Preserva todos os campos de query\n// Este node garante que os campos query_* sejam preservados após o IF node\n\nconst inputData = $input.first().json;\nconst queryData = $node[\"Build SQL Queries\"].json;\n\n// Log para debug\nconsole.log('=== MERGE QUERIES DEBUG ===');\nconsole.log('Input has count:', inputData.count);\nconsole.log('Query data available:', !!queryData);\n\n// Merge todos os dados preservando os campos de query\nreturn {\n    ...inputData,\n    // Preservar todos os campos de query do Build SQL Queries\n    query_count: queryData.query_count,\n    query_details: queryData.query_details,\n    query_upsert: queryData.query_upsert,\n    queries: queryData.queries,\n    // Preservar dados do telefone\n    phone_with_code: queryData.phone_with_code,\n    phone_without_code: queryData.phone_without_code,\n    phone_number: queryData.phone_number,\n    // Manter o count do resultado anterior\n    count: inputData.count || 0,\n    // Pass through outros dados\n    whatsapp_name: queryData.whatsapp_name || inputData.whatsapp_name || ''\n};"
+      },
+      "id": "8d27a067-0ae9-440c-82c6-a1abae211f4a",
+      "name": "Merge Queries Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        512
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "id": "merge-conversation-data",
+      "name": "Merge Conversation Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        640,
+        240
+      ],
+      "executeOnce": false
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Receive Message": {
+      "main": [
+        [
+          {
+            "node": "Prepare Phone Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Count": {
+      "main": [
+        [
+          {
+            "node": "Check If New User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If New User": {
+      "main": [
+        [
+          {
+            "node": "Merge Queries Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Queries Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Details": {
+      "main": [
+        [
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Create New Conversation": {
+      "main": [
+        [
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "State Machine Logic": {
+      "main": [
+        [
+          {
+            "node": "Prepare Update Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Conversation State": {
+      "main": [
+        [
+          {
+            "node": "Save Inbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Response": {
+      "main": [
+        [
+          {
+            "node": "Upsert Lead Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check If Scheduling",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check If Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Scheduling": {
+      "main": [
+        [
+          {
+            "node": "Trigger Appointment Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Handoff": {
+      "main": [
+        [
+          {
+            "node": "Trigger Human Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Appointment Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Human Handoff": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Phone Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Update Data": {
+      "main": [
+        [
+          {
+            "node": "Update Conversation State",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Phone Formats": {
+      "main": [
+        [
+          {
+            "node": "Build SQL Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SQL Queries": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Queries Data": {
+      "main": [
+        [
+          {
+            "node": "Create New Conversation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Queries Data1": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation Details",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Conversation Data": {
+      "main": [
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "aeef9a7b-8afa-4a7f-b2db-7b074f4bdbe6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "be7607dc500d0df7a2cb94e774f3665239bf8a65324d98f4d2534280e5bd21e1"
+  },
+  "id": "NJ9fxsfQY83hsyBs",
+  "tags": [
+    {
+      "updatedAt": "2025-12-16T17:43:09.351Z",
+      "createdAt": "2025-12-16T17:43:09.351Z",
+      "id": "Bt7aSJBUi1XItwT9",
+      "name": "menu-based"
+    },
+    {
+      "updatedAt": "2025-12-16T17:43:09.349Z",
+      "createdAt": "2025-12-16T17:43:09.349Z",
+      "id": "xvWQ3HxS15JPlKvc",
+      "name": "v1"
+    }
+  ]
+}
