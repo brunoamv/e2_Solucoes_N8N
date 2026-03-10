@@ -1,205 +1,200 @@
-# E2 Soluções WhatsApp Bot - Context for Claude Code
+# E2 Bot - Context for Claude Code
 
-> **Critical Context** | Updated: 2026-03-10 | V2.8.3 (WF01) + V57.2 (WF02) DEPLOYED
-
----
-
-## 🎯 Project Identity
-
-**System**: WhatsApp bot with Claude AI + RAG (E2 Soluções - Brazilian electrical engineering)
-
-**Stack**: n8n + Claude 3.5 Sonnet + Supabase + PostgreSQL + Evolution API v2.3.7 + RD Station CRM
-
-**Language**: Portuguese (PT-BR)
+> **Status**: WF01 V2.8.3 ✅ | WF02 V63 🚀 READY | Updated: 2026-03-10
 
 ---
 
-## ✅ Current Production Status
+## 🎯 System Overview
 
-### Workflow 01 - WhatsApp Handler V2.8.3 ✅ DEPLOYED
-
-**Critical Fix**: Atomic duplicate detection via PostgreSQL ON CONFLICT
-**Status**: ✅ WORKING IN PRODUCTION
-
-**5 Bugs Resolved**:
-1. ✅ Race Condition - Save Message first (atomic duplicate detection)
-2. ✅ Ghost Connections - Removed obsolete nodes
-3. ✅ Node References - Updated to valid nodes only
-4. ✅ ExpressionError - All expressions validated
-5. ✅ Infinite Loop - Removed "Extract Conversation ID" node
-
-**Flow**:
-```
-Extract → Save Message (ON CONFLICT) → Check Operation →
-Is Duplicate? → [true: Duplicate Response | false: AI Agent]
-```
-
-**Files**:
-- Workflow: `n8n/workflows/01_main_whatsapp_handler_V2.8.3_NO_LOOP.json`
-- Docs: `docs/PLAN/V2.8_3_FINAL_VALIDATION.md`
+**Type**: WhatsApp AI Bot (E2 Soluções - Engenharia Elétrica)
+**Stack**: n8n + Claude 3.5 + PostgreSQL + Evolution API v2.3.7
+**Language**: PT-BR
 
 ---
 
-### Workflow 02 - AI Agent V57.2 ✅ READY FOR TESTING
+## ✅ Production Status
 
-**Critical Fix**: Remove empty `conversation` object that caused conversation_id NULL
-**Status**: ✅ GENERATED - Ready for import and testing
+### WF01: Handler V2.8.3 ✅ DEPLOYED
+- **Function**: Duplicate detection + routing
+- **Method**: PostgreSQL ON CONFLICT atomic operation
+- **File**: `01_main_whatsapp_handler_V2.8.3_NO_LOOP.json`
 
-**Problem Solved**:
-- V57.1 created empty `conversation = {}` object
-- Used `conversation.id` instead of extracted `conversation_id` variable
-- Result: conversation_id always NULL → executions stuck in "running"
+### WF02: AI Agent V63 🚀 READY FOR DEPLOYMENT
+- **Status**: Generated, ready for import
+- **File**: `02_ai_agent_conversation_V63_COMPLETE_REDESIGN.json` (60.5 KB)
+- **Generator**: `scripts/generate-workflow-v63-complete-redesign.py`
 
-**Solution V57.2**:
-- ✅ Removed `const conversation = input.conversation || {}`
-- ✅ Changed all `conversation.field` → `input.field` (8 surgical fixes)
-- ✅ Uses V54-extracted `conversation_id` variable correctly
-- ✅ Preserves V54 extraction, V32 state mapping, V57 merge append
+**V63 Key Improvements** (vs V62.3):
+- ✅ **Removed** manual phone collection (redundant state)
+- ✅ **Direct flow**: name → WhatsApp confirmation (uses webhook phone)
+- ✅ **Optimized**: 8 states (was 9), 12 templates (was 16)
+- ✅ **Code**: ~24% reduction (~950 lines from ~1260)
+- ✅ **Validated**: Triggers for scheduling + handoff_comercial
 
-**Flow**:
-```
-V57 Code Processor → State Machine Logic (uses input.* directly) →
-Build Update Queries (receives valid conversation_id) → Database Updates
-```
-
-**Files**:
-- Workflow: `n8n/workflows/02_ai_agent_conversation_V57_2_CONVERSATION_FIX.json`
-- Docs: `docs/PLAN/V57_2_CONVERSATION_OBJECT_BUG.md`
-- Script: `scripts/fix-workflow-v57_2-conversation-object-bug.py`
-
-**Testing Steps**:
-```bash
-# 1. Import V57.2 workflow: http://localhost:5678
-# 2. Deactivate V57.1 workflow
-# 3. Activate V57.2 workflow
-# 4. Send WhatsApp "oi" → menu
-# 5. Send "1" → asks name
-# 6. Send "Bruno Rosa" → asks phone (NOT menu loop)
-# 7. Monitor: docker logs -f e2bot-n8n-dev | grep "conversation_id"
-# 8. Verify: conversation_id NOT NULL in logs
-# 9. Verify: Executions complete with "success" status
-```
+**Plan Documentation**:
+- `docs/PLAN/V63_COMPLETE_FLOW_REDESIGN.md` - Complete technical plan
+- `docs/PLAN/V63_VALIDATION_REPORT.md` - Requirements validation
 
 ---
 
 ## 📊 Architecture
 
 ```
-WhatsApp (Evolution API v2.3.7 - senderPn field)
+WhatsApp (Evolution API v2.3.7)
   ↓
-Workflow 01 V2.8.3 - WhatsApp Handler
-  ├─→ ON CONFLICT duplicate detection (atomic)
-  └─→ Route to AI Agent or Duplicate Response
-      ↓
-Workflow 02 V57.2 - AI Agent
-  ├─→ V57 Merge Append (combines data sources)
-  ├─→ V54 Extraction (extracts conversation_id correctly)
-  ├─→ State Machine (uses input.* directly - V57.2 fix)
-  ├─→ V32 State Mapping (DB → code names)
-  ├─→ V43 Database (all columns present)
-  ├─→ Claude AI + Supabase RAG
-  └─→ RD Station CRM + Calendar + Email
+WF01 V2.8.3: Handler
+  ├─ Extract phone/message
+  ├─ Save (ON CONFLICT DO NOTHING)
+  └─ Route (duplicate/new) → WF02
+  ↓
+WF02 V63: AI Agent
+  ├─ State Machine (8 states)
+  ├─ Templates (12 total)
+  ├─ Database (PostgreSQL)
+  └─ Claude AI + RAG
 ```
 
 ---
 
-## 📂 Essential Files
+## 🔄 V63 Flow States (8 Total)
 
 ```
-n8n/workflows/
-  ├── 01_main_whatsapp_handler_V2.8.3_NO_LOOP.json        # WF01 ✅ DEPLOYED
-  └── 02_ai_agent_conversation_V57_2_CONVERSATION_FIX.json # WF02 ⏳ TESTING
+1. greeting               → Show menu (5 services)
+2. service_selection      → Capture service (1-5)
+3. collect_name           → Get name + DIRECT to WhatsApp confirm
+4. collect_phone_whatsapp_confirmation → Confirm or alternative
+5. collect_phone_alternative → If user chose option 2
+6. collect_email          → Email or skip
+7. collect_city           → City
+8. confirmation           → Show summary + trigger workflows
+   ├─ Option "sim" + service 1/3 → scheduling (Appointment Scheduler)
+   └─ Option "sim" + other services → handoff_comercial (Human Handoff)
+```
+
+**Key Optimization**: Removed `collect_phone` state - uses `input.phone_number` from Evolution webhook
+
+**Services**: 1-Solar | 2-Subestação | 3-Projetos | 4-BESS | 5-Análise
+
+---
+
+## 🚀 Deploy V63
+
+### Quick Deploy (5 steps)
+```bash
+# 1. Import workflow
+# http://localhost:5678 → Import:
+# n8n/workflows/02_ai_agent_conversation_V63_COMPLETE_REDESIGN.json
+
+# 2. Deactivate old (V62.3 or V60.2)
+# Find old workflow → Toggle: Inactive
+
+# 3. Activate V63
+# Find "V63 COMPLETE REDESIGN" → Toggle: Active
+
+# 4. Test happy path
+# WhatsApp: "oi" → "1" → "Bruno" → "1" (confirm WhatsApp) → email → city → "sim"
+# Expected: Scheduling message ✅
+
+# 5. Monitor
+docker logs -f e2bot-n8n-dev | grep -E "V63|confirmation"
+```
+
+### Test Scenarios
+```bash
+# A) Happy path (WhatsApp confirmed)
+"oi" → "1" → "Bruno Rosa" → "1" → "bruno@email.com" → "Goiânia" → "sim"
+# ✅ Verify: Direct flow, no manual phone prompt
+
+# B) Alternative phone
+"oi" → "2" → "Maria" → "2" → "(62)3092-2900" → email → city → "sim"
+# ✅ Verify: Alternative phone collected
+
+# C) Data correction
+Complete flow → "não" → "3" (email) → new email → city → "sim"
+# ✅ Verify: Field corrected, summary updated
+```
+
+### Rollback
+```bash
+# If issues: Deactivate V63 → Activate V62.3 or V58.1 (stable)
+```
+
+---
+
+## 📂 Key Files
+
+```
+workflows/
+  ├── 01_main_whatsapp_handler_V2.8.3_NO_LOOP.json       ✅ Production
+  └── 02_ai_agent_conversation_V63_COMPLETE_REDESIGN.json 🚀 Ready
 
 scripts/
-  ├── fix-workflow-01-v28-3-remove-loop.py                 # V2.8.3 generator
-  ├── fix-workflow-v57_2-conversation-object-bug.py        # V57.2 generator
-  └── run-migration-v43.sh                                 # V43 database
+  └── generate-workflow-v63-complete-redesign.py         Generator
 
-docs/PLAN/
-  ├── V2.8_3_FINAL_VALIDATION.md                           # WF01 validation
-  └── V57_2_CONVERSATION_OBJECT_BUG.md                     # WF02 bug analysis
+docs/
+  ├── QUICKSTART.md                         Quick setup
+  └── PLAN/
+      ├── V63_COMPLETE_FLOW_REDESIGN.md     Technical plan
+      └── V63_VALIDATION_REPORT.md          Validation
 ```
 
 ---
 
-## 🎯 Conversation States
+## 🐛 Version History (Compressed)
 
-```
-greeting → service_selection → collect_name → collect_phone →
-collect_email → collect_city → confirmation →
-scheduling | handoff_comercial | completed
-```
+**WF01**: V2.8.0-2 (evolution) → V2.8.3 ✅ (atomic duplicate detection)
 
-**E2 Services**:
-1. Energia Solar | 2. Subestação | 3. Projetos Elétricos | 4. BESS | 5. Análise e Laudos
+**WF02**:
+- V27-V56: Evolution phases
+- V57.2: Object fix
+- V58.1: UX refactor (stable fallback)
+- V60.2: Complete flow + rich templates
+- V62.3: Bug fixes (but introduced template timing issues)
+- **V63**: 🚀 Complete redesign (simplified, optimized)
 
 ---
 
-## 🔧 Quick Testing
+## 🔧 Essential Commands
 
-### V2.8.3 (WF01)
+### Database Check
 ```bash
-# Monitor duplicate detection
-docker logs -f e2bot-n8n-dev | grep -E "V2.8|operation"
-
-# Test: Send "oi" → operation='inserted', AI Agent called
-# Test: Send duplicate → operation='updated', returns "duplicate"
+docker exec -it e2bot-postgres-dev psql -U postgres -d e2bot_dev \
+  -c "SELECT phone_number, lead_name, service_type, current_state FROM conversations ORDER BY updated_at DESC LIMIT 5;"
 ```
 
-### V57.2 (WF02)
+### Evolution Status
 ```bash
-# Monitor conversation_id
-docker logs -f e2bot-n8n-dev | grep "conversation_id"
-
-# Test: Send "oi" → "1" → "Bruno Rosa"
-# Verify: conversation_id NOT NULL
-# Verify: Bot progresses (NOT menu loop)
-# Check: http://localhost:5678/projects/08qzhIsou3TK6J3Z/executions
+curl -s http://localhost:8080/instance/fetchInstances \
+  -H "apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891" | jq
 ```
 
-### Database
+### Logs (Real-time)
 ```bash
-# V43 columns check
-docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c "\d conversations"
+# All logs with V63 markers
+docker logs -f e2bot-n8n-dev | grep -E "V63|State Machine|confirmation"
 ```
 
 ---
 
-## 🐛 Version History (Ultra-Compact)
+## 📚 External References
 
-**Workflow 01 Evolution**:
-- V2.8.0: Race condition fix (Save Message first)
-- V2.8.1: Ghost connections cleanup
-- V2.8.2: Node references update
-- V2.8.3: Infinite loop fix ✅ **DEPLOYED**
-
-**Workflow 02 Evolution**:
-- V27-V30: Early validation issues → Fixed
-- V31: Validator isolation → Fixed
-- V32: State mapping → Fixed
-- V43: Database migration → Executed
-- V48-V56: Merge attempts → Evolved to V57
-- V57: Merge append pattern → Implemented
-- V57.1: State machine syntax → Fixed
-- V57.2: Conversation object bug → **READY FOR TESTING**
+- **n8n**: https://docs.n8n.io
+- **Claude**: https://docs.anthropic.com
+- **Evolution API**: https://github.com/EvolutionAPI
+- **Detailed Setup**: `docs/QUICKSTART.md`
 
 ---
 
-## 📞 Critical Docs
+## 🎯 Next Steps
 
-**V2.8.3 (WF01)**:
-- Validation: `docs/PLAN/V2.8_3_FINAL_VALIDATION.md`
-- Analysis: `docs/PLAN/V2.8_3_ANALYSIS_REPORT.md`
+1. ✅ V63 workflow generated
+2. 🚀 **Import V63** to n8n (http://localhost:5678)
+3. 🧪 **Test 3 scenarios** (happy path, alt phone, correction)
+4. 📊 **Monitor** for 10 conversations
+5. ✅ **Deploy** 100% if successful
 
-**V57.2 (WF02)**:
-- Bug Analysis: `docs/PLAN/V57_2_CONVERSATION_OBJECT_BUG.md`
-- V57 Base: `docs/PLAN/V57_MERGE_APPEND_SOLUTION.md`
-
-**External**:
-- n8n: https://docs.n8n.io
-- Claude: https://docs.anthropic.com
-- Evolution: https://github.com/EvolutionAPI
+**Priority**: 🟢 HIGH - Breaks bug cycle, simplifies maintenance
 
 ---
 
-**Status**: V2.8.3 DEPLOYED ✅ | V57.2 READY FOR TESTING ⏳
+**Maintained by**: Claude Code | **Last Review**: 2026-03-10
