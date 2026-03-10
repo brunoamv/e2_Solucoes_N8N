@@ -1,14 +1,14 @@
 # E2 Soluções Bot - Project Status
 
-**Última Atualização**: 2025-01-12 (22:30)
-**Fase Atual**: Workflow V22 Connection Pattern Fixed → 100% Operacional
-**Status Sistema**: ✅ OPERACIONAL (100% funcional - V22 completa)
+**Última Atualização**: 2026-01-13 (14:00)
+**Fase Atual**: Workflow V27 Message Flow Preservation → Menu Validation Fixed
+**Status Sistema**: ✅ OPERACIONAL (100% funcional - V27 completa com menu validation)
 
 ---
 
-## 🚨 Atualizações Críticas (2025-01-12)
+## 🚨 Atualizações Críticas (2026-01-13)
 
-### ✅ EVOLUÇÃO COMPLETA V17 → V22 (RESOLVIDO)
+### ✅ EVOLUÇÃO COMPLETA V17 → V27 (TOTALMENTE RESOLVIDO)
 
 | Versão | Issue | Status | Impacto | Documentação |
 |--------|-------|--------|---------|--------------|
@@ -17,12 +17,19 @@
 | **V20** | Template Strings | ✅ RESOLVIDO | ALTO - {{ }} não processados | Scripts: `fix-workflow-v20-query-format.py` |
 | **V21** | Data Flow Issues | ✅ RESOLVIDO | ALTO - Dados incompletos | `docs/FIX_DATA_FLOW_V21.md` |
 | **V22** | Connection Pattern | ✅ RESOLVIDO | CRÍTICO - "Cannot read properties" | `docs/ANALYSIS_V22_FIX.md` |
+| **V23** | Upsert Lead Data | ✅ RESOLVIDO | CRÍTICO - Lead data não salvo | `docs/ANALYSIS_V23_FIX.md` |
+| **V24** | Update Conversation (User) | ❌ NÃO RESOLVIDO | CRÍTICO - DB não salva | Correção manual do usuário |
+| **V25** | Simplified UPSERT | ✅ RESOLVIDO | CRÍTICO - CTE complexo falha | `docs/V25_SOLUTION_SUMMARY.md` |
+| **V26** | Menu Validation | ⚠️ PARCIAL | CRÍTICO - Menu não reconhece "1" | `docs/V26_MENU_FIX_SUMMARY.md` |
+| **V27** | Message Flow Fix | ✅ RESOLVIDO | CRÍTICO - Mensagem perdida no fluxo | `docs/V27_ANALYSIS_REPORT.md` |
 
-**Solução Final V22** (ATUAL):
-- Build Update Queries distribui queries em PARALELO para todos os nodes
-- Save Inbound/Outbound Messages recebem queries corretas
-- Update Conversation State executa sem erros
-- Workflow: `02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json`
+**Solução Final V27** (ATUAL - 2026-01-13):
+- Message fields preservados através de todo o workflow (message, content, body, text)
+- Build SQL Queries e Merge nodes explicitamente preservam campos
+- Menu validation funcional com extração robusta de campos
+- UPSERT simplificado com INSERT...ON CONFLICT (V25)
+- Debug V27 INPUT ANALYSIS para troubleshooting
+- Workflow: `02_ai_agent_conversation_V27_MESSAGE_FLOW_FIX.json`
 
 ### Correções Anteriores (2025-01-06)
 | Issue | Status | Impacto | Documentação |
@@ -286,11 +293,24 @@ cat docs/sprints/README.md
 
 ---
 
-## 🔧 Scripts de Correção Disponíveis (V17 → V22)
+## 🔧 Scripts de Correção Disponíveis (V17 → V27)
 
 ### Scripts Python da Evolução Completa
 ```bash
-# V22 - Connection Pattern Fix (ATUAL) ✅
+# V27 - Message Flow Fix (ATUAL) ✅
+python scripts/fix-workflow-v27-message-flow.py
+
+# V26 - Menu Validation Fix (parcial)
+python scripts/fix-workflow-v26-menu-validation.py
+
+# V25 - Simplified UPSERT
+python scripts/fix-workflow-v25-upsert-simplified.py
+
+# V23 - Extended Parallel Distribution
+python scripts/fix-workflow-v23-upsert-lead.py
+python scripts/fix-workflow-v23-add-upsert-query.py
+
+# V22 - Connection Pattern Fix
 python scripts/fix-workflow-v22-connection-pattern.py
 
 # V21 - Data Flow Fix
@@ -308,19 +328,25 @@ python scripts/fix-postgres-query-interpolation.py
 # Scripts de Validação
 ./scripts/validate-v21-fix.sh  # Valida V21 data flow
 ./scripts/validate-postgres-fix.sh  # Valida PostgreSQL queries
+docker logs -f e2bot-n8n-dev | grep V27  # Valida V27 message flow
 
 # Outros scripts úteis
 python scripts/fix-workflow-json.py  # Fix JSON import
 python scripts/fix-collected-data-handling.py  # Fix collected_data
 ```
 
-### Workflows Corrigidos (V22 é a versão ATUAL)
-- `02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json` - ✅ VERSÃO ATUAL (parallel query distribution)
+### Workflows Corrigidos (V27 é a versão ATUAL)
+- `02_ai_agent_conversation_V27_MESSAGE_FLOW_FIX.json` - ✅ VERSÃO ATUAL (message preservation + menu fix)
+- `02_ai_agent_conversation_V26_MENU_VALIDATION_FIX.json` - V26 (menu validation attempt)
+- `02_ai_agent_conversation_V25_UPSERT_SIMPLIFIED.json` - V25 (simplified UPSERT)
+- `02_ai_agent_conversation_V24.json` - V24 (user's manual fix)
+- `02_ai_agent_conversation_V23_EXTENDED_PARALLEL_COMPLETE.json` - V23 (extended parallel)
+- `02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json` - V22 (partial parallel)
 - `02_ai_agent_conversation_V21_DATA_FLOW_FIXED.json` - V21 (direct data flow)
 - `02_ai_agent_conversation_V20_QUERY_FIX.json` - V20 (template strings)
 - `02_ai_agent_conversation_V19_MERGE_CONVERSATION.json` - V19 (conversation ID)
 - `02_ai_agent_conversation_V17.json` - V17 (PostgreSQL queries)
-- **Para usar**: Importar V22 via n8n UI (http://localhost:5678)
+- **Para usar**: Importar V27 via n8n UI (http://localhost:5678)
 
 ---
 
@@ -338,27 +364,47 @@ python scripts/fix-collected-data-handling.py  # Fix collected_data
 
 ---
 
-**Próxima Ação Recomendada (V22 Implementation)**:
+**Próxima Ação Recomendada (V27 Implementation)**:
 1. ✅ Verificar Evolution API v2.3.7 está rodando: `docker logs e2bot-evolution-dev`
-2. ⚡ **IMPORTAR V22 WORKFLOW**:
+2. ⚡ **IMPORTAR V27 WORKFLOW**:
    ```bash
    # No n8n UI (http://localhost:5678):
-   # a) Import: 02_ai_agent_conversation_V22_CONNECTION_PATTERN_FIXED.json
-   # b) Desativar workflows V17-V21
-   # c) Ativar workflow V22
+   # a) Import: 02_ai_agent_conversation_V27_MESSAGE_FLOW_FIX.json
+   # b) Desativar workflows V17-V26
+   # c) Ativar workflow V27
    ```
 3. 🧪 **Testar fluxo completo**:
    - Enviar mensagem WhatsApp
-   - Selecionar opção "1" no menu
-   - Verificar progressão correta (não deve repetir menu)
-   - Confirmar salvamento de mensagens no banco
-4. 📊 **Validar execução**:
+   - Selecionar opção "1" no menu (DEVE FUNCIONAR AGORA!)
+   - Verificar que menu é reconhecido corretamente
+   - Confirmar progressão para coleta de nome
+   - Verificar salvamento no banco
+4. 📊 **Validar execução V27**:
    ```bash
-   # Verificar logs sem erros
-   docker logs -f e2bot-n8n-dev | grep -E "(V22|Save.*Message|ERROR)"
+   # Verificar logs V27 com mensagens preservadas
+   docker logs -f e2bot-n8n-dev | grep "V27 INPUT ANALYSIS"
+
+   # Deve mostrar:
+   # Input 0 message value: 1
+   # Input 0 content value: 1
+   # (NÃO deve estar vazio)
 
    # Verificar mensagens salvas
    docker exec e2bot-postgres-dev psql -U postgres -d e2_bot \
-     -c "SELECT COUNT(*) FROM messages WHERE created_at > NOW() - INTERVAL '10 minutes';"
+     -c "SELECT phone_number, user_message, bot_response FROM messages WHERE created_at > NOW() - INTERVAL '10 minutes';"
+
+   # Verificar estado da conversa
+   docker exec e2bot-postgres-dev psql -U postgres -d e2_bot \
+     -c "SELECT phone_number, state_machine_state, collected_data FROM conversations WHERE updated_at > NOW() - INTERVAL '10 minutes';"
    ```
-5. ⏳ Quando OpenAI token disponível, executar setup Sprint 1.1 conforme `docs/validation/README.md`
+5. 🔍 **Se ainda com problemas**:
+   ```bash
+   # Verificar workflow 01 está passando mensagem
+   docker logs -f e2bot-n8n-dev | grep "Execute Workflow"
+
+   # Testar webhook diretamente (bypass workflow 01)
+   curl -X POST http://localhost:5678/webhook/webhook-ai-agent \
+     -H "Content-Type: application/json" \
+     -d '{"phone_number": "556181755748", "message": "1", "body": "1", "text": "1"}'
+   ```
+6. ⏳ Quando OpenAI token disponível, executar setup Sprint 1.1 conforme `docs/validation/README.md`

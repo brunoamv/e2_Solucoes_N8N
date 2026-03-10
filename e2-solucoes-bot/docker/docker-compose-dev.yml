@@ -97,16 +97,18 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-CoraRosa}
-      - POSTGRES_DB=e2_bot
+      - POSTGRES_DB=postgres
 
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
-      # Inicialização do schema (será executado na primeira vez)
+      # Inicialização do e2bot_dev database (será executado na primeira vez)
+      - ../database/init-e2bot-dev.sh:/docker-entrypoint-initdb.d/00_init_database.sh:ro
+      # Schema V43 com todas as colunas necessárias
       - ../database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ../database/appointment_functions.sql:/docker-entrypoint-initdb.d/02_appointment_functions.sql:ro
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d e2_bot"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d e2bot_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -205,7 +207,7 @@ services:
       - evolution_store:/evolution/store
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
       retries: 3

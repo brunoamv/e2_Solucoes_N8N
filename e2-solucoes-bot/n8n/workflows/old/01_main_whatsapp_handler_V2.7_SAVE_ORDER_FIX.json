@@ -1,0 +1,475 @@
+{
+  "name": "01 - WhatsApp Handler V2.7 (Save Message Order Fix)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-evolution",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-whatsapp",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        300
+      ],
+      "webhookId": "whatsapp-evolution"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "event-check",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "messages.upsert",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "from-me-check",
+              "leftValue": "={{ $json.body.data.key.fromMe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-messages",
+      "name": "Filter Messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combined extraction and duplicate check to ensure proper flow\nconst inputData = $input.item.json;\n\nif (!inputData.body || !inputData.body.data) {\n  throw new Error('Invalid webhook payload');\n}\n\nconst data = inputData.body.data;\nconst message = data.message || {};\nconst key = data.key || {};\n\n// Função para extrair o número de telefone corretamente\nfunction extractPhoneNumber(data) {\n  // Prioridade 1: usar senderPn se existir (v2.3+)\n  if (data.senderPn) {\n    console.log('Using senderPn field (v2.3+):', data.senderPn);\n    return formatBrazilianPhone(data.senderPn);\n  }\n\n  // Prioridade 2: usar remoteJid (v2.2.x e fallback)\n  const key = data.key || {};\n  if (key.remoteJid) {\n    console.log('Using remoteJid field (fallback):', key.remoteJid);\n    return extractFromRemoteJid(key.remoteJid);\n  }\n\n  console.log('WARNING: No phone number field available');\n  return '';\n}\n\n// Função para formatar número brasileiro\nfunction formatBrazilianPhone(phone) {\n  let cleaned = String(phone).replace(/\\D/g, '');\n\n  // Remove código do país se presente\n  if (cleaned.startsWith('55') && cleaned.length >= 12) {\n    cleaned = cleaned.substring(2);\n  }\n\n  // Validação: deve ter 10-11 dígitos (DDD + número)\n  if (!/^\\d{10,11}$/.test(cleaned)) {\n    console.log('WARNING: Phone number format unexpected:', cleaned);\n  }\n\n  return cleaned;\n}\n\n// Função para extrair de remoteJid\nfunction extractFromRemoteJid(remoteJid) {\n  if (!remoteJid) return '';\n\n  // Remove @s.whatsapp.net ou @g.us (grupos)\n  let cleaned = remoteJid.replace(/@[sg]\\.(?:whatsapp\\.net|us)$/, '');\n\n  // Aplica formatação padrão\n  return formatBrazilianPhone(cleaned);\n}\n\n// Build output\nconst output = {\n  phone_number: extractPhoneNumber(data),\n  whatsapp_name: data.pushName || '',\n  message_id: key.id || `gen_${Date.now()}`,\n  message_type: 'text',\n  content: '',\n  media_url: null,\n  // Initialize duplicate flag as false\n  is_duplicate: false,\n  needs_save: true\n};\n\n// Log para debug\nconsole.log('Evolution API Data:', {\n  senderPn: data.senderPn || 'not present',\n  remoteJid: key.remoteJid || 'not present'\n});\nconsole.log('Phone number extraído:', output.phone_number);\n\n// Extract content based on message type\nif (message.conversation) {\n  output.content = message.conversation;\n} else if (message.extendedTextMessage) {\n  output.content = message.extendedTextMessage.text || '';\n} else if (message.imageMessage) {\n  output.message_type = 'image';\n  output.media_url = message.imageMessage.url || '';\n  output.content = message.imageMessage.caption || '[Imagem]';\n} else if (message.audioMessage) {\n  output.message_type = 'audio';\n  output.content = '[Áudio]';\n} else if (message.documentMessage) {\n  output.message_type = 'document';\n  output.content = message.documentMessage.fileName || '[Documento]';\n}\n\nreturn output;"
+      },
+      "id": "extract-data",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT id FROM messages WHERE whatsapp_message_id = '{{ $json.message_id.replace(/'/g, \"''\") }}' LIMIT 1",
+        "options": {
+          "queryBatching": "independent"
+        }
+      },
+      "id": "check-duplicate",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -800,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge duplicate check result with message data\nconst messageData = $node[\"Extract Message Data\"].json;\nconst queryResult = $input.all();\n\n// Check if we have a duplicate\nlet isDuplicate = false;\nif (queryResult && queryResult.length > 0) {\n  // Check if the result has an id field\n  const firstResult = queryResult[0];\n  if (firstResult && firstResult.json && firstResult.json.id) {\n    isDuplicate = true;\n  }\n}\n\n// Return merged data with duplicate status\nreturn {\n  ...messageData,\n  is_duplicate: isDuplicate,\n  needs_save: !isDuplicate\n};"
+      },
+      "id": "merge-results",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "duplicate-check",
+              "leftValue": "={{ $json.is_duplicate }}",
+              "rightValue": "={{ true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-duplicate",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO messages (\n  conversation_id,\n  direction,\n  content,\n  message_type,\n  media_url,\n  whatsapp_message_id\n) VALUES (\n  {{ $node[\"Extract Conversation ID\"].json.conversation_id }},\n  'inbound',\n  '{{ $node[\"Merge Results\"].json.content.replace(/'/g, \"''\") }}',\n  '{{ $node[\"Merge Results\"].json.message_type }}',\n  {{ $node[\"Merge Results\"].json.media_url ? \"'\" + $node[\"Merge Results\"].json.media_url.replace(/'/g, \"''\") + \"'\" : \"null\" }},\n  '{{ $node[\"Merge Results\"].json.message_id.replace(/'/g, \"''\") }}'\n) ON CONFLICT (whatsapp_message_id)\nDO UPDATE SET\n  content = EXCLUDED.content,\n  media_url = EXCLUDED.media_url,\n  conversation_id = EXCLUDED.conversation_id\nRETURNING id, created_at, CASE WHEN xmax = 0 THEN 'inserted' ELSE 'updated' END as operation",
+        "options": {},
+        "alwaysOutputData": true
+      },
+      "id": "save-message",
+      "name": "Save Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "image-check",
+              "leftValue": "={{ $node[\"Merge Results\"].json.message_type }}",
+              "rightValue": "image",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-image",
+      "name": "Is Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepara os dados para passar ao Workflow 02\nconst messageData = $node[\"Merge Results\"].json;\n\n// Garantir que o phone_number seja passado corretamente\nconst phone_number = messageData.phone_number || '';\n\nif (!phone_number) {\n  throw new Error('Phone number is required but was not extracted correctly');\n}\n\nconsole.log('Passando para Workflow 02:', {\n  phone_number: phone_number,\n  whatsapp_name: messageData.whatsapp_name\n});\n\nreturn {\n  phone_number: phone_number,\n  whatsapp_name: messageData.whatsapp_name || '',\n  message: messageData.content || '',\n  message_type: messageData.message_type || 'text',\n  media_url: messageData.media_url || null,\n  message_id: messageData.message_id || '',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "prepare-data",
+      "name": "Prepare Data for AI Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "77olYrOCl5EJeOkX",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "trigger-ai",
+      "name": "Trigger AI Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "4",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "trigger-image-analysis",
+      "name": "Trigger Image Analysis",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "webhook-response-success",
+      "name": "Webhook Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"duplicate\", \"message\": \"Message already processed\" } }}",
+        "options": {}
+      },
+      "id": "webhook-response-duplicate",
+      "name": "Webhook Response Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"ignored\", \"message\": \"Not a user message\" } }}",
+        "options": {}
+      },
+      "id": "webhook-response-ignored",
+      "name": "Webhook Response Ignored",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1200,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract conversation_id from Trigger AI Agent response\nconst aiResponse = $input.first().json;\n\nconsole.log('V2.7 Extract Conversation ID:');\nconsole.log('  AI Agent Response Keys:', Object.keys(aiResponse).join(', '));\n\n// Try multiple possible fields\nlet conversation_id = null;\n\nif (aiResponse.conversation_id) {\n    conversation_id = aiResponse.conversation_id;\n    console.log('  ✓ Found conversation_id:', conversation_id);\n} else if (aiResponse.id) {\n    conversation_id = aiResponse.id;\n    console.log('  ✓ Found id (using as conversation_id):', conversation_id);\n} else {\n    console.error('  ❌ ERROR: No conversation_id found in AI response!');\n    console.error('  Available keys:', Object.keys(aiResponse));\n    throw new Error('V2.7: conversation_id not found in AI Agent response');\n}\n\n// Return conversation_id plus all original data for Save Message\nreturn {\n    ...aiResponse,\n    conversation_id: conversation_id\n};"
+      },
+      "id": "extract-conversation-id",
+      "name": "Extract Conversation ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        200
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Filter Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Messages": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Response Ignored",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Message": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Image?": {
+      "main": [
+        [
+          {
+            "node": "Trigger Image Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Data for AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data for AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Trigger AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Extract Conversation ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Image Analysis": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data for AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Conversation ID": {
+      "main": [
+        [
+          {
+            "node": "Save Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "v2-7-save-message-order-fix",
+  "meta": {
+    "instanceId": "be7607dc500d0df7a2cb94e774f3665239bf8a65324d98f4d2534280e5bd21e1"
+  },
+  "id": "workflow-01-v27-save-order-fix",
+  "tags": []
+}

@@ -12,8 +12,17 @@ CREATE TABLE conversations (
     phone_number VARCHAR(20) NOT NULL UNIQUE,
     whatsapp_name VARCHAR(255),
     current_state VARCHAR(50) DEFAULT 'novo',
+    state_machine_state VARCHAR(50),  -- V45: State machine tracking for workflow logic
     collected_data JSONB DEFAULT '{}',
     service_type VARCHAR(50),
+    error_count INTEGER DEFAULT 0,  -- V45: Track validation errors in conversation
+
+    -- V43: Legacy columns for n8n workflow compatibility
+    service_id VARCHAR(100),
+    contact_name VARCHAR(255),
+    contact_email VARCHAR(255),
+    city VARCHAR(100),
+
     rdstation_contact_id VARCHAR(100),
     rdstation_deal_id VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -35,6 +44,7 @@ CREATE TABLE conversations (
 CREATE INDEX idx_conversations_phone ON conversations(phone_number);
 CREATE INDEX idx_conversations_status ON conversations(status);
 CREATE INDEX idx_conversations_service ON conversations(service_type);
+CREATE INDEX idx_conversations_state_machine ON conversations(state_machine_state);  -- V45: Index for state machine queries
 CREATE INDEX idx_conversations_rdstation_contact ON conversations(rdstation_contact_id);
 CREATE INDEX idx_conversations_rdstation_deal ON conversations(rdstation_deal_id);
 

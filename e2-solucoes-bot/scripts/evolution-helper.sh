@@ -147,19 +147,38 @@ evolution_send() {
 evolution_recreate() {
     echo "🔄 Recriando instância: $INSTANCE_NAME"
     echo ""
-    echo "1/5 - Deletando instância antiga..."
+    echo "1/7 - Deletando instância antiga..."
     evolution_delete
     echo ""
     echo "⏳ Aguardando 3 segundos..."
     sleep 3
     echo ""
-    echo "2/5 - Criando nova instância..."
+    echo "2/7 - Copiando .env para o container Evolution..."
+    docker cp "$ENV_FILE" e2bot-evolution-dev:/evolution/.env
+    if [ $? -eq 0 ]; then
+        echo "   ✅ Arquivo .env copiado com sucesso"
+    else
+        echo "   ⚠️  Aviso: Falha ao copiar .env (container pode não existir ainda)"
+    fi
+    echo ""
+    echo "3/7 - Reiniciando container para carregar variáveis de ambiente..."
+    docker restart e2bot-evolution-dev
+    if [ $? -eq 0 ]; then
+        echo "   ✅ Container reiniciado com sucesso"
+    else
+        echo "   ❌ Erro ao reiniciar container"
+    fi
+    echo ""
+    echo "⏳ Aguardando reinicialização completa (20 segundos)..."
+    sleep 20
+    echo ""
+    echo "4/7 - Criando nova instância..."
     evolution_create
     echo ""
-    echo "⏳ Aguardando Evolution API inicializar (5 segundos)..."
+    echo "⏳ Aguardando Evolution API estabilizar (5 segundos)..."
     sleep 5
     echo ""
-    echo "3/5 - Configurando webhook para n8n..."
+    echo "5/7 - Configurando webhook para n8n..."
     curl -s -X POST "$EVOLUTION_URL/webhook/set/$INSTANCE_NAME" \
         -H "apikey: $EVOLUTION_API_KEY" \
         -H "Content-Type: application/json" \
@@ -178,11 +197,11 @@ evolution_recreate() {
             }
         }' | jq '.webhook' 2>/dev/null || echo "   ✅ Webhook configurado"
     echo ""
-    echo "4/5 - Verificando configuração do webhook..."
+    echo "6/7 - Verificando configuração do webhook..."
     curl -s "$EVOLUTION_URL/webhook/find/$INSTANCE_NAME" \
         -H "apikey: $EVOLUTION_API_KEY" | jq -r '.url' 2>/dev/null
     echo ""
-    echo "5/5 - Buscando QR Code..."
+    echo "7/7 - Buscando QR Code..."
     evolution_qrcode
 }
 

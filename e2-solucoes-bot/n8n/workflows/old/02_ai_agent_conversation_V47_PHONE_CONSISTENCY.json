@@ -1,0 +1,720 @@
+{
+  "name": "02 - AI Agent Conversation V47 (Phone Consistency Fix)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e007064a-93ec-4da7-a718-bf4a4bcf331f",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validação de entrada do Workflow 01\nconst inputData = $input.first().json;\n\n// Validação crítica do phone_number\nif (!inputData.phone_number || inputData.phone_number === 'undefined') {\n    throw new Error('Phone number is required but was not received from Workflow 01');\n}\n\n// Limpar e validar formato do phone_number\nlet phone_number = String(inputData.phone_number).replace(/[^0-9]/g, '');\n\n// Remover @s.whatsapp.net se existir\nif (phone_number.includes('@')) {\n  phone_number = phone_number.split('@')[0];\n}\n\n// IMPORTANTE: Adicionar código 55 se não tiver (MOVIDO DO PREPARE UPDATE DATA)\nif (phone_number && !phone_number.startsWith('55')) {\n  // Se tem 10 ou 11 dígitos (formato brasileiro), adiciona 55\n  if (phone_number.length === 10 || phone_number.length === 11) {\n    phone_number = '55' + phone_number;\n    console.log('Adicionado código 55:', phone_number);\n  }\n  // Se tem 12 ou 13 dígitos começando com outro código, mantém\n  else if (phone_number.length >= 12) {\n    console.log('Número já tem código de país:', phone_number);\n  }\n  // Qualquer outro caso, tenta adicionar 55\n  else {\n    phone_number = '55' + phone_number;\n    console.log('Formato desconhecido, adicionado 55:', phone_number);\n  }\n}\n\n// Validação de formato brasileiro (DDD + número) - AGORA COM 55\nif (phone_number.length < 12 || phone_number.length > 13) {\n    console.warn(`Phone number format unusual: ${phone_number} (expected 12-13 digits with country code)`);\n}\n\nconsole.log('Validated input:', {\n    phone_number: phone_number,  // Agora já tem 55\n    whatsapp_name: inputData.whatsapp_name,\n    message_type: inputData.message_type\n});\n\nreturn {\n    phone_number: phone_number,  // COM código 55\n    whatsapp_name: inputData.whatsapp_name || '',\n    message: inputData.message || '',\n    message_type: inputData.message_type || 'text',\n    media_url: inputData.media_url || null,\n    message_id: inputData.message_id || '',\n    timestamp: inputData.timestamp || new Date().toISOString()\n};"
+      },
+      "id": "56bd8c6a-b7a0-40a4-a6c4-57f05ca25744",
+      "name": "Validate Input Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare both phone formats for SQL queries\n// This node receives data directly from WEBHOOK (not from Validate Input Data)\nconst inputData = $input.first().json;\n\n// Get phone number - could come from webhook or validate input\nlet phone_with_code = String(inputData.phone_number || '');\n\n// Clean the phone number\nphone_with_code = phone_with_code.replace(/[^0-9]/g, '');\n\n// Add country code if missing\nif (phone_with_code && !phone_with_code.startsWith('55')) {\n    if (phone_with_code.length === 10 || phone_with_code.length === 11) {\n        phone_with_code = '55' + phone_with_code;\n        console.log('Added country code 55:', phone_with_code);\n    }\n}\n\n// Create version without country code for compatibility\nlet phone_without_code = phone_with_code;\nif (phone_with_code.startsWith('55')) {\n    phone_without_code = phone_with_code.substring(2);\n}\n\nconsole.log('=== PHONE FORMAT PREPARATION ===');\nconsole.log('With code (55):', phone_with_code);\nconsole.log('Without code:', phone_without_code);\n\n// Return both formats and pass through all other data\nreturn {\n    ...inputData, // Pass through all original data\n    phone_with_code: phone_with_code,      // e.g., \"556181755748\"\n    phone_without_code: phone_without_code, // e.g., \"6181755748\"\n    // Keep original for compatibility\n    phone_number: phone_with_code,\n\n    // CRITICAL V26 FIX: Ensure ALL possible message field names are present\n    // This handles different webhook formats from Evolution API\n    message: inputData.message || inputData.body || inputData.text || inputData.content || '',\n    content: inputData.content || inputData.message || inputData.body || inputData.text || '',\n    body: inputData.body || inputData.message || inputData.text || inputData.content || '',\n    text: inputData.text || inputData.message || inputData.body || inputData.content || '',\n\n    // Also ensure whatsapp_name is present\n    whatsapp_name: inputData.whatsapp_name || inputData.pushName || inputData.profileName || ''\n};"
+      },
+      "id": "580dfe3e-31ea-4337-a502-f8addfbf9367",
+      "name": "Prepare Phone Formats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1024,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-ai-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "0c70f884-0df7-418d-b238-d74060588bed",
+      "name": "Webhook - Receive Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        688
+      ],
+      "webhookId": "ai-agent-conversation-v1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_count}}",
+        "additionalFields": {}
+      },
+      "id": "6ce6c308-1183-4ffd-a8b2-1290a45b82d3",
+      "name": "Get Conversation Count",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        688
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_details}}",
+        "additionalFields": {}
+      },
+      "id": "d6f73a5f-97f4-417d-8b06-83f7c2c6e2ea",
+      "name": "Get Conversation Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        352,
+        928
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.count }}",
+              "value2": "0"
+            }
+          ]
+        }
+      },
+      "id": "c21aeec7-83c2-4f54-9ad2-ec3b033d9078",
+      "name": "Check If New User",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_upsert}}",
+        "options": {}
+      },
+      "id": "4657386e-04f9-4e40-b63d-74bf9cf206fa",
+      "name": "Create New Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "\n// =====================================\n// V40 STATE MACHINE - V34 COMPLETE STRUCTURE\n// =====================================\nconsole.log('V40 STATE MACHINE - START');\n\n// Extract input data - agora conversation virá do banco via Get Conversation Details\nconst input = $input.first().json;\nconst message = input.message || input.body || input.text || '';\nconst phoneNumber = input.phone_number || input.phone_without_code || '';\nconst conversation = input.conversation || {};  // Agora será populado!\n\nconsole.log('V40 Input:');\nconsole.log('  Message:', message);\nconsole.log('  Phone:', phoneNumber);\nconsole.log('  Conversation ID:', conversation.id || 'NEW');\n\n// Get current state - agora virá do banco!\nconst currentStage = conversation.state_machine_state ||\n                     conversation.current_state ||\n                     conversation.state_for_machine ||\n                     'greeting';\n\nconsole.log('V40 Current Stage:', currentStage);\nconsole.log('V40 Conversation State Machine State:', conversation.state_machine_state);\n\n// Initialize variables\nlet responseText = '';\nlet nextStage = currentStage;\nlet updateData = {};\nlet errorCount = conversation.error_count || 0;\n\n// State name mapping\nconst stateNameMapping = {\n  'novo': 'greeting',\n  'identificando_servico': 'service_selection',\n  'service_selection': 'service_selection',\n  'coletando_nome': 'collect_name',\n  'collect_name': 'collect_name',\n  'coletando_telefone': 'collect_phone',\n  'collect_phone': 'collect_phone',\n  'coletando_email': 'collect_email',\n  'collect_email': 'collect_email',\n  'coletando_cidade': 'collect_city',\n  'collect_city': 'collect_city',\n  'confirmacao': 'confirmation',\n  'confirmation': 'confirmation',\n  'greeting': 'greeting'\n};\n\nconst normalizedStage = stateNameMapping[currentStage] || currentStage;\nconsole.log('V40 Normalized Stage:', normalizedStage);\n\n// Templates\nconst templates = {\n  greeting: '🤖 Olá! Bem-vindo à E2 Soluções!\\n\\nSomos especialistas em engenharia elétrica.\\n\\nEscolha o serviço desejado:\\n\\n1️⃣ - Energia Solar\\n2️⃣ - Subestação\\n3️⃣ - Projetos Elétricos\\n4️⃣ - BESS (Armazenamento)\\n5️⃣ - Análise e Laudos\\n\\nDigite o número (1-5):',\n  invalid_option: '❌ Opção inválida. Por favor, escolha um número de 1 a 5.',\n  collect_name: '👤 Qual seu nome completo?',\n  invalid_name: '❌ Por favor, informe um nome válido (mínimo 3 letras).',\n  collect_phone: '📱 Agora, informe seu telefone com DDD:\\nExemplo: (61) 98765-4321',\n  collect_email: '📧 Qual seu melhor e-mail?\\n\\n_Digite \"pular\" se não quiser informar_',\n  collect_city: '📍 De qual cidade você está falando?'\n};\n\n// State machine\nswitch (normalizedStage) {\n  case 'greeting':\n  case 'novo':\n    console.log('V40: Processing GREETING state');\n    if (/^[1-5]$/.test(message)) {\n      console.log('V40: Service selected:', message);\n      updateData.service_selected = message;\n      responseText = 'Ótima escolha! Vou precisar de alguns dados.\\n\\n' + templates.collect_name;\n      nextStage = 'collect_name';\n    } else {\n      console.log('V40: Showing greeting menu');\n      responseText = templates.greeting;\n      nextStage = 'service_selection';\n    }\n    break;\n\n  case 'service_selection':\n  case 'identificando_servico':\n    console.log('V40: Processing SERVICE_SELECTION state');\n    if (/^[1-5]$/.test(message)) {\n      console.log('V40: Valid service number:', message);\n      updateData.service_selected = message;\n      responseText = templates.collect_name;\n      nextStage = 'collect_name';\n    } else {\n      console.log('V40: Invalid service selection');\n      responseText = templates.invalid_option + '\\n\\n' + templates.greeting;\n      nextStage = 'service_selection';\n      errorCount++;\n    }\n    break;\n\n  case 'collect_name':\n  case 'coletando_nome':\n    console.log('================================');\n    console.log('V40: COLLECT_NAME STATE');\n    console.log('Message:', message);\n    console.log('================================');\n\n    const trimmedName = message.trim();\n    console.log('V40 Name Validation:');\n    console.log('  Trimmed:', trimmedName);\n    console.log('  Length:', trimmedName.length);\n\n    if (trimmedName.length >= 2 && !/^[0-9]+$/.test(trimmedName)) {\n      console.log('✅ V40: NAME ACCEPTED:', trimmedName);\n      updateData.lead_name = trimmedName;\n      responseText = `Obrigado, ${trimmedName}!\\n\\n` + templates.collect_phone;\n      nextStage = 'collect_phone';\n      errorCount = 0;\n    } else {\n      console.log('❌ V40: NAME REJECTED');\n      responseText = templates.invalid_name;\n      nextStage = 'collect_name';\n      errorCount++;\n    }\n    break;\n\n  case 'collect_phone':\n  case 'coletando_telefone':\n    console.log('V40: Processing COLLECT_PHONE state');\n    updateData.phone = message;\n    responseText = templates.collect_email;\n    nextStage = 'collect_email';\n    break;\n\n  case 'collect_email':\n  case 'coletando_email':\n    console.log('V40: Processing COLLECT_EMAIL state');\n    if (message.toLowerCase() !== 'pular') {\n      updateData.email = message;\n    }\n    responseText = templates.collect_city;\n    nextStage = 'collect_city';\n    break;\n\n  case 'collect_city':\n  case 'coletando_cidade':\n    console.log('V40: Processing COLLECT_CITY state');\n    updateData.city = message;\n    responseText = '✅ Perfeito! Recebi todos os seus dados.\\n\\n' +\n                  'Em breve, um de nossos especialistas entrará em contato.\\n\\n' +\n                  'Obrigado por escolher a E2 Soluções! 🚀';\n    nextStage = 'completed';\n    break;\n\n  default:\n    console.log('V40: UNKNOWN STATE:', normalizedStage);\n    responseText = templates.greeting;\n    nextStage = 'greeting';\n    break;\n}\n\nconsole.log('V40 State Machine Complete');\nconsole.log('  Response:', responseText.substring(0, 50) + '...');\nconsole.log('  Next Stage:', nextStage);\n\n// CRITICAL: Usar nomenclatura V34 Build Update Queries (snake_case)\nconst result = {\n  // CRITICAL FIELDS - EXATA nomenclatura V34\n  response_text: responseText,        // V34 Build Update Queries usa isso!\n  next_stage: nextStage,\n  current_state: normalizedStage,\n\n  // Phone fields\n  phone_number: phoneNumber,\n  phone_with_code: phoneNumber,\n  phone_without_code: phoneNumber.replace(/^55/, ''),\n\n  // Update data\n  collected_data: {\n    ...conversation.collected_data,\n    ...updateData\n  },\n\n  // State machine fields\n  state_machine_state: nextStage,\n  errorCount: errorCount,\n\n  // Message data\n  message: message,\n  message_type: 'text',\n\n  // Conversation data - IMPORTANTE: agora temos ID do banco!\n  conversation_id: conversation.id || null,\n  lead_id: phoneNumber,\n\n  // Execution tracking\n  v40_executed: true,\n  v40_timestamp: new Date().toISOString()\n};\n\nconsole.log('V40 Final Result Keys:', Object.keys(result));\nconsole.log('V40 CRITICAL: response_text =', result.response_text ? 'SET' : 'MISSING');\nconsole.log('V40 CRITICAL: next_stage =', result.next_stage);\nconsole.log('V40 CRITICAL: conversation_id =', result.conversation_id || 'NULL');\nconsole.log('V40 STATE MACHINE - END');\n\nreturn result;\n"
+      },
+      "id": "3b0d5abe-e6f6-435d-9ff1-8d55163dcaa4",
+      "name": "State Machine Logic",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        320,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_update_conversation }}"
+      },
+      "id": "66353703-f1f3-484e-9968-38434542d35f",
+      "name": "Update Conversation State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        608,
+        752
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_save_inbound }}"
+      },
+      "id": "81b1fa8f-a8d0-4ff8-8181-ee25c085d2f3",
+      "name": "Save Inbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        720,
+        112
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_save_outbound }}"
+      },
+      "id": "73cd6d71-0a16-427a-aaae-f46a450c7788",
+      "name": "Save Outbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        912,
+        128
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://e2bot-evolution-dev:8080/message/sendText/e2-solucoes-bot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $node[\"Build Update Queries\"].json[\"phone_number\"] }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $node[\"Build Update Queries\"].json[\"response_text\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3f54980b-240b-43f6-bd38-6cd95e547d86",
+      "name": "Send WhatsApp Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        928,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.next_stage }}",
+              "value2": "scheduling"
+            }
+          ]
+        }
+      },
+      "id": "689d6869-74ad-486c-920d-75feff34c381",
+      "name": "Check If Scheduling",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.next_stage }}",
+              "value2": "handoff_comercial"
+            }
+          ]
+        }
+      },
+      "id": "e6eb8498-894a-42c5-9ab2-268128a46989",
+      "name": "Check If Handoff",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $workflow.id + 3 }}",
+        "options": {}
+      },
+      "id": "4881d6ce-2c8a-4acc-af3e-2d41eaf35f36",
+      "name": "Trigger Appointment Scheduler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $workflow.id + 8 }}",
+        "options": {}
+      },
+      "id": "88c3d6ed-566a-41d8-a3c9-d0b6ac5d903d",
+      "name": "Trigger Human Handoff",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_upsert_lead }}",
+        "options": {}
+      },
+      "id": "6e324676-b9d4-4075-9033-aaaef8880693",
+      "name": "Upsert Lead Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        928,
+        1024
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ { success: true, stage: $json.next_stage } }}",
+        "options": {}
+      },
+      "id": "16badfa3-fda3-43e7-9690-0ca5a6db30cd",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build SQL Queries Node - Prepara todas as queries SQL\n// Recebe dados do node anterior\nconst data = $input.first().json;\nconst phone_with_code = data.phone_with_code || '';\nconst phone_without_code = data.phone_without_code || '';\n\n// Validação de segurança\nif (!phone_with_code || !phone_without_code) {\n  throw new Error('Phone numbers not properly formatted');\n}\n\n// Escape simples para SQL injection\nconst escapeSql = (str) => {\n  return String(str).replace(/'/g, \"''\");\n};\n\n// Query para contar conversas existentes\nconst query_count = `\n  SELECT COUNT(*) as count\n  FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n`.trim();\n\n// Query para buscar detalhes da conversa\nconst query_details = `\n  SELECT\n    *,\n    COALESCE(state_machine_state,\n      CASE current_state\n        WHEN 'novo' THEN 'greeting'\n        WHEN 'identificando_servico' THEN 'service_selection'\n        WHEN 'coletando_dados' THEN 'collect_name'\n        WHEN 'agendando' THEN 'scheduling'\n        WHEN 'handoff_comercial' THEN 'handoff_comercial'\n        WHEN 'concluido' THEN 'completed'\n        ELSE 'greeting'\n      END\n    ) as state_for_machine\n  FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n  ORDER BY updated_at DESC\n  LIMIT 1\n`.trim();\n\n// Query para criar/atualizar conversa\nconst query_upsert = `\n  -- Limpar duplicatas antigas\n  DELETE FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n  AND id NOT IN (\n    SELECT id FROM conversations\n    WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n    ORDER BY updated_at DESC\n    LIMIT 1\n  );\n\n  -- Inserir ou atualizar conversa\n  INSERT INTO conversations (\n    phone_number,\n    whatsapp_name,\n    service_id,\n    contact_name,\n    contact_email,\n    city,\n    current_state,\n    state_machine_state,\n    collected_data,\n    error_count,\n    created_at,\n    updated_at\n  ) VALUES (\n    '${escapeSql(phone_with_code)}',\n    '${escapeSql(data.whatsapp_name || '')}',\n    NULL,\n    NULL,\n    NULL,\n    NULL,\n    'novo',\n    'greeting',\n    '{}'::jsonb,\n    0,\n    CURRENT_TIMESTAMP,\n    CURRENT_TIMESTAMP\n  )\n  ON CONFLICT (phone_number) DO UPDATE SET\n    whatsapp_name = COALESCE(EXCLUDED.whatsapp_name, conversations.whatsapp_name),\n    last_message_at = CURRENT_TIMESTAMP,\n    updated_at = CURRENT_TIMESTAMP,\n    state_machine_state = CASE\n      WHEN conversations.state_machine_state IN ('completed', 'handoff_comercial')\n      THEN 'greeting'\n      ELSE conversations.state_machine_state\n    END\n  RETURNING *\n`.trim();\n\n// Log para debug\nconsole.log('=== BUILD SQL QUERIES (FIXED) ===');\nconsole.log('Phone with code:', phone_with_code);\nconsole.log('Phone without code:', phone_without_code);\nconsole.log('Queries built successfully as STRINGS');\n\n// IMPORTANTE: Retornar cada query como campo string individual\n// Log para debug\nconsole.log('=== BUILD SQL QUERIES (V27) ===');\nconsole.log('Input message fields:');\nconsole.log('  data.message:', data.message);\nconsole.log('  data.content:', data.content);\nconsole.log('  data.body:', data.body);\nconsole.log('  data.text:', data.text);\n\n// IMPORTANTE: Retornar cada query como campo string individual\n// V27: PRESERVAR CAMPOS DE MENSAGEM\n// Log para debug\nconsole.log('=== BUILD SQL QUERIES (V28) ===');\nconsole.log('Input message fields:');\nconsole.log('  data.message:', data.message);\nconsole.log('  data.content:', data.content);\nconsole.log('  data.body:', data.body);\nconsole.log('  data.text:', data.text);\n\n// IMPORTANTE: Retornar cada query como campo string individual\n// V28: PRESERVAR CAMPOS DE MENSAGEM E RETORNAR ARRAY\nconst result = {\n  ...data,  // Pass through ALL original data\n\n  // SQL Queries\n  query_count: query_count,        // String SQL\n  query_details: query_details,    // String SQL\n  query_upsert: query_upsert,      // String SQL\n\n  // V28 CRITICAL: Explicitly preserve message fields\n  message: data.message || '',\n  content: data.content || '',\n  body: data.body || '',\n  text: data.text || '',\n\n  // Phone fields\n  phone_with_code: phone_with_code,\n  phone_without_code: phone_without_code,\n  phone_number: data.phone_number || phone_with_code,\n\n  // Other fields\n  whatsapp_name: data.whatsapp_name || ''\n};\n\n// V28: Return as array for n8n compatibility\nconsole.log('V28: Build SQL Queries returning array');\nreturn [result];"
+      },
+      "id": "720cb1d4-f306-4b9a-885c-4819e20ba03d",
+      "name": "Build SQL Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        272
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Queries Node - V28 Array Return Fix\n// Este node garante que os campos query_* sejam preservados após o IF node\n// V28: RETORNA ARRAY DE OBJETOS como n8n espera\n\nconst inputData = $input.first().json;\nconst queryData = $node[\"Build SQL Queries\"].json;\n\n// Log para debug\nconsole.log('=== MERGE QUERIES V28 ARRAY FIX ===');\nconsole.log('Input has count:', inputData.count);\nconsole.log('Query data available:', !!queryData);\nconsole.log('Message fields from queryData:');\nconsole.log('  queryData.message:', queryData.message);\nconsole.log('  queryData.content:', queryData.content);\nconsole.log('  queryData.body:', queryData.body);\nconsole.log('  queryData.text:', queryData.text);\n\n// Merge todos os dados preservando os campos de query E mensagem\nconst mergedData = {\n    ...inputData,\n    ...queryData,  // V28: Include ALL fields from queryData\n\n    // Preservar todos os campos de query do Build SQL Queries\n    query_count: queryData.query_count,\n    query_details: queryData.query_details,\n    query_upsert: queryData.query_upsert,\n\n    // V28 CRITICAL: Preservar campos de mensagem\n    message: queryData.message || inputData.message || '',\n    content: queryData.content || inputData.content || '',\n    body: queryData.body || inputData.body || '',\n    text: queryData.text || inputData.text || '',\n\n    // Preservar dados do telefone\n    phone_with_code: queryData.phone_with_code,\n    phone_without_code: queryData.phone_without_code,\n    phone_number: queryData.phone_number || queryData.phone_with_code,\n\n    // Manter o count do resultado anterior\n    count: inputData.count || 0,\n\n    // Pass through outros dados\n    whatsapp_name: queryData.whatsapp_name || inputData.whatsapp_name || ''\n};\n\n// V28 CRITICAL: Return ARRAY of objects, not single object\nconsole.log('V28: Returning array with 1 object');\nreturn [mergedData];  // ← ARRAY RETURN FIX"
+      },
+      "id": "fa6e38f7-1d32-4861-bc3d-1fe9355fe60e",
+      "name": "Merge Queries Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        16
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Queries Node - V28 Array Return Fix\n// Este node garante que os campos query_* sejam preservados após o IF node\n// V28: RETORNA ARRAY DE OBJETOS como n8n espera\n\nconst inputData = $input.first().json;\nconst queryData = $node[\"Build SQL Queries\"].json;\n\n// Log para debug\nconsole.log('=== MERGE QUERIES V28 ARRAY FIX ===');\nconsole.log('Input has count:', inputData.count);\nconsole.log('Query data available:', !!queryData);\nconsole.log('Message fields from queryData:');\nconsole.log('  queryData.message:', queryData.message);\nconsole.log('  queryData.content:', queryData.content);\nconsole.log('  queryData.body:', queryData.body);\nconsole.log('  queryData.text:', queryData.text);\n\n// Merge todos os dados preservando os campos de query E mensagem\nconst mergedData = {\n    ...inputData,\n    ...queryData,  // V28: Include ALL fields from queryData\n\n    // Preservar todos os campos de query do Build SQL Queries\n    query_count: queryData.query_count,\n    query_details: queryData.query_details,\n    query_upsert: queryData.query_upsert,\n\n    // V28 CRITICAL: Preservar campos de mensagem\n    message: queryData.message || inputData.message || '',\n    content: queryData.content || inputData.content || '',\n    body: queryData.body || inputData.body || '',\n    text: queryData.text || inputData.text || '',\n\n    // Preservar dados do telefone\n    phone_with_code: queryData.phone_with_code,\n    phone_without_code: queryData.phone_without_code,\n    phone_number: queryData.phone_number || queryData.phone_with_code,\n\n    // Manter o count do resultado anterior\n    count: inputData.count || 0,\n\n    // Pass through outros dados\n    whatsapp_name: queryData.whatsapp_name || inputData.whatsapp_name || ''\n};\n\n// V28 CRITICAL: Return ARRAY of objects, not single object\nconsole.log('V28: Returning array with 1 object');\nreturn [mergedData];  // ← ARRAY RETURN FIX"
+      },
+      "id": "f5af431d-1cd1-41f9-8253-3023f61c18de",
+      "name": "Merge Queries Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        1040
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "id": "22c5f52e-f449-43b8-bb85-ddd3af8923d5",
+      "name": "Merge Conversation Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        176,
+        768
+      ],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Update Queries - V21 FIXED DATA FLOW\n// Recebe dados DIRETAMENTE do State Machine Logic\nconst inputData = $input.first().json;\n\nconsole.log('=== V25 BUILD UPDATE QUERIES DEBUG (SIMPLIFIED) ===');\nconsole.log('Input keys:', Object.keys(inputData));\nconsole.log('Phone number:', inputData.phone_number);\nconsole.log('Response text:', inputData.response_text);\nconsole.log('Next stage:', inputData.next_stage);\nconsole.log('Collected data:', inputData.collected_data);\n\n// Função helper para escapar SQL\nconst escapeSql = (str) => {\n  if (str === null || str === undefined || str === '') return '';\n  return String(str).replace(/'/g, \"''\");\n};\n\n// Função para preparar JSON para PostgreSQL\nconst prepareJsonb = (obj) => {\n  if (!obj || typeof obj !== 'object') return '{}';\n  return JSON.stringify(obj).replace(/'/g, \"''\");\n};\n\n// CRITICAL FIX: Extrair dados com fallbacks robustos\nlet phone_number = String(inputData.phone_number || '');\n\n// Limpar e garantir formato correto\nphone_number = phone_number.replace(/[^0-9]/g, '');\n\n// Adicionar código 55 se necessário\nif (phone_number && !phone_number.startsWith('55')) {\n  if (phone_number.length === 10 || phone_number.length === 11) {\n    phone_number = '55' + phone_number;\n  }\n}\n\n// Criar versões com e sem código\nconst phone_with_code = phone_number;\nconst phone_without_code = phone_number.startsWith('55') ? phone_number.substring(2) : phone_number;\n\n// Extrair outros dados necessários\nconst response_text = escapeSql(inputData.response_text || 'Olá! Como posso ajudar?');\nconst next_stage = inputData.next_stage || inputData.current_state || 'greeting';\nconst collected_data = inputData.collected_data || {};\nconst collected_data_json = prepareJsonb(collected_data);\nconst message_content = escapeSql(inputData.message || '');\nconst message_type = inputData.message_type || 'text';\nconst message_id = inputData.message_id || '';\nconst conversation_id = inputData.conversation_id || null;\n\n// Mapear estados para o banco\nconst state_mapping = {\n  'greeting': 'novo',\n  'service_selection': 'identificando_servico',\n  'collect_name': 'coletando_dados',\n  'collect_phone': 'coletando_dados',\n  'collect_email': 'coletando_dados',\n  'collect_city': 'coletando_dados',\n  'confirmation': 'coletando_dados',\n  'scheduling': 'agendando',\n  'handoff_comercial': 'handoff_comercial',\n  'completed': 'concluido'\n};\n\nconst db_state = state_mapping[next_stage] || 'novo';\n\nconsole.log('=== V25 QUERY BUILDING (SIMPLIFIED) ===');\nconsole.log('Phone with code:', phone_with_code);\nconsole.log('Phone without code:', phone_without_code);\nconsole.log('Next stage:', next_stage);\nconsole.log('DB State:', db_state);\nconsole.log('Conversation ID:', conversation_id);\n\n// Query 1: Update Conversation State (V25 SIMPLIFIED)\nconst query_update_conversation = `\n-- V25: Simplified UPSERT with native PostgreSQL INSERT...ON CONFLICT\nINSERT INTO conversations (\n  phone_number,\n  whatsapp_name,\n  current_state,\n  state_machine_state,\n  collected_data,\n  service_type,\n  contact_name,\n  contact_email,\n  city,\n  status,\n  last_message_at,\n  created_at,\n  updated_at\n) VALUES (\n  '${phone_with_code}',\n  '${escapeSql(collected_data?.lead_name || '')}',\n  '${db_state}',\n  '${next_stage}',\n  '${collected_data_json}'::jsonb,\n  ${collected_data?.service_type ? \"'\" + escapeSql(collected_data.service_type) + \"'\" : 'NULL'},\n  '${escapeSql(collected_data?.lead_name || '')}',\n  '${escapeSql(collected_data?.email || '')}',\n  '${escapeSql(collected_data?.city || '')}',\n  'active',\n  NOW(),\n  NOW(),\n  NOW()\n)\nON CONFLICT (phone_number)\nDO UPDATE SET\n  current_state = EXCLUDED.current_state,\n  state_machine_state = EXCLUDED.state_machine_state,\n  collected_data = EXCLUDED.collected_data,\n  service_type = COALESCE(EXCLUDED.service_type, conversations.service_type),\n  contact_name = COALESCE(NULLIF(EXCLUDED.contact_name, ''), conversations.contact_name),\n  contact_email = COALESCE(NULLIF(EXCLUDED.contact_email, ''), conversations.contact_email),\n  city = COALESCE(NULLIF(EXCLUDED.city, ''), conversations.city),\n  whatsapp_name = COALESCE(NULLIF(EXCLUDED.whatsapp_name, ''), conversations.whatsapp_name),\n  last_message_at = NOW(),\n  updated_at = NOW()\nRETURNING *`.trim();\n\nconsole.log('✅ V25: Simplified UPSERT query built');\nconsole.log('Query length:', query_update_conversation.length);\n\n// Query 2: Save Inbound Message\nconst query_save_inbound = `\nINSERT INTO messages (\n  conversation_id,\n  direction,\n  content,\n  message_type,\n  whatsapp_message_id,\n  created_at\n)\nVALUES (\n  (SELECT id FROM conversations WHERE phone_number IN ('${phone_with_code}', '${phone_without_code}') ORDER BY updated_at DESC LIMIT 1),\n  'inbound',\n  '${message_content}',\n  '${message_type}',\n  '${message_id}',\n  NOW()\n)\nON CONFLICT (whatsapp_message_id)\nWHERE whatsapp_message_id IS NOT NULL AND whatsapp_message_id != ''\nDO NOTHING\nRETURNING *`.trim();\n\n// Query 3: Save Outbound Message\nconst query_save_outbound = `\nINSERT INTO messages (\n  conversation_id,\n  direction,\n  content,\n  message_type,\n  whatsapp_message_id,\n  created_at\n)\nVALUES (\n  (SELECT id FROM conversations WHERE phone_number IN ('${phone_with_code}', '${phone_without_code}') ORDER BY updated_at DESC LIMIT 1),\n  'outbound',\n  '${response_text}',\n  'text',\n  'out_' || extract(epoch from NOW())::bigint || '_' || random()::text,\n  NOW()\n)\nRETURNING *`.trim();\n\n// Query 4: Upsert Lead Data\nconst query_upsert_lead = `\nWITH existing_lead AS (\n  SELECT id\n  FROM leads\n  WHERE phone_number IN ('${phone_with_code}', '${phone_without_code}')\n  LIMIT 1\n),\nupdated AS (\n  UPDATE leads\n  SET\n    name = COALESCE(NULLIF('${escapeSql(collected_data?.lead_name || '')}', ''), name),\n    email = COALESCE(NULLIF('${escapeSql(collected_data?.email || '')}', ''), email),\n    city = COALESCE(NULLIF('${escapeSql(collected_data?.city || '')}', ''), city),\n    service_type = COALESCE(NULLIF('${escapeSql(collected_data?.service_type || '')}', ''), service_type),\n    -- V46: state_machine_state removed (belongs to conversations only)\n    service_details = '${collected_data_json}'::jsonb,\n    updated_at = NOW()\n  WHERE id IN (SELECT id FROM existing_lead)\n  RETURNING *, 'updated' as operation\n),\ninserted AS (\n  INSERT INTO leads (\n    phone_number,\n    name,\n    email,\n    city,\n    service_type,\n    -- V46: state_machine_state removed\n    service_details,\n    created_at,\n    updated_at\n  )\n  SELECT\n    '${phone_with_code}',\n    '${escapeSql(collected_data?.lead_name || '')}',\n    '${escapeSql(collected_data?.email || '')}',\n    '${escapeSql(collected_data?.city || '')}',\n    '${escapeSql(collected_data?.service_type || '')}',\n    -- V46: next_stage value removed\n    '${collected_data_json}'::jsonb,\n    NOW(),\n    NOW()\n  WHERE NOT EXISTS (SELECT 1 FROM existing_lead)\n  RETURNING *, 'inserted' as operation\n)\nSELECT * FROM updated\nUNION ALL\nSELECT * FROM inserted`.trim();\n\n// Log para debug\nconsole.log('✅ V25: All queries built with simplified UPSERT');\n\n// Retornar todas as queries e TODOS os dados necessários\nreturn {\n  // Dados originais do State Machine\n  phone_number: phone_with_code,\n  phone_with_code: phone_with_code,\n  phone_without_code: phone_without_code,\n  response_text: inputData.response_text,\n  next_stage: next_stage,\n  collected_data: collected_data,\n  conversation_id: conversation_id,\n  message: inputData.message,\n  message_type: message_type,\n  message_id: message_id,\n\n  // Queries SQL prontas\n  query_update_conversation,\n  query_save_inbound,\n  query_save_outbound,\n  query_upsert_lead,\n\n  // Metadados\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "7ed4b34c-e158-4180-8d42-63042a07188e",
+      "name": "Build Update Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        496
+      ],
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Receive Message": {
+      "main": [
+        [
+          {
+            "node": "Prepare Phone Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Count": {
+      "main": [
+        [
+          {
+            "node": "Check If New User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If New User": {
+      "main": [
+        [
+          {
+            "node": "Merge Queries Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Queries Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Details": {
+      "main": [
+        [
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Create New Conversation": {
+      "main": [
+        [
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "State Machine Logic": {
+      "main": [
+        [
+          {
+            "node": "Build Update Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Response": {
+      "main": [
+        [
+          {
+            "node": "Check If Scheduling",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check If Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Scheduling": {
+      "main": [
+        [
+          {
+            "node": "Trigger Appointment Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Handoff": {
+      "main": [
+        [
+          {
+            "node": "Trigger Human Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Appointment Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Human Handoff": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Phone Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Phone Formats": {
+      "main": [
+        [
+          {
+            "node": "Build SQL Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SQL Queries": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Queries Data": {
+      "main": [
+        [
+          {
+            "node": "Create New Conversation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Queries Data1": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation Details",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Conversation Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Conversation Data": {
+      "main": [
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Update Queries": {
+      "main": [
+        [
+          {
+            "node": "Update Conversation State",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Inbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "v47-phone-consistency",
+  "meta": {
+    "instanceId": "be7607dc500d0df7a2cb94e774f3665239bf8a65324d98f4d2534280e5bd21e1"
+  },
+  "id": "LS2EakwfZkKyqeb4",
+  "tags": [
+    {
+      "updatedAt": "2025-12-16T17:43:09.351Z",
+      "createdAt": "2025-12-16T17:43:09.351Z",
+      "id": "Bt7aSJBUi1XItwT9",
+      "name": "menu-based"
+    },
+    {
+      "updatedAt": "2025-12-16T17:43:09.349Z",
+      "createdAt": "2025-12-16T17:43:09.349Z",
+      "id": "xvWQ3HxS15JPlKvc",
+      "name": "v1"
+    }
+  ]
+}
