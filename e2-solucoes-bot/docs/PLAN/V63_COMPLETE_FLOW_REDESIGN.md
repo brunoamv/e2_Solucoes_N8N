@@ -123,13 +123,6 @@ Este é o melhor número para contato?
 1️⃣ *Sim, pode usar este*
 2️⃣ *Não, vou informar outro*`,
 
-  // ===== 5. PHONE ALTERNATIVE REQUEST - Use {{name}} =====
-  phone_alternative: `📱 *Certo, {{name}}!*
-
-*Qual o melhor telefone para contato?*
-
-_Informe com DDD:_
-Exemplo: (62) 98765-4321 ou 62987654321`,
 
   // ===== 6. EMAIL REQUEST - Use {{name}} =====
   email_request: `📧 *Qual é o seu e-mail, {{name}}?*
