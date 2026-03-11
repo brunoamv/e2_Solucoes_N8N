@@ -1,6 +1,6 @@
 # E2 Bot - Claude Code Context
 
-> **Status**: WF01 V2.8.3 ✅ | WF02 V67 ✅ DEPLOYED | Updated: 2026-03-11
+> **Production**: WF01 V2.8.3 ✅ | WF02 V69.2 ✅ | Updated: 2026-03-11
 
 ---
 
@@ -12,7 +12,7 @@
 
 **Architecture**:
 ```
-WhatsApp → WF01 (duplicate detection) → WF02 (AI agent: 13 states, 25 templates, correction flow)
+WhatsApp → WF01 (duplicate detection) → WF02 (AI agent: 8 states, 12 templates)
 ```
 
 ---
@@ -20,30 +20,26 @@ WhatsApp → WF01 (duplicate detection) → WF02 (AI agent: 13 states, 25 templa
 ## ✅ Production
 
 ### WF01: Handler V2.8.3 ✅
-- **Function**: Duplicate detection + routing (PostgreSQL ON CONFLICT)
 - **File**: `01_main_whatsapp_handler_V2.8.3_NO_LOOP.json`
+- **Function**: Duplicate detection + routing (PostgreSQL ON CONFLICT)
 
-### WF02: AI Agent V67 ✅ DEPLOYED
-- **File**: `02_ai_agent_conversation_V67_SERVICE_DISPLAY_FIX.json` (76.7 KB)
-- **States**: 13 (8 base + 5 correction)
-- **Templates**: 25 (14 base + 11 correction)
+### WF02: AI Agent V69.2 ✅ DEPLOYED
+- **File**: `02_ai_agent_conversation_V69_2_NEXT_STAGE_FIX.json` (80.2 KB)
+- **States**: 8 (greeting → confirmation)
+- **Templates**: 12 total
 - **Services**: 1-Solar | 2-Subestação | 3-Projetos | 4-BESS | 5-Análise
 
-**V67 Fixes** (cumulative):
-- ✅ Service display bug (all 5 services show correctly)
-- ✅ V66 Bug #1: trimmedCorrectedName (duplicate variable)
-- ✅ V66 Bug #2: query_correction_update (scope error)
-
-**Features**:
-- Full correction flow (name, phone, email, city)
-- SQL UPDATE queries (atomic: column + JSONB)
-- Loop protection (max 5 corrections → handoff)
+**V69.2 Fixes** (all bugs resolved):
+- ✅ Triggers execute (next_stage reference fixed)
+- ✅ Name populated (trimmedCorrectedName)
+- ✅ Returning user (getServiceName function)
+- ✅ Workflow connected (node name preserved)
 
 ---
 
 ## 🔄 Flow
 
-**Base States (8)**:
+**8 States**:
 1. greeting → Menu (5 services)
 2. service_selection → Capture (1-5)
 3. collect_name → Get name + WhatsApp confirm
@@ -51,32 +47,25 @@ WhatsApp → WF01 (duplicate detection) → WF02 (AI agent: 13 states, 25 templa
 5. collect_phone_alternative → Alternative phone
 6. collect_email → Email or skip
 7. collect_city → City
-8. confirmation → Summary + trigger workflows
-
-**Correction States (5)**:
-9. correction_field_selection → Choose field (1-4)
-10-13. correction_[name|phone|email|city] → Correct + UPDATE → return
-
-**Confirmation Options**:
-- "1" (sim/agendar) → Scheduling OR handoff_comercial
-- "2" (não agora) → handoff_comercial
-- "3" (corrigir) → Correction flow
+8. confirmation → Summary + triggers
+   - "sim" + service 1/3 → **Trigger Appointment Scheduler** ✅
+   - "sim" + other → **Trigger Human Handoff** ✅
 
 ---
 
 ## 🚀 Deploy
 
 ```bash
-# Import V67
+# Import V69.2
 # http://localhost:5678 → Import:
-# n8n/workflows/02_ai_agent_conversation_V67_SERVICE_DISPLAY_FIX.json
+# n8n/workflows/02_ai_agent_conversation_V69_2_NEXT_STAGE_FIX.json
 
-# Deactivate old → Activate V67 → Test
+# Deactivate old → Activate V69.2 → Test
 ```
 
-**Test**: Verify all 5 services display correctly in confirmation message.
+**Test**: WhatsApp "oi" → service 1 → complete → verify Trigger Appointment Scheduler executes
 
-**Rollback**: V67 → V66 FIXED V2 (service bug) OR V65 (stable, no correction)
+**Rollback**: V69.2 → V68.3 (stable fallback)
 
 ---
 
@@ -85,34 +74,30 @@ WhatsApp → WF01 (duplicate detection) → WF02 (AI agent: 13 states, 25 templa
 ```
 workflows/
   ├── 01_main_whatsapp_handler_V2.8.3_NO_LOOP.json              ✅ Production
-  ├── 02_ai_agent_conversation_V67_SERVICE_DISPLAY_FIX.json     ✅ Production
-  ├── 02_ai_agent_conversation_V66_*_FIXED_V2.json              (rollback)
-  └── 02_ai_agent_conversation_V65_UX_COMPLETE_FIX.json         (stable fallback)
+  └── 02_ai_agent_conversation_V69_2_NEXT_STAGE_FIX.json        ✅ Production
 
 scripts/
-  ├── fix-v67-service-display-keys.py                           V67 fix
-  ├── generate-workflow-v66-correction-states.py                V66 generator
-  ├── fix-v66-duplicate-variable.py                             V66 fix #1
-  └── fix-v66-query-correction-update.py                        V66 fix #2
+  ├── generate-workflow-v69_1-fixed-connections.py              V69.1
+  └── generate-workflow-v69_2-next-stage-fix.py                 V69.2
 
 docs/
-  ├── V67_SERVICE_DISPLAY_FIX.md                                V67 bug report
-  ├── V66_FIXED_V2_READY_FOR_DEPLOYMENT.md                      V66 guide
-  └── PLAN/
-      ├── V67_SERVICE_DISPLAY_FIX.md                            V67 plan
-      └── V66_CORRECTION_STATES_COMPLETE.md                     V66 spec (1100+ lines)
+  ├── V69_1_CONNECTION_BUG_FIX.md                               V69.1 analysis
+  ├── V69_2_NEXT_STAGE_BUG_FIX.md                               V69.2 analysis
+  └── PROJECT_STATUS.md                                         Current status
 ```
 
 ---
 
-## 🐛 Version History
+## 🐛 Version History (Compressed)
 
 **WF01**: V2.8.3 ✅ (atomic duplicate detection)
 
 **WF02**:
-- V64 → V65 → V66 (correction states, 2 bugs)
-- V66 FIXED V2 (2 bugs fixed, service display bug)
-- **V67** ✅ (service display fix, all bugs resolved)
+- V64-V67: Evolution + bug fixes
+- V68.3: Syntax fixes (base)
+- V69: getServiceName (broke connections)
+- V69.1: Fixed connections (triggers broken)
+- **V69.2** ✅: Fixed triggers (ALL RESOLVED)
 
 ---
 
@@ -132,20 +117,20 @@ curl -s http://localhost:8080/instance/fetchInstances \
 
 **Logs**:
 ```bash
-docker logs -f e2bot-n8n-dev | grep -E "V67|service_type|correction"
+docker logs -f e2bot-n8n-dev | grep -E "V69|Trigger"
 ```
 
 ---
 
-## 🎯 Current Status
+## 🎯 Status
 
-✅ **V67 DEPLOYED** - All features working:
-- Service display: All 5 services correct
-- Correction flow: All 4 fields working
-- V66 bug fixes: Both preserved
-- Production ready: 100%
+✅ **V69.2 DEPLOYED** - All features working:
+- Triggers: Both execute correctly ✅
+- Workflow: Connected and executes ✅
+- Data: All fields populated ✅
+- Production: 100% ready ✅
 
-**Next**: Monitor production usage, collect user feedback
+**Next**: Monitor production, track trigger execution rate
 
 ---
 
