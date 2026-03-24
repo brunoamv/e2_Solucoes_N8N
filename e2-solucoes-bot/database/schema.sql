@@ -153,7 +153,7 @@ CREATE TABLE appointments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT valid_status CHECK (status IN (
-        'agendado', 'confirmado', 'em_andamento', 'realizado', 'cancelado', 'reagendado', 'no_show'
+        'agendado', 'confirmado', 'em_andamento', 'realizado', 'cancelado', 'reagendado', 'no_show', 'erro_calendario'
     ))
 );
 

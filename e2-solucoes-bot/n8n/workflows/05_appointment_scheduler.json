@@ -150,10 +150,13 @@
         "jsonBody": "={\n  \"subject\": \"Visita Técnica - {{ $('Get Lead Data').item.json.name }}\",\n  \"deal_id\": \"{{ $('Get Lead Data').item.json.rdstation_deal_id }}\",\n  \"assigned_user_id\": \"{{ $env.RDSTATION_USER_TECNICO }}\",\n  \"due_date\": \"{{ $('Get Appointment').item.json.scheduled_date }}\",\n  \"notes\": \"Visita técnica agendada via bot WhatsApp.\\n\\nEndereço: {{ $('Get Lead Data').item.json.address }}, {{ $('Get Lead Data').item.json.city }}/{{ $('Get Lead Data').item.json.state }}\\n\\nGoogle Calendar: {{ $('Create Google Event').item.json.htmlLink }}\"\n}"
       },
       "id": "create-rdstation-task",
-      "name": "Create RD Station Task",
+      "name": "Create RD Station Task (OPTIONAL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1450, 300]
+      "position": [1450, 300],
+      "continueOnFail": true,
+      "alwaysOutputData": true,
+      "notes": "RD Station integration is OPTIONAL. Workflow continues even if this fails."
     },
     {
       "parameters": {

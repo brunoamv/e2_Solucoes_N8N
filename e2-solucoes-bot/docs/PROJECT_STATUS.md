@@ -1,121 +1,174 @@
 # E2 Bot - Project Status
 
-**Last Updated**: 2026-03-11
+**Last Updated**: 2026-03-24
 **Environment**: Production
 **Overall Status**: ✅ OPERATIONAL
 
 ---
 
-## 📊 Current Production Version
+## 📊 Production Versions
 
 ### WF01: Handler V2.8.3 ✅
-- **Status**: STABLE
 - **Function**: Duplicate detection + routing
-- **Performance**: 100% reliable
+- **Tech**: PostgreSQL ON CONFLICT
+- **Status**: Stable, 100% reliable
 
-### WF02: AI Agent V69.2 ✅
-- **Status**: DEPLOYED
-- **Deployed**: 2026-03-11
-- **Features**: 8 states, 12 templates, trigger execution
-- **Validation**: All services + triggers tested ✅
+### WF02: AI Agent V74 🚀 READY
+- **Status**: READY FOR DEPLOY
+- **Previous**: V69.2 (production stable)
+- **New**: V74 adds scheduling verification logic
+- **Features**: 8 states, 12 templates, 2 triggers
 
----
-
-## ✅ V69.2 Production Features
-
-**Core Functions**:
-- 5 service types (Solar, Subestação, Projetos, BESS, Análise)
-- 8 states (greeting → confirmation)
-- Direct WhatsApp phone confirmation
-- Database atomic UPDATEs (column + JSONB)
-- **Trigger execution**: Appointment Scheduler + Human Handoff ✅
-
-**All Bugs Fixed**:
-- ✅ Triggers execute (next_stage reference fixed)
-- ✅ Name field populated (trimmedCorrectedName)
-- ✅ Returning user works (getServiceName function)
-- ✅ Workflow connected (node name preserved)
+### WF05: Appointment Scheduler V3.6 ✅
+- **Status**: PRODUCTION
+- **ID**: f6eIJIqfaSs6BSpJ
+- **Function**: Google Calendar + DB appointments
+- **Tech**: Direct INSERT reminders, array attendees
 
 ---
 
-## 📈 Version Timeline
+## 🎯 V74 Key Features
 
-| Version | Status | Key Change |
-|---------|--------|------------|
-| V64-V67 | Evolution | Base development + bug fixes |
-| V68.3 | Base | Syntax fixes (foundation for V69) |
-| V69 | Broken | Added getServiceName (broke connections) |
-| V69.1 | Partial | Fixed connections (triggers still broken) |
-| **V69.2** | **✅ PRODUCTION** | **Trigger fix (all bugs resolved)** |
+**What's New**:
+- ✅ "Check If Scheduling" verification node
+- ✅ Correct WF05 V3.6 trigger (f6eIJIqfaSs6BSpJ)
+- ✅ Smart routing: service 1/3 + confirm → schedule | other → handoff
+- ✅ All input fields configured (7 fields)
+
+**Workflow Flow**:
+```
+Send Response → Check If Scheduling
+                       ↓
+    TRUE (scheduling_redirect) → Trigger WF05 V3.6
+    FALSE (other states) → Check If Handoff
+```
+
+**Testing**: 4 test cases ready (see TEST_V74_END_TO_END.md)
+**Deployment**: Full procedure (see DEPLOY_V74_PRODUCTION.md)
+
+---
+
+## 📈 Version Evolution
+
+| Version | Date | Status | Key Change |
+|---------|------|--------|------------|
+| V68.3 | 2026-03-09 | Stable | Base syntax fixes |
+| V69.2 | 2026-03-11 | ✅ PROD | Trigger fix, all bugs resolved |
+| **V74** | **2026-03-24** | **🚀 READY** | **Scheduling verification + correct WF05 ID** |
+
+---
+
+## 🏗️ System Architecture
+
+**Stack**: n8n + Claude 3.5 + PostgreSQL + Evolution API v2.3.7
+**Language**: PT-BR
+**Flow**: WhatsApp → WF01 → WF02 → [WF05 | Handoff]
+
+**Services**:
+1. ☀️ Energia Solar → schedule
+2. ⚡ Subestação → handoff
+3. 📐 Projetos Elétricos → schedule
+4. 🔋 BESS → handoff
+5. 📊 Análise → handoff
+
+**8 States**:
+greeting → service_selection → collect_name → collect_phone_whatsapp_confirmation → collect_phone_alternative → collect_email → collect_city → confirmation
+
+**Triggers**:
+- Appointment Scheduler (WF05): Services 1,3 + option 1
+- Human Handoff: Services 2,4,5 OR option 2
+
+---
+
+## 📂 Key Files
+
+**Production Workflows**:
+- `01_main_whatsapp_handler_V2.8.3_NO_LOOP.json` - WF01
+- `02_ai_agent_conversation_V69_2_NEXT_STAGE_FIX.json` - WF02 V69.2 (current)
+- `02_ai_agent_conversation_V74_APPOINTMENT_CONFIRMATION.json` - WF02 V74 (ready)
+- `05_appointment_scheduler_v3.6.json` - WF05 V3.6
+
+**Scripts**:
+- `scripts/generate-workflow-v74-appointment-confirmation.py` - V74 generator
+
+**Documentation**:
+- `CLAUDE.md` - Main context
+- `docs/TEST_V74_END_TO_END.md` - Test guide
+- `docs/DEPLOY_V74_PRODUCTION.md` - Deploy guide
+- `docs/PLAN_V74_APPOINTMENT_CONFIRMATION_MESSAGE.md` - Technical plan
 
 ---
 
 ## 🎯 System Health
 
-**Workflows**: 2/2 operational
-**Database**: PostgreSQL - healthy
+**Workflows**: 3/3 operational
+**Database**: PostgreSQL - healthy (appointments + appointment_reminders tables)
 **Evolution API**: v2.3.7 - connected
-**Claude AI**: Operational
+**Google Calendar**: Configured, credentials valid
 **Templates**: 12/12 validated
-**Triggers**: 2/2 executing ✅
+**Triggers**: 2/2 configured
 
 **Known Issues**: None
 
 ---
 
-## 📂 Critical Files
+## 🚀 Next Steps
 
-**Production Workflows**:
-- `01_main_whatsapp_handler_V2.8.3_NO_LOOP.json` (WF01)
-- `02_ai_agent_conversation_V69_2_NEXT_STAGE_FIX.json` (WF02)
+1. ✅ V74 workflow generated and validated
+2. ✅ Test guide created (4 test cases)
+3. ✅ Deploy guide created (full procedure)
+4. ⏳ Execute tests (TEST_V74_END_TO_END.md)
+5. ⏳ Deploy to production (DEPLOY_V74_PRODUCTION.md)
 
-**Rollback Options**:
-- V68.3 (stable, no getServiceName)
-- V67 (stable, older version)
-
-**Documentation**:
-- `CLAUDE.md` - Main context (compressed 66%)
-- `docs/V69_2_NEXT_STAGE_BUG_FIX.md` - Latest fix
-- `docs/V69_1_CONNECTION_BUG_FIX.md` - Connection fix
-
----
-
-## 🔍 Monitoring
-
-**Key Metrics**:
-- Trigger execution: 100% (both working)
-- Workflow connectivity: 100% (all nodes connected)
-- Database integrity: Verified
-- Evolution API: Connected
-
-**Next Actions**:
-- Monitor trigger execution rate
-- Track service distribution (1-5)
-- Validate returning user flow
+**Monitoring Plan**:
+- First 2 hours: Real-time execution tracking
+- First 24 hours: Metrics collection
+- First 7 days: Performance analysis
+- First 30 days: Full stability validation
 
 ---
 
-## 🚨 Emergency Contacts
-
-**Rollback Command**:
-```bash
-# n8n UI: Deactivate V69.2 → Activate V68.3
-```
+## 🔍 Quick Commands
 
 **Database Check**:
 ```bash
 docker exec -it e2bot-postgres-dev psql -U postgres -d e2bot_dev \
-  -c "SELECT phone_number, lead_name, service_type, current_state FROM conversations ORDER BY updated_at DESC LIMIT 5;"
+  -c "SELECT phone_number, lead_name, service_type, current_state, next_stage FROM conversations ORDER BY updated_at DESC LIMIT 5;"
 ```
 
-**Trigger Verification**:
+**Evolution API Status**:
 ```bash
-# Check execution logs for trigger activity
-docker logs -f e2bot-n8n-dev | grep -E "Trigger Appointment|Trigger Human"
+curl -s http://localhost:8080/instance/fetchInstances \
+  -H "apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891" | jq -r '.[] | "\(.instance.instanceName): \(.instance.state)"'
+```
+
+**n8n Logs**:
+```bash
+docker logs -f e2bot-n8n-dev | grep -E "V74|Trigger"
+```
+
+**Appointment Check**:
+```bash
+docker exec -it e2bot-postgres-dev psql -U postgres -d e2bot_dev \
+  -c "SELECT lead_name, service_type, scheduled_date, google_calendar_event_id FROM appointments ORDER BY created_at DESC LIMIT 5;"
 ```
 
 ---
 
+## 🚨 Rollback
+
+**If V74 Issues**:
+1. n8n: Deactivate V74 → Activate V69.2
+2. Verify: Check executions in n8n
+3. Monitor: Database + Evolution API
+4. Document: Create ROLLBACK_V74_[DATE].md
+
+**Rollback Targets**:
+- V69.2: Stable production (current)
+- V68.3: Stable fallback (no triggers)
+
+---
+
 **Maintained by**: Claude Code
-**Project Lead**: E2 Soluções
-**Status**: ✅ PRODUCTION READY - ALL BUGS RESOLVED
+**Project**: E2 Soluções WhatsApp Bot
+**Status**: V74 Ready for Testing & Deployment
