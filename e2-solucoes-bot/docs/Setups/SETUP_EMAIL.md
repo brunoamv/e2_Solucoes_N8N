@@ -62,7 +62,7 @@ EMAIL_FROM_ADDRESS=e2solucoes.bot@gmail.com
 # scripts/test-email.sh
 
 set -a
-source docker/.env.dev
+source docker/.env
 set +a
 
 echo "🧪 Testando conexão SMTP..."

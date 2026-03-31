@@ -70,7 +70,7 @@ services:
 
       # Workflows (read-only para preservar originais)
       - ../n8n/workflows:/workflows:ro
-
+      - ../email-templates:/email-templates:ro  # 👈 EMAIL TEMPLATES
     # === DNS Configuration (fix for OAuth Google) ===
     dns:
       - 8.8.8.8
@@ -212,10 +212,10 @@ services:
       - evolution_store:/evolution/store
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/instance/fetchInstances -H 'apikey: ${EVOLUTION_API_KEY}' || exit 1"]
       interval: 30s
       timeout: 15s
-      retries: 3
+      retries: 5
       start_period: 60s
 
     networks:

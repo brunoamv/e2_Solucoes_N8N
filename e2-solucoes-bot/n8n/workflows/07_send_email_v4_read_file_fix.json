@@ -1,0 +1,255 @@
+{
+  "name": "07 - Send Email V4 (Read File Fix)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "notes": "V3.0: Clean trigger configuration"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Email Data - V3.0 (Complete Fix)\nconst input = $input.first().json;\n\n// ===== TEMPLATE CONFIGURATION =====\nconst TEMPLATE_CONFIG = {\n    \"confirmacao_agendamento\": {\n        \"file\": \"confirmacao_agendamento.html\",\n        \"subject\": \"Agendamento Confirmado - E2 Solu\\u00e7\\u00f5es\"\n    },\n    \"lembrete_2h\": {\n        \"file\": \"lembrete_2h.html\",\n        \"subject\": \"Lembrete: Sua visita \\u00e9 em 2 horas - E2 Solu\\u00e7\\u00f5es\"\n    },\n    \"novo_lead\": {\n        \"file\": \"novo_lead.html\",\n        \"subject\": \"Obrigado pelo contato - E2 Solu\\u00e7\\u00f5es\"\n    },\n    \"apos_visita\": {\n        \"file\": \"apos_visita.html\",\n        \"subject\": \"Obrigado pela visita - E2 Solu\\u00e7\\u00f5es\"\n    }\n};\n\n// ===== EMAIL SENDER CONFIGURATION =====\nconst SENDER_CONFIG = {\n    \"from_email\": \"contato@e2solucoes.com.br\",\n    \"from_name\": \"E2 Solu\\u00e7\\u00f5es\",\n    \"reply_to\": \"contato@e2solucoes.com.br\"\n};\n\n// ===== DETECT INPUT SOURCE =====\nconst isFromWF05 = !!(input.appointment_id && input.calendar_success !== undefined);\n\nconsole.log('📧 [Prepare Email Data V3] Input source:', {\n    isFromWF05,\n    has_appointment_id: !!input.appointment_id,\n    has_calendar_success: input.calendar_success !== undefined,\n    has_template: !!input.template,\n    has_to: !!input.to,\n    has_lead_email: !!input.lead_email\n});\n\n// ===== DETERMINE EMAIL RECIPIENT =====\nlet emailRecipient;\n\nif (isFromWF05) {\n    // WF05 input: use lead_email\n    emailRecipient = input.lead_email;\n    console.log('📧 Using lead_email from WF05:', emailRecipient);\n} else {\n    // Manual trigger: use 'to' or 'email' field\n    emailRecipient = input.to || input.email;\n    console.log('📧 Using manual trigger recipient:', emailRecipient);\n}\n\nif (!emailRecipient) {\n    throw new Error('Email recipient not found in input data. WF05 needs lead_email, manual trigger needs to/email field.');\n}\n\n// ===== DETERMINE TEMPLATE =====\nlet emailTemplate;\n\nif (isFromWF05) {\n    // WF05 input: always use confirmacao_agendamento template\n    emailTemplate = 'confirmacao_agendamento';\n    console.log('📧 Using WF05 template: confirmacao_agendamento');\n} else {\n    // Manual trigger: use specified template\n    emailTemplate = input.template || input.email_template;\n    if (!emailTemplate) {\n        throw new Error('Email template not specified. Provide template field.');\n    }\n    console.log('📧 Using manual template:', emailTemplate);\n}\n\n// ===== VALIDATE TEMPLATE EXISTS =====\nif (!TEMPLATE_CONFIG[emailTemplate]) {\n    throw new Error(`Unknown email template: ${emailTemplate}. Available: ${Object.keys(TEMPLATE_CONFIG).join(', ')}`);\n}\n\nconst templateInfo = TEMPLATE_CONFIG[emailTemplate];\n\n// ===== PREPARE TEMPLATE DATA =====\nlet templateData;\n\nif (isFromWF05) {\n    // ===== WF05 DATA MAPPING =====\n\n    // Extract date part from scheduled_date\n    let dateString = input.scheduled_date;\n    if (typeof dateString === 'string' && dateString.includes('T')) {\n        dateString = dateString.split('T')[0]; // \"2026-04-25\"\n    }\n\n    // Format date to Brazilian format (DD/MM/YYYY)\n    const [year, month, day] = dateString.split('-');\n    const formattedDate = `${day}/${month}/${year}`;\n\n    // Extract time parts (remove seconds if present)\n    const timeStart = input.scheduled_time_start?.split(':').slice(0, 2).join(':') || '00:00';\n    const timeEnd = input.scheduled_time_end?.split(':').slice(0, 2).join(':') || '00:00';\n    const formattedTime = `${timeStart} às ${timeEnd}`;\n\n    // Generate Google Calendar event link\n    const googleEventLink = input.google_calendar_event_id\n        ? `https://calendar.google.com/calendar/event?eid=${input.google_calendar_event_id}`\n        : '';\n\n    templateData = {\n        // Lead information\n        name: input.lead_name || 'Cliente',\n        email: emailRecipient,\n        phone_number: input.phone_number || '',\n        whatsapp_name: input.whatsapp_name || input.lead_name || 'Cliente',\n\n        // Service information\n        service_type: input.service_type || 'Serviço',\n        city: input.city || '',\n        address: input.address || '',\n        state: input.state || '',\n        zip_code: input.zip_code || '',\n\n        // Appointment information\n        scheduled_date: dateString, // YYYY-MM-DD\n        formatted_date: formattedDate, // DD/MM/YYYY\n        formatted_time: formattedTime, // HH:MM às HH:MM\n\n        // Calendar integration\n        google_event_link: googleEventLink,\n        google_calendar_event_id: input.google_calendar_event_id || '',\n\n        // Status\n        appointment_id: input.appointment_id,\n        status: input.status || 'confirmado'\n    };\n\n    console.log('✅ [WF05 Data Mapping] Template data prepared:', {\n        name: templateData.name,\n        email: templateData.email,\n        service: templateData.service_type,\n        date: templateData.formatted_date,\n        time: templateData.formatted_time,\n        has_google_link: !!templateData.google_event_link\n    });\n\n} else {\n    // ===== MANUAL TRIGGER DATA MAPPING (BACKWARD COMPATIBILITY) =====\n    templateData = {\n        name: input.name || 'Cliente',\n        email: emailRecipient,\n        phone_number: input.phone_number || input.phone || '',\n        service_type: input.service_type || '',\n        scheduled_date: input.scheduled_date || '',\n        formatted_date: input.formatted_date || '',\n        formatted_time: input.formatted_time || '',\n        google_event_link: input.google_event_link || '',\n        ...input // Spread all input for backward compatibility\n    };\n\n    console.log('✅ [Manual Trigger] Template data prepared (backward compatible)');\n}\n\n// ===== RETURN COMPLETE EMAIL DATA =====\nreturn {\n    // Recipient\n    to: emailRecipient,\n\n    // Template\n    template: emailTemplate,\n    template_file: templateInfo.file, // ✅ V3: Template filename for Read Template File node\n    subject: templateInfo.subject,    // ✅ V3: Email subject\n\n    // Template data (variables)\n    template_data: templateData,\n\n    // Sender info\n    from_email: SENDER_CONFIG.from_email,   // ✅ V3: Sender email\n    from_name: SENDER_CONFIG.from_name,     // ✅ V3: Sender name\n    reply_to: SENDER_CONFIG.reply_to,       // ✅ V3: Reply-to address\n\n    // Metadata\n    source: isFromWF05 ? 'wf05_trigger' : 'manual_trigger',\n    prepared_at: new Date().toISOString()\n};"
+      },
+      "id": "prepare-email-data",
+      "name": "Prepare Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ],
+      "notes": "V3.0: Complete email data preparation with template mapping, subject, and sender info"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "filePath": "=/home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/email-templates/{{ $json.template_file }}",
+        "options": {}
+      },
+      "id": "read-template-file",
+      "name": "Read Template File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ],
+      "notes": "V4.0: Use Read/Write Files from Disk instead of Execute Command (Docker path fix)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get template HTML and data\nconst templateHtml = $('Read Template File').first().json.data;\nconst data = $input.first().json;\nconst templateData = data.template_data;\n\n// Simple template variable replacement\nconst renderTemplate = (html, data) => {\n  let rendered = html;\n  \n  // Replace {{variable}} style placeholders\n  rendered = rendered.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (match, key) => {\n    return data[key] !== undefined ? data[key] : match;\n  });\n  \n  // Handle conditional blocks: {{#if variable}}...{{/if}}\n  rendered = rendered.replace(/\\{\\{#if\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/if\\}\\}/g, (match, key, content) => {\n    return data[key] ? content : '';\n  });\n  \n  // Handle inverted conditionals: {{#unless variable}}...{{/unless}}\n  rendered = rendered.replace(/\\{\\{#unless\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/unless\\}\\}/g, (match, key, content) => {\n    return !data[key] ? content : '';\n  });\n  \n  return rendered;\n};\n\n// Render the template\nconst htmlBody = renderTemplate(templateHtml, templateData);\n\n// Generate plain text version (simple HTML stripping)\nconst textBody = htmlBody\n  .replace(/<style[^>]*>.*?<\\/style>/gs, '')\n  .replace(/<script[^>]*>.*?<\\/script>/gs, '')\n  .replace(/<[^>]+>/g, '')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&amp;/g, '&')\n  .replace(/\\n\\s*\\n/g, '\\n\\n')\n  .trim();\n\nreturn {\n  ...data,\n  html_body: htmlBody,\n  text_body: textBody\n};\n"
+      },
+      "id": "render-template",
+      "name": "Render Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ],
+      "notes": "V4.0: Updated to read .data instead of .stdout (Read File output)"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_email }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html_body }}",
+        "options": {
+          "fromName": "={{ $json.from_name }}",
+          "replyTo": "={{ $json.reply_to }}",
+          "ccEmail": "",
+          "bccEmail": "",
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "send-email-smtp",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1050,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP - E2 Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_logs (\n  recipient_email,\n  recipient_name,\n  subject,\n  template_used,\n  status,\n  sent_at,\n  metadata\n) VALUES ($1, $2, $3, $4, $5, NOW(), $6)",
+        "additionalFields": {
+          "queryParameters": "={{ $json.to }},={{ $json.template_data.name }},={{ $json.subject }},={{ $json.template }},sent,={{ JSON.stringify({ template_data: $json.template_data }) }}"
+        }
+      },
+      "id": "log-email-sent",
+      "name": "Log Email Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return success response\nconst input = $input.first().json;\n\nreturn {\n  success: true,\n  message: 'Email sent successfully',\n  recipient: input.to,\n  subject: input.subject,\n  template: input.template,\n  sent_at: new Date().toISOString()\n};\n"
+      },
+      "id": "return-success",
+      "name": "Return Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ $json.error }}",
+        "options": {}
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        850,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_logs (\n  recipient_email,\n  recipient_name,\n  subject,\n  template_used,\n  status,\n  sent_at,\n  error_message,\n  metadata\n) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)",
+        "additionalFields": {
+          "queryParameters": "={{ $('Prepare Email Data').item.json.to }},={{ $('Prepare Email Data').item.json.template_data.name }},={{ $('Prepare Email Data').item.json.subject }},={{ $('Prepare Email Data').item.json.template }},failed,={{ $json.message }},={{ JSON.stringify({ error: $json.message }) }}"
+        }
+      },
+      "id": "log-email-error",
+      "name": "Log Email Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Data": {
+      "main": [
+        [
+          {
+            "node": "Read Template File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Template File": {
+      "main": [
+        [
+          {
+            "node": "Render Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Template": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Log Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "errorWorkflow": "error-handler"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "wf05-integration",
+      "createdAt": "2026-03-26T00:00:00.000000"
+    },
+    {
+      "name": "v4.0",
+      "createdAt": "2026-03-26T00:00:00.000000"
+    },
+    {
+      "name": "read-file-fix",
+      "createdAt": "2026-03-30T00:00:00.000000"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-10T00:00:00.000Z",
+  "versionId": "2.0"
+}
