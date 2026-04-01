@@ -1,0 +1,166 @@
+{
+  "name": "07 - Send Email V8.1 (Read in Code)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "notes": "V8.1: Clean trigger configuration"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Email Data + Read Template - V8.1\nconst input = $input.first().json;\n\n// ===== TEMPLATE CONFIGURATION =====\nconst TEMPLATE_CONFIG = {\n    \"confirmacao_agendamento\": {\n        \"file\": \"confirmacao_agendamento.html\",\n        \"subject\": \"Agendamento Confirmado - E2 Soluções\"\n    },\n    \"lembrete_2h\": {\n        \"file\": \"lembrete_2h.html\",\n        \"subject\": \"Lembrete: Sua visita é em 2 horas - E2 Soluções\"\n    },\n    \"novo_lead\": {\n        \"file\": \"novo_lead.html\",\n        \"subject\": \"Obrigado pelo contato - E2 Soluções\"\n    },\n    \"apos_visita\": {\n        \"file\": \"apos_visita.html\",\n        \"subject\": \"Obrigado pela visita - E2 Soluções\"\n    }\n};\n\n// ===== EMAIL SENDER CONFIGURATION =====\nconst SENDER_CONFIG = {\n    \"from_email\": \"contato@e2solucoes.com.br\",\n    \"from_name\": \"E2 Soluções\",\n    \"reply_to\": \"contato@e2solucoes.com.br\"\n};\n\n// ===== DETECT INPUT SOURCE =====\nconst isFromWF05 = !!(input.appointment_id && input.calendar_success !== undefined);\n\nconsole.log('📧 [Prepare Email Data V8.1] Input source:', {\n    isFromWF05,\n    has_appointment_id: !!input.appointment_id,\n    has_calendar_success: input.calendar_success !== undefined\n});\n\n// ===== DETERMINE EMAIL RECIPIENT =====\nlet emailRecipient;\n\nif (isFromWF05) {\n    emailRecipient = input.lead_email;\n    console.log('📧 Using lead_email from WF05:', emailRecipient);\n} else {\n    emailRecipient = input.to || input.email;\n    console.log('📧 Using manual trigger recipient:', emailRecipient);\n}\n\nif (!emailRecipient) {\n    throw new Error('Email recipient not found');\n}\n\n// ===== DETERMINE TEMPLATE =====\nlet emailTemplate;\n\nif (isFromWF05) {\n    emailTemplate = 'confirmacao_agendamento';\n    console.log('📧 Using WF05 template: confirmacao_agendamento');\n} else {\n    emailTemplate = input.template || input.email_template;\n    if (!emailTemplate) {\n        throw new Error('Email template not specified');\n    }\n    console.log('📧 Using manual template:', emailTemplate);\n}\n\n// ===== VALIDATE TEMPLATE EXISTS =====\nif (!TEMPLATE_CONFIG[emailTemplate]) {\n    throw new Error(`Unknown email template: ${emailTemplate}`);\n}\n\nconst templateInfo = TEMPLATE_CONFIG[emailTemplate];\n\n// ===== READ TEMPLATE FILE USING $fs HELPER =====\nconst templatePath = `/email-templates/${templateInfo.file}`;\n\nconsole.log('📂 [V8.1] Reading template file:', templatePath);\n\nlet templateHtml;\ntry {\n    // V8.1 SOLUTION: Use n8n $fs helper to read file\n    const fs = require('fs');\n    templateHtml = fs.readFileSync(templatePath, 'utf8');\n\n    console.log('✅ [V8.1] Template loaded:', {\n        path: templatePath,\n        length: templateHtml.length,\n        first_100_chars: templateHtml.substring(0, 100)\n    });\n} catch (error) {\n    console.error('❌ [V8.1] Template read failed:', error.message);\n    throw new Error(`Failed to read template ${templatePath}: ${error.message}`);\n}\n\n// ===== PREPARE TEMPLATE DATA =====\nlet templateData;\n\nif (isFromWF05) {\n    // WF05 DATA MAPPING\n    let dateString = input.scheduled_date;\n    if (typeof dateString === 'string' && dateString.includes('T')) {\n        dateString = dateString.split('T')[0];\n    }\n\n    const [year, month, day] = dateString.split('-');\n    const formattedDate = `${day}/${month}/${year}`;\n\n    const timeStart = input.scheduled_time_start?.split(':').slice(0, 2).join(':') || '00:00';\n    const timeEnd = input.scheduled_time_end?.split(':').slice(0, 2).join(':') || '00:00';\n    const formattedTime = `${timeStart} às ${timeEnd}`;\n\n    const googleEventLink = input.google_calendar_event_id\n        ? `https://calendar.google.com/calendar/event?eid=${input.google_calendar_event_id}`\n        : '';\n\n    templateData = {\n        name: input.lead_name || 'Cliente',\n        email: emailRecipient,\n        phone_number: input.phone_number || '',\n        whatsapp_name: input.whatsapp_name || input.lead_name || 'Cliente',\n        service_type: input.service_type || 'Serviço',\n        city: input.city || '',\n        address: input.address || '',\n        state: input.state || '',\n        zip_code: input.zip_code || '',\n        scheduled_date: dateString,\n        formatted_date: formattedDate,\n        formatted_time: formattedTime,\n        google_event_link: googleEventLink,\n        google_calendar_event_id: input.google_calendar_event_id || '',\n        appointment_id: input.appointment_id,\n        status: input.status || 'confirmado'\n    };\n} else {\n    // MANUAL TRIGGER DATA MAPPING\n    templateData = {\n        name: input.name || 'Cliente',\n        email: emailRecipient,\n        phone_number: input.phone_number || input.phone || '',\n        service_type: input.service_type || '',\n        scheduled_date: input.scheduled_date || '',\n        formatted_date: input.formatted_date || '',\n        formatted_time: input.formatted_time || '',\n        google_event_link: input.google_event_link || '',\n        ...input\n    };\n}\n\n// ===== RENDER TEMPLATE =====\nconst renderTemplate = (html, data) => {\n    let rendered = html;\n\n    console.log('🔄 [V8.1 Render] Starting template rendering');\n\n    // Replace {{variable}}\n    rendered = rendered.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (match, key) => {\n        const value = data[key] !== undefined ? data[key] : match;\n        return value;\n    });\n\n    // Handle {{#if variable}}...{{/if}}\n    rendered = rendered.replace(/\\{\\{#if\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/if\\}\\}/g, (match, key, content) => {\n        return data[key] ? content : '';\n    });\n\n    // Handle {{#unless variable}}...{{/unless}}\n    rendered = rendered.replace(/\\{\\{#unless\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/unless\\}\\}/g, (match, key, content) => {\n        return !data[key] ? content : '';\n    });\n\n    return rendered;\n};\n\nconst htmlBody = renderTemplate(templateHtml, templateData);\n\n// Generate plain text version\nconst textBody = htmlBody\n    .replace(/<style[^>]*>.*?<\\/style>/gs, '')\n    .replace(/<script[^>]*>.*?<\\/script>/gs, '')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&amp;/g, '&')\n    .replace(/\\n\\s*\\n/g, '\\n\\n')\n    .trim();\n\nconsole.log('✅ [V8.1 Render] Template rendered:', {\n    html_length: htmlBody.length,\n    text_length: textBody.length\n});\n\n// ===== RETURN COMPLETE EMAIL DATA =====\nreturn {\n    to: emailRecipient,\n    template: emailTemplate,\n    subject: templateInfo.subject,\n    html_body: htmlBody,\n    text_body: textBody,\n    from_email: SENDER_CONFIG.from_email,\n    from_name: SENDER_CONFIG.from_name,\n    reply_to: SENDER_CONFIG.reply_to,\n    template_data: templateData,\n    source: isFromWF05 ? 'wf05_trigger' : 'manual_trigger',\n    prepared_at: new Date().toISOString()\n};\n"
+      },
+      "id": "prepare-and-render",
+      "name": "Prepare and Render Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ],
+      "notes": "V8.1: Read template + prepare data + render in single node using fs.readFileSync"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_email }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html_body }}",
+        "options": {
+          "fromName": "={{ $json.from_name }}",
+          "replyTo": "={{ $json.reply_to }}",
+          "ccEmail": "",
+          "bccEmail": "",
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "send-email-smtp",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        650,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP - E2 Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_logs (recipient_email, recipient_name, subject, template_used, status, sent_at, metadata) VALUES ($1, $2, $3, $4, $5, NOW(), $6)",
+        "additionalFields": {
+          "queryParameters": "={{ $json.to }},={{ $json.template_data.name }},={{ $json.subject }},={{ $json.template }},sent,={{ JSON.stringify({ template_data: $json.template_data }) }}"
+        }
+      },
+      "id": "log-email-sent",
+      "name": "Log Email Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return success response\nconst input = $input.first().json;\n\nreturn {\n  success: true,\n  message: 'Email sent successfully',\n  recipient: input.to,\n  subject: input.subject,\n  template: input.template,\n  sent_at: new Date().toISOString()\n};\n"
+      },
+      "id": "return-success",
+      "name": "Return Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare and Render Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare and Render Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Log Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "errorWorkflow": "error-handler"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "wf05-integration",
+      "createdAt": "2026-03-26T00:00:00.000000"
+    },
+    {
+      "name": "v8.1",
+      "createdAt": "2026-03-31T00:00:00.000000"
+    },
+    {
+      "name": "read-in-code",
+      "createdAt": "2026-03-31T00:00:00.000000"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-03-31T20:03:31Z",
+  "versionId": "V8.1"
+}

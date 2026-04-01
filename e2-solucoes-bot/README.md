@@ -1,101 +1,125 @@
-# 🤖 E2 Bot - WhatsApp AI Assistant
+# E2 Bot - WhatsApp AI Assistant
 
-> **Prod**: WF01 V2.8.3 | WF02 V74.1.2 | WF05 V3.6
-> **Ready**: WF02 V75 | WF05 V4.0.4 | WF07 V6
-> **Updated**: 2026-03-31
+> **Production-ready WhatsApp automation** | n8n + Claude AI + PostgreSQL + Evolution API | Brazilian Portuguese
 
-Bot inteligente WhatsApp com Claude AI para E2 Soluções (Engenharia Elétrica).
+Intelligent bot for E2 Soluções handling customer inquiries, appointment scheduling, and automated email confirmations.
 
 ---
 
-## ⚡ Quick Start
+## 🚀 Quick Start
 
-### Pré-requisitos
+### Prerequisites
 - Docker + Docker Compose
-- Git
-- API Keys: Anthropic, Evolution API, Google Services
+- WhatsApp Business number
+- Google Calendar API credentials
+- Gmail SMTP account
+- Anthropic API key (Claude)
 
-### Setup (5 min)
+### 1. Clone & Configure
 ```bash
-# Clone
-git clone <repo-url>
+git clone <repository-url>
 cd e2-solucoes-bot
-
-# Configure
 cp docker/.env.example docker/.env
-nano docker/.env  # Add API keys
-
-# Start
-docker-compose -f docker/docker-compose-dev.yml up -d
-
-# Access
-open http://localhost:5678  # n8n
+# Edit docker/.env with your credentials
 ```
 
-📘 **Full Guide**: See `QUICKSTART.md`
-
----
-
-## 🎯 Features
-
-**Intelligent Conversation** (8 states):
-- 🤖 Claude 3.5 Sonnet NLP
-- 💬 Context-aware dialogues
-- 🧠 Persistent memory
-- 📊 Service-specific data collection
-
-**Services** (5 types):
-- ☀️ Solar Energy (residential/commercial/industrial)
-- ⚡ Substations (maintenance/construction)
-- 📐 Electrical Projects (design/permits)
-- 🔋 BESS (battery storage)
-- 📊 Analysis & Reports
-
-**Automation**:
-- 📅 Google Calendar integration
-- ✉️ Automated email confirmations
-- 📱 WhatsApp notifications
-- 🔄 RD Station CRM sync
-
----
-
-## 🏗️ Architecture
-
+### 2. Deploy Infrastructure
+```bash
+cd docker
+docker-compose -f docker-compose-dev.yml up -d
 ```
-WhatsApp → Evolution API
-    ↓
-n8n Workflows (3 main)
-    ↓
-WF01: Handler (deduplication)
-    ↓
-WF02: AI Agent (8 states, Claude 3.5)
-    ↓
-WF05: Appointment Scheduler (Google Calendar)
-    ↓
-WF07: Email Sender (automated confirmations)
-    ↓
-PostgreSQL + Evolution API DB
+
+### 3. Import Workflows
+```bash
+# Access n8n at http://localhost:5678
+# Import workflows from n8n/workflows/:
+# - 01_main_whatsapp_handler_V2.8.3_NO_LOOP.json
+# - 02_ai_agent_conversation_V74.1_2_FUNCIONANDO.json
+# - 05_appointment_scheduler_v3.6.json
+# - 07_send_email_v13_insert_select.json (LATEST ✅)
+```
+
+### 4. Connect WhatsApp
+```bash
+# Generate QR code
+curl http://localhost:8080/instance/connect/e2-solucoes-bot \
+  -H "apikey: YOUR_API_KEY"
+# Scan QR code with WhatsApp
 ```
 
 ---
 
-## 📦 Current Status
+## 📊 System Architecture
 
-### Production
-- ✅ **WF01 V2.8.3**: WhatsApp handler (dedup via PostgreSQL)
-- ✅ **WF02 V74.1.2**: AI agent (8 states, working)
-- ✅ **WF05 V3.6**: Appointment scheduler (stable)
+### Flow Overview
+```
+WhatsApp Message
+    ↓
+WF01: Main Handler (deduplication)
+    ↓
+WF02: AI Agent (8-state conversation)
+    ↓
+    ├─→ WF05: Appointment Scheduler → WF07: Email Confirmation
+    └─→ Human Handoff (complex cases)
+```
 
-### Ready for Deploy
-- 🚀 **WF02 V75**: Personalized appointment confirmations
-- 🚀 **WF05 V4.0.4**: Email data fix (16 fields → WF07)
-- 🚀 **WF07 V6**: Complete email solution (Docker volume fix)
+### Workflow Versions (Production)
+| ID | Name | Version | Function |
+|----|------|---------|----------|
+| WF01 | Main Handler | V2.8.3 | Duplicate detection, routing |
+| WF02 | AI Agent | V74.1.2 | 8-state conversation flow |
+| WF05 | Scheduler | V3.6 | Google Calendar + DB |
+| WF07 | Email | V13 ✅ | SMTP + PostgreSQL logging |
 
-### Recent Fixes
-- ✅ Docker n8n container corruption (2026-03-31)
-- ✅ Evolution API webhook errors resolved
-- ✅ WF07 V2-V6 evolution (all bugs fixed)
-- ✅ WF05 timezone, attendees, email data fixes
+### State Machine (WF02)
+```
+greeting → service_selection → name → phone → email → city → confirmation → trigger_actions
+```
+
+**Services**: 1-Solar | 2-Subestação | 3-Projetos | 4-BESS | 5-Análise
+**Triggers**: Services 1/3 + confirm → WF05 | Others → Handoff
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables (docker/.env)
+```bash
+# Evolution API
+EVOLUTION_API_KEY=your_evolution_key
+EVOLUTION_INSTANCE_NAME=e2-solucoes-bot
+
+# n8n
+N8N_BASIC_AUTH_USER=admin
+N8N_BASIC_AUTH_PASSWORD=secure_password
+N8N_ENCRYPTION_KEY=generate_random_key
+
+# Anthropic (Claude AI)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Google Calendar
+GOOGLE_CALENDAR_ID=your_calendar@gmail.com
+# Upload credentials JSON via n8n UI
+
+# SMTP (Gmail)
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=app_specific_password
+SMTP_FROM=E2 Soluções <your_email@gmail.com>
+
+# Business Hours (Hardcoded in WF05 V7)
+WORK_START=08:00
+WORK_END=18:00
+WORK_DAYS=1,2,3,4,5  # Mon-Fri
+```
+
+### Database Schema
+```sql
+-- Core tables
+conversations: phone_number, lead_name, service_type, current_state
+appointments: id, lead_email, scheduled_date, google_calendar_event_id
+email_logs: recipient_email, template_used, status, sent_at
+appointment_reminders: appointment_id, reminder_type, status
+```
 
 ---
 
@@ -103,107 +127,150 @@ PostgreSQL + Evolution API DB
 
 ```
 e2-solucoes-bot/
-├── CLAUDE.md                 # Claude Code context (compressed)
-├── README.md                 # This file
-├── QUICKSTART.md            # Quick setup guide
-├── CHANGELOG.md             # Version history
-│
 ├── docker/
-│   ├── docker-compose-dev.yml
-│   └── .env.example
-│
-├── database/
-│   ├── schema.sql
-│   └── appointment_functions.sql
-│
-├── n8n/workflows/
-│   ├── 01_main_whatsapp_handler_V2.8.3_NO_LOOP.json
-│   ├── 02_ai_agent_conversation_V74.1_2_FUNCIONANDO.json
-│   ├── 02_ai_agent_conversation_V75_APPOINTMENT_FINAL_MESSAGE.json
-│   ├── 05_appointment_scheduler_v3.6.json
-│   ├── 05_appointment_scheduler_v4.0.4.json
-│   └── 07_send_email_v6_docker_volume_fix.json
-│
-├── email-templates/          # 4 HTML templates
-├── scripts/                  # Automation scripts
-└── docs/                     # Documentation
-    ├── BUGFIX_*.md
-    ├── DEPLOY_*.md
-    └── Setups/
+│   ├── docker-compose-dev.yml    # Infrastructure
+│   └── .env                      # Configuration
+├── n8n/
+│   ├── workflows/                # Production workflows
+│   └── email-templates/          # HTML email templates
+├── scripts/
+│   ├── generate-workflow-*.py    # Workflow generators
+│   └── evolution-helper.sh       # WhatsApp management
+├── docs/
+│   ├── BUGFIX_*.md              # Version evolution
+│   ├── DEPLOY_*.md              # Deployment guides
+│   └── Setups/                  # Integration guides
+├── CLAUDE.md                     # Technical context (compact)
+└── README.md                     # This file
 ```
 
 ---
 
-## 🚀 Deploy Guide
+## 🛠️ Common Operations
 
-### WF02 V75
+### Check System Status
 ```bash
-# 1. Import workflow
-http://localhost:5678 → Import → 02_ai_agent_conversation_V75_APPOINTMENT_FINAL_MESSAGE.json
+# All containers
+docker ps | grep e2bot
 
-# 2. Test with Service 1 or 3
-# Expected: Personalized final message with real appointment data
-
-# 3. Deploy
-# Backup V74.1.2 → Deactivate → Activate V75
-
-# Rollback if needed
-# Deactivate V75 → Activate V74.1.2
-```
-
-### WF05 V4.0.4
-```bash
-# Import
-05_appointment_scheduler_v4.0.4.json
-
-# Test
-# Service 1/3 → verify 16 fields passed to WF07
-```
-
-### WF07 V6 (CRITICAL - Docker Config Required)
-```bash
-# 1. Update docker-compose-dev.yml
-# Add to n8n-dev volumes:
-  - ../email-templates:/email-templates:ro
-
-# 2. Restart Docker
-docker-compose -f docker/docker-compose-dev.yml down
-docker-compose -f docker/docker-compose-dev.yml up -d
-
-# 3. Verify mount
-docker exec e2bot-n8n-dev ls /email-templates/
-
-# 4. Import workflow
-07_send_email_v6_docker_volume_fix.json
-
-# 5. Test
-# Service 1/3 → verify email sent
-```
-
----
-
-## 🔧 Common Commands
-
-```bash
-# Container status
-docker ps --format "table {{.Names}}\t{{.Status}}"
-
-# Database check
-docker exec -it e2bot-postgres-dev psql -U postgres -d e2bot_dev \
+# Database conversations
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
   -c "SELECT phone_number, lead_name, service_type, current_state FROM conversations ORDER BY updated_at DESC LIMIT 5;"
 
-# Evolution API status
-curl -s http://localhost:8080/instance/fetchInstances \
-  -H "apikey: YOUR_API_KEY" | jq
+# WhatsApp connection
+curl http://localhost:8080/instance/fetchInstances \
+  -H "apikey: YOUR_API_KEY" | jq '.[] | .instance.state'
+```
 
-# Logs
-docker logs -f e2bot-n8n-dev
-docker logs -f e2bot-evolution-dev
+### Monitor Workflows
+```bash
+# n8n logs
+docker logs -f e2bot-n8n-dev | grep -E "ERROR|workflow"
+
+# Evolution API logs
+docker logs -f e2bot-evolution-dev | grep -E "ERROR|message"
+```
+
+### Restart Services
+```bash
+# Individual service
+docker restart e2bot-n8n-dev
+
+# All services
+cd docker && docker-compose -f docker-compose-dev.yml restart
 ```
 
 ---
 
-## 🛠️ Stack
+## 📚 Documentation
+
+### Deployment Guides
+- **WF02 V75**: `docs/DEPLOY_V75_PRODUCTION.md` - Personalized confirmations
+- **WF05 V7**: `docs/DEPLOY_WF05_V7_HARDCODED_FINAL.md` - Business hours fix
+- **WF07 V13**: `docs/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md` - Database logging fix ✅
+
+### Technical Analysis
+- **n8n Limitations**: `docs/ANALYSIS_N8N_VERSION_UPGRADE_VS_WORKAROUNDS.md`
+- **HTTP Request Solution**: `docs/SOLUTION_FINAL_HTTP_REQUEST.md`
+- **Email Setup**: `docs/Setups/SETUP_EMAIL_WF05_INTEGRATION.md`
+
+### Evolution Timeline
+See `CLAUDE.md` for complete workflow evolution history (V1 → V13).
+
+---
+
+## 🔍 Troubleshooting
+
+### WhatsApp Not Connecting
+```bash
+# Regenerate QR code
+./scripts/evolution-helper.sh evolution_qrcode
+
+# Check instance status
+./scripts/evolution-helper.sh evolution_status
+
+# Recreate instance (last resort)
+./scripts/evolution-helper.sh evolution_recreate
+```
+
+### Workflows Not Executing
+```bash
+# Check n8n health
+curl http://localhost:5678/healthz
+
+# Verify PostgreSQL connection
+docker exec e2bot-postgres-dev psql -U postgres -c "\l"
+
+# Check workflow activation
+# Access http://localhost:5678 → Workflows → Verify "Active" toggle
+```
+
+### Email Not Sending (WF07)
+```bash
+# Check SMTP credentials in n8n UI
+# Verify email templates accessible:
+docker exec e2bot-templates-dev ls -la /usr/share/nginx/html/
+
+# Test template fetch:
+curl http://localhost/confirmacao_agendamento.html
+
+# Check email_logs table:
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
+  -c "SELECT * FROM email_logs ORDER BY sent_at DESC LIMIT 5;"
+```
+
+---
+
+## 🎓 Key Technical Learnings
+
+### n8n Version 2.14.2 Limitations
+1. **Environment Variables**: `$env` access blocked in Code nodes and Set expressions
+2. **Filesystem**: Read/Write File restricted to `~/.n8n-files` directory
+3. **Node.js Modules**: `fs`, `path` blocked in Code nodes
+4. **Query Parameters**: `queryReplacement` does NOT resolve `={{ }}` expressions
+
+### Solutions Applied
+- **Business Hours**: Hardcoded constants in Code node (WF05 V7)
+- **Email Templates**: nginx container + HTTP Request node (WF07 V9+)
+- **Database Logging**: INSERT...SELECT pattern with direct expression injection (WF07 V13 ✅)
+
+---
+
+## 🚀 Upcoming Features
+
+### Ready for Testing
+- **WF02 V75**: Personalized appointment confirmations with real date/time/location data
+- **WF05 V7**: Hardcoded business hours validation (eliminates env var dependency)
+
+### Deployment Order
+1. Import WF07 V13 (fixes database logging) ✅
+2. Test WF05 V7 (business hours validation)
+3. Test WF02 V75 (personalized messages)
+4. Production deployment in sequence
+
+---
+
+## 📊 Stack
 
 | Component | Technology | Version |
 |-----------|------------|---------|
@@ -212,60 +279,14 @@ docker logs -f e2bot-evolution-dev
 | Database | PostgreSQL | 15 |
 | WhatsApp | Evolution API | v2.3.7 |
 | Calendar | Google Calendar | API v3 |
+| Email Templates | nginx | alpine |
 
 ---
 
-## 📚 Documentation
+## 📞 Support
 
-**Essential**:
-- `CLAUDE.md` - Claude Code context (compressed)
-- `QUICKSTART.md` - Quick setup guide
-- `CHANGELOG.md` - Version history
-
-**Deploy**:
-- `docs/DEPLOY_V75_PRODUCTION.md`
-- `docs/BUGFIX_WF05_V4.0.4_EMAIL_DATA_PASSING.md`
-- `docs/PLAN_V6_DOCKER_TEMPLATE_ACCESS.md`
-
-**Setup**:
-- `docs/Setups/SETUP_EMAIL_WF05_INTEGRATION.md`
-- `docker/.env.example`
-
----
-
-## 🎯 Next Steps
-
-1. ✅ Deploy WF07 V6 (update docker-compose + test)
-2. ✅ Deploy WF05 V4.0.4 (test email integration)
-3. ✅ Deploy WF02 V75 (test personalized messages)
-4. 📋 Production deployment with monitoring
-
----
-
-## 🤝 Contributing
-
-```bash
-# Development
-./scripts/start-dev.sh
-# Access: http://localhost:5678
-
-# Edit workflows
-# Modify JSONs in n8n/workflows/
-# Re-import in n8n UI
-
-# Test
-# Use test phone numbers
-# Verify database updates
-```
-
----
-
-## 📄 License
-
-Proprietary - E2 Soluções
-
----
+**Technical Context**: See `CLAUDE.md` for detailed workflow specifications and evolution history.
 
 **Project**: E2 Soluções WhatsApp Bot
-**Maintained**: Claude Code
-**Version**: 4.0 (2026-03-31)
+**Maintained**: Claude Code + Human Review
+**Last Update**: 2026-04-01

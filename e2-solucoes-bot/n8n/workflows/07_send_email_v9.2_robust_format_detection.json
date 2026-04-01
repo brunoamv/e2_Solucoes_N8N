@@ -1,0 +1,227 @@
+{
+  "name": "07 - Send Email V9.2 (Robust Format Detection)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "execute-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "notes": "V9.2: Trigger for WF05 integration"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Email Data - V9.2\nconst input = $input.first().json;\n\n// ===== TEMPLATE CONFIGURATION =====\nconst TEMPLATE_CONFIG = {\n    \"confirmacao_agendamento\": {\n        \"file\": \"confirmacao_agendamento.html\",\n        \"subject\": \"Agendamento Confirmado - E2 Soluções\"\n    },\n    \"lembrete_2h\": {\n        \"file\": \"lembrete_2h.html\",\n        \"subject\": \"Lembrete: Sua visita é em 2 horas - E2 Soluções\"\n    },\n    \"lembrete_24h\": {\n        \"file\": \"lembrete_24h.html\",\n        \"subject\": \"Lembrete: Sua visita é amanhã - E2 Soluções\"\n    },\n    \"novo_lead\": {\n        \"file\": \"novo_lead.html\",\n        \"subject\": \"Obrigado pelo contato - E2 Soluções\"\n    },\n    \"apos_visita\": {\n        \"file\": \"apos_visita.html\",\n        \"subject\": \"Obrigado pela visita - E2 Soluções\"\n    }\n};\n\n// ===== EMAIL SENDER CONFIGURATION =====\nconst SENDER_CONFIG = {\n    \"from_email\": \"contato@e2solucoes.com.br\",\n    \"from_name\": \"E2 Soluções\",\n    \"reply_to\": \"contato@e2solucoes.com.br\"\n};\n\n// ===== DETECT INPUT SOURCE =====\nconst isFromWF05 = !!(input.appointment_id && input.calendar_success !== undefined);\n\nconsole.log('📧 [Prepare Email Data V9.2] Input source:', {\n    isFromWF05,\n    has_appointment_id: !!input.appointment_id,\n    has_calendar_success: input.calendar_success !== undefined\n});\n\n// ===== DETERMINE EMAIL RECIPIENT =====\nlet emailRecipient;\n\nif (isFromWF05) {\n    emailRecipient = input.lead_email;\n    console.log('📧 Using lead_email from WF05:', emailRecipient);\n} else {\n    emailRecipient = input.to || input.email;\n    console.log('📧 Using manual trigger recipient:', emailRecipient);\n}\n\nif (!emailRecipient) {\n    throw new Error('Email recipient not found');\n}\n\n// ===== DETERMINE TEMPLATE =====\nlet emailTemplate;\n\nif (isFromWF05) {\n    emailTemplate = 'confirmacao_agendamento';\n    console.log('📧 Using WF05 template: confirmacao_agendamento');\n} else {\n    emailTemplate = input.template || input.email_template;\n    if (!emailTemplate) {\n        throw new Error('Email template not specified');\n    }\n    console.log('📧 Using manual template:', emailTemplate);\n}\n\n// ===== VALIDATE TEMPLATE EXISTS =====\nif (!TEMPLATE_CONFIG[emailTemplate]) {\n    throw new Error(`Unknown email template: ${emailTemplate}`);\n}\n\nconst templateInfo = TEMPLATE_CONFIG[emailTemplate];\n\n// ===== PREPARE TEMPLATE DATA =====\nlet templateData;\n\nif (isFromWF05) {\n    // WF05 DATA MAPPING\n    let dateString = input.scheduled_date;\n    if (typeof dateString === 'string' && dateString.includes('T')) {\n        dateString = dateString.split('T')[0];\n    }\n\n    const [year, month, day] = dateString.split('-');\n    const formattedDate = `${day}/${month}/${year}`;\n\n    const timeStart = input.scheduled_time_start?.split(':').slice(0, 2).join(':') || '00:00';\n    const timeEnd = input.scheduled_time_end?.split(':').slice(0, 2).join(':') || '00:00';\n    const formattedTime = `${timeStart} às ${timeEnd}`;\n\n    const googleEventLink = input.google_calendar_event_id\n        ? `https://calendar.google.com/calendar/event?eid=${input.google_calendar_event_id}`\n        : '';\n\n    templateData = {\n        name: input.lead_name || 'Cliente',\n        email: emailRecipient,\n        phone_number: input.phone_number || '',\n        whatsapp_name: input.whatsapp_name || input.lead_name || 'Cliente',\n        service_type: input.service_type || 'Serviço',\n        city: input.city || '',\n        address: input.address || '',\n        state: input.state || '',\n        zip_code: input.zip_code || '',\n        scheduled_date: dateString,\n        formatted_date: formattedDate,\n        formatted_time: formattedTime,\n        google_event_link: googleEventLink,\n        google_calendar_event_id: input.google_calendar_event_id || '',\n        appointment_id: input.appointment_id,\n        status: input.status || 'confirmado'\n    };\n} else {\n    // MANUAL TRIGGER DATA MAPPING\n    templateData = {\n        name: input.name || 'Cliente',\n        email: emailRecipient,\n        phone_number: input.phone_number || input.phone || '',\n        service_type: input.service_type || '',\n        scheduled_date: input.scheduled_date || '',\n        formatted_date: input.formatted_date || '',\n        formatted_time: input.formatted_time || '',\n        google_event_link: input.google_event_link || '',\n        ...input\n    };\n}\n\nconsole.log('✅ [Prepare Email Data V9.2] Data prepared:', {\n    recipient: emailRecipient,\n    template: emailTemplate,\n    template_file: templateInfo.file\n});\n\n// ===== RETURN DATA FOR HTTP REQUEST NODE =====\nreturn {\n    to: emailRecipient,\n    template: emailTemplate,\n    template_file: templateInfo.file,\n    subject: templateInfo.subject,\n    template_data: templateData,\n    from_email: SENDER_CONFIG.from_email,\n    from_name: SENDER_CONFIG.from_name,\n    reply_to: SENDER_CONFIG.reply_to,\n    source: isFromWF05 ? 'wf05_trigger' : 'manual_trigger',\n    prepared_at: new Date().toISOString()\n};\n"
+      },
+      "id": "prepare-email-data",
+      "name": "Prepare Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ],
+      "notes": "V9.2: Prepare data and determine template"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://e2bot-templates-dev/{{ $json.template_file }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "string"
+            }
+          }
+        }
+      },
+      "id": "fetch-template-http",
+      "name": "Fetch Template (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        650,
+        300
+      ],
+      "notes": "V9.2: Fetch HTML template from nginx"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Render Template - V9.2 (Robust Format Detection)\n// GET TEMPLATE HTML FROM HTTP REQUEST NODE\nlet rawData = $('Fetch Template (HTTP)').first().json;\n\nconsole.log('🔍 [Render Template V9.2] Raw data inspection:', {\n    type: typeof rawData,\n    is_array: Array.isArray(rawData),\n    has_data_property: 'data' in rawData,\n    data_type: typeof rawData?.data,\n    data_is_array: Array.isArray(rawData?.data),\n    first_5_keys: Object.keys(rawData).slice(0, 5),\n    sample_structure: JSON.stringify(rawData).substring(0, 200)\n});\n\n// ===== ROBUST FORMAT DETECTION AND CONVERSION =====\nlet templateHtml = '';\n\n// Helper function to check if object has only numeric string keys\nconst hasOnlyNumericKeys = (obj) => {\n    const keys = Object.keys(obj);\n    return keys.length > 0 && keys.every(k => /^\\d+$/.test(k));\n};\n\n// Helper function to convert object with numeric keys to string\nconst numericKeysToString = (obj) => {\n    const keys = Object.keys(obj).sort((a, b) => parseInt(a) - parseInt(b));\n    return keys.map(k => obj[k]).join('');\n};\n\n// FORMAT DETECTION LOGIC (Comprehensive)\nif (typeof rawData === 'string') {\n    // Case 1: Direct string response\n    templateHtml = rawData;\n    console.log('✅ [V9.2] Case 1: Direct string (length:', templateHtml.length, ')');\n\n} else if (Array.isArray(rawData)) {\n    // Case 2: Direct array response\n    templateHtml = rawData.join('');\n    console.log('✅ [V9.2] Case 2: Direct array converted (length:', templateHtml.length, ')');\n\n} else if (typeof rawData === 'object' && rawData !== null) {\n\n    // Case 3: Object with 'data' property (string)\n    if (rawData.data && typeof rawData.data === 'string') {\n        templateHtml = rawData.data;\n        console.log('✅ [V9.2] Case 3: Object.data as string (length:', templateHtml.length, ')');\n\n    // Case 4: Object with 'data' property (array)\n    } else if (rawData.data && Array.isArray(rawData.data)) {\n        templateHtml = rawData.data.join('');\n        console.log('✅ [V9.2] Case 4: Object.data as array converted (length:', templateHtml.length, ')');\n\n    // Case 5: Object with 'data' property (object with numeric keys)\n    } else if (rawData.data && typeof rawData.data === 'object' && hasOnlyNumericKeys(rawData.data)) {\n        templateHtml = numericKeysToString(rawData.data);\n        console.log('✅ [V9.2] Case 5: Object.data with numeric keys converted (length:', templateHtml.length, ')');\n\n    // Case 6: Object with numeric keys directly (no 'data' wrapper)\n    } else if (hasOnlyNumericKeys(rawData)) {\n        templateHtml = numericKeysToString(rawData);\n        console.log('✅ [V9.2] Case 6: Root object with numeric keys converted (length:', templateHtml.length, ')');\n\n    // Case 7: Unknown object structure\n    } else {\n        console.error('❌ [V9.2] Unknown object structure:', {\n            has_data: !!rawData.data,\n            data_type: typeof rawData.data,\n            keys_sample: Object.keys(rawData).slice(0, 10),\n            data_keys_sample: rawData.data ? Object.keys(rawData.data).slice(0, 10) : null\n        });\n        throw new Error('Template HTML format not recognized - see logs for details');\n    }\n\n} else {\n    // Case 8: Completely unknown format\n    console.error('❌ [V9.2] Completely unknown format:', typeof rawData);\n    throw new Error('Template HTML is null, undefined, or unsupported type');\n}\n\n// VALIDATION\nif (!templateHtml || templateHtml.length === 0) {\n    throw new Error('Template HTML is empty after format conversion');\n}\n\nconsole.log('📝 [V9.2] Template conversion successful:', {\n    final_length: templateHtml.length,\n    starts_with: templateHtml.substring(0, 30),\n    is_html: templateHtml.trim().toLowerCase().startsWith('<!doctype') || templateHtml.trim().toLowerCase().startsWith('<html')\n});\n\n// GET EMAIL DATA FROM PREPARE EMAIL DATA NODE\nconst emailData = $('Prepare Email Data').first().json;\nconst templateData = emailData.template_data;\n\n// ===== RENDER TEMPLATE =====\nconst renderTemplate = (html, data) => {\n    let rendered = html;\n\n    console.log('🔄 [Render V9.2] Starting template rendering');\n\n    // Replace {{variable}}\n    rendered = rendered.replace(/\\{\\{\\s*(\\w+)\\s*\\}\\}/g, (match, key) => {\n        const value = data[key] !== undefined ? data[key] : match;\n        return value;\n    });\n\n    // Handle {{#if variable}}...{{/if}}\n    rendered = rendered.replace(/\\{\\{#if\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/if\\}\\}/g, (match, key, content) => {\n        return data[key] ? content : '';\n    });\n\n    // Handle {{#unless variable}}...{{/unless}}\n    rendered = rendered.replace(/\\{\\{#unless\\s+(\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/unless\\}\\}/g, (match, key, content) => {\n        return !data[key] ? content : '';\n    });\n\n    return rendered;\n};\n\nconst htmlBody = renderTemplate(templateHtml, templateData);\n\n// Generate plain text version\nconst textBody = htmlBody\n    .replace(/<style[^>]*>.*?<\\/style>/gs, '')\n    .replace(/<script[^>]*>.*?<\\/script>/gs, '')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&amp;/g, '&')\n    .replace(/\\n\\s*\\n/g, '\\n\\n')\n    .trim();\n\nconsole.log('✅ [Render V9.2] Template rendered successfully:', {\n    html_length: htmlBody.length,\n    text_length: textBody.length\n});\n\n// ===== RETURN COMPLETE EMAIL DATA =====\nreturn {\n    to: emailData.to,\n    template: emailData.template,\n    subject: emailData.subject,\n    html_body: htmlBody,\n    text_body: textBody,\n    from_email: emailData.from_email,\n    from_name: emailData.from_name,\n    reply_to: emailData.reply_to,\n    template_data: templateData,\n    source: emailData.source,\n    rendered_at: new Date().toISOString()\n};\n"
+      },
+      "id": "render-template",
+      "name": "Render Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ],
+      "notes": "V9.2: Robust format detection (8 cases)"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_email }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html_body }}",
+        "options": {
+          "fromName": "={{ $json.from_name }}",
+          "replyTo": "={{ $json.reply_to }}",
+          "ccEmail": "",
+          "bccEmail": "",
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "send-email-smtp",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1050,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP - E2 Email"
+        }
+      },
+      "notes": "V9.2: Send email via SMTP"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO email_logs (recipient_email, recipient_name, subject, template_used, status, sent_at, metadata) VALUES ($1, $2, $3, $4, $5, NOW(), $6)",
+        "additionalFields": {
+          "queryParameters": "={{ $json.to }},={{ $json.template_data.name }},={{ $json.subject }},={{ $json.template }},sent,={{ JSON.stringify({ template_data: $json.template_data }) }}"
+        }
+      },
+      "id": "log-email-sent",
+      "name": "Log Email Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      },
+      "notes": "V9.2: Log email to database"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return success response\nconst input = $input.first().json;\n\nreturn {\n  success: true,\n  message: 'Email sent successfully',\n  recipient: input.to,\n  subject: input.subject,\n  template: input.template,\n  sent_at: new Date().toISOString()\n};\n"
+      },
+      "id": "return-success",
+      "name": "Return Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        300
+      ],
+      "notes": "V9.2: Return success response"
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Data": {
+      "main": [
+        [
+          {
+            "node": "Fetch Template (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Template (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "Render Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Template": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Log Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "errorWorkflow": "error-handler"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "wf05-integration",
+      "createdAt": "2026-03-26T00:00:00.000000"
+    },
+    {
+      "name": "v9.2",
+      "createdAt": "2026-04-01T00:00:00.000000"
+    },
+    {
+      "name": "robust-format",
+      "createdAt": "2026-04-01T00:00:00.000000"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-01T10:10:18Z",
+  "versionId": "V9.2"
+}

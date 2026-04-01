@@ -27,6 +27,9 @@ services:
     ports:
       - "5678:5678"
 
+    env_file:
+      - .env
+
     environment:
       # === Development Configuration ===
       - NODE_ENV=development
@@ -243,6 +246,27 @@ services:
 
     networks:
       - e2bot-dev
+
+  # ============================================================================
+  # nginx - Email Templates Server (WF07 V9)
+  # ============================================================================
+  n8n-templates:
+    image: nginx:alpine
+    container_name: e2bot-templates-dev
+    restart: unless-stopped
+
+    volumes:
+      - ../email-templates:/usr/share/nginx/html:ro
+
+    networks:
+      - e2bot-dev
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/confirmacao_agendamento.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 # ============================================================================
 # Volumes
