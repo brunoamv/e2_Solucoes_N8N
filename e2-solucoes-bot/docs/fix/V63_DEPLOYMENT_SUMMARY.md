@@ -221,7 +221,7 @@ Scripts:
 
 Documentation:
   CLAUDE.md                                   (compressed context)
-  docs/QUICKSTART.md                          (deployment guide)
+  docs/Setups/QUICKSTART.md                          (deployment guide)
   docs/PLAN/V63_COMPLETE_FLOW_REDESIGN.md     (technical plan)
   docs/PLAN/V63_VALIDATION_REPORT.md          (validation)
   docs/V63_DEPLOYMENT_SUMMARY.md              (this file)

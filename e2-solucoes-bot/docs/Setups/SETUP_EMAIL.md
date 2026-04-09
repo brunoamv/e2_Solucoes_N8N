@@ -1,598 +1,409 @@
-# Setup Email Notifications
+# Setup Email - SMTP Configuration
 
-## Visão Geral
+> **Versão**: 3.0 (DEFINITIVA) | **Atualização**: 2026-04-08
+> **Método**: Gmail App Password (desenvolvimento) + SMTP dedicado (produção)
+> **Objetivo**: Configurar SMTP para WF07 (Send Email)
 
-Guia completo para configurar o sistema de envio de emails do bot E2 Soluções, incluindo notificações automáticas de agendamento, confirmações, lembretes e alertas para a equipe comercial.
+---
+
+## 📋 Índice
+
+1. [Pré-requisitos](#pré-requisitos)
+2. [Opção A: Gmail App Password (Desenvolvimento)](#opção-a-gmail-app-password-desenvolvimento)
+3. [Opção B: SMTP Dedicado (Produção)](#opção-b-smtp-dedicado-produção)
+4. [Configurar Credencial n8n](#configurar-credencial-n8n)
+5. [Testar Conexão](#testar-conexão)
+6. [Troubleshooting](#troubleshooting)
+
+---
 
 ## Pré-requisitos
 
-- Conta de email para o bot (Gmail, Outlook, ou SMTP customizado)
-- Acesso às configurações de segurança da conta
-- Domínio próprio (opcional, para email profissional)
+**Obrigatório**:
+- Conta Gmail (opção A) ou serviço SMTP (opção B)
+- n8n rodando em `http://localhost:5678`
+- WF07 (Send Email) importado
 
-## Opção A: Gmail (Recomendado para Dev/Teste)
-
-### A.1. Criar Conta Gmail Dedicada
-
-1. Acesse: https://accounts.google.com/signup
-2. Crie conta específica para o bot:
-   - Email: `bot@e2solucoes.com.br` (se tiver domínio)
-   - OU: `e2solucoes.bot@gmail.com`
-   - Nome: "E2 Soluções Bot"
-
-### A.2. Habilitar "App Passwords"
-
-**IMPORTANTE:** Gmail bloqueou "less secure apps". Use App Password:
-
-1. Acesse: https://myaccount.google.com/security
-2. Ative **"2-Step Verification"** (obrigatório)
-3. Volte em Security
-4. Busque: **"App passwords"**
-5. Clique em **"App passwords"**
-6. Selecione:
-   - App: **Mail**
-   - Device: **Other (Custom name)** → "E2 Bot n8n"
-7. Clique em **"Generate"**
-
-Será gerado um password de 16 caracteres:
-
-```
-xxxx xxxx xxxx xxxx
-```
-
-**Guarde esta senha!** Ela substitui sua senha normal para SMTP.
-
-### A.3. Configurar SMTP Gmail
-
+**Verificar n8n rodando**:
 ```bash
-# Editar .env.dev
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_SECURE=false  # STARTTLS
-EMAIL_USER=e2solucoes.bot@gmail.com
-EMAIL_PASSWORD=xxxx xxxx xxxx xxxx  # App Password (remover espaços)
-EMAIL_FROM_NAME=E2 Soluções
-EMAIL_FROM_ADDRESS=e2solucoes.bot@gmail.com
-```
-
-### A.4. Testar Conexão SMTP
-
-```bash
-#!/bin/bash
-# scripts/test-email.sh
-
-set -a
-source docker/.env
-set +a
-
-echo "🧪 Testando conexão SMTP..."
-
-# Remover espaços do app password
-EMAIL_PASSWORD=$(echo "$EMAIL_PASSWORD" | tr -d ' ')
-
-# Testar conexão
-swaks --to bruno@e2solucoes.com.br \
-  --from "$EMAIL_FROM_ADDRESS" \
-  --server "$EMAIL_HOST:$EMAIL_PORT" \
-  --auth LOGIN \
-  --auth-user "$EMAIL_USER" \
-  --auth-password "$EMAIL_PASSWORD" \
-  --tls \
-  --header "Subject: Teste E2 Bot" \
-  --body "Email de teste do bot E2 Soluções."
-
-# Se swaks não instalado:
-# sudo apt-get install swaks  # Ubuntu/Debian
-# brew install swaks          # macOS
-```
-
-**Resultado esperado:**
-
-```
-*** CONNECTED to smtp.gmail.com:587
-=== TLS started with cipher ...
-<-  250 2.0.0 OK
-=== Message sent successfully
+curl -I http://localhost:5678
+# Deve retornar HTTP 200 ou redirecionamento
 ```
 
 ---
 
-## Opção B: Domínio Próprio (SMTP Customizado)
+## Opção A: Gmail App Password (Desenvolvimento)
 
-### B.1. Configurar DNS (MX Records)
+### ✅ RECOMENDADO: Port 465 + SSL/TLS
 
-Se usar email `bot@e2solucoes.com.br`, configure DNS:
+**Gmail SMTP Ports**:
+- **Port 465**: SSL/TLS direto → Usar `Secure: true` ✅ **(RECOMENDADO)**
+- **Port 587**: STARTTLS → Usar `Secure: false` (configuração alternativa)
 
-```
-MX Record:
-  Priority: 10
-  Value: mail.e2solucoes.com.br
-
-A Record (mail):
-  Name: mail
-  Value: [IP do servidor SMTP]
-
-SPF Record:
-  Type: TXT
-  Value: v=spf1 ip4:[IP do servidor] ~all
-
-DKIM Record:
-  Type: TXT
-  Name: default._domainkey
-  Value: [Chave DKIM do provedor]
-```
-
-### B.2. Escolher Provedor SMTP
-
-**Opções profissionais:**
-
-1. **SendGrid** (https://sendgrid.com)
-   - Free tier: 100 emails/dia
-   - Configuração simples
-   - Excelente deliverability
-
-2. **Mailgun** (https://mailgun.com)
-   - Free tier: 5.000 emails/mês (3 meses)
-   - API poderosa
-   - Bom para transacional
-
-3. **Amazon SES** (https://aws.amazon.com/ses/)
-   - $0.10 por 1.000 emails
-   - Escalável
-   - Requer verificação de domínio
-
-4. **Postmark** (https://postmarkapp.com)
-   - Free trial: 100 emails
-   - Especializado em transacional
-   - Deliverability top
-
-### B.3. Configurar SendGrid (Exemplo)
-
-1. **Criar conta**: https://signup.sendgrid.com/
-2. **Verificar email**
-3. **Criar API Key**:
-   - Settings → API Keys → Create API Key
-   - Nome: "E2 Bot"
-   - Permissions: Full Access (ou apenas Mail Send)
-   - Copiar key: `SG.xxxxxxxxxxxxxxxxxxxx`
-
-4. **Configurar .env**:
-
-```bash
-# SendGrid SMTP
-EMAIL_HOST=smtp.sendgrid.net
-EMAIL_PORT=587
-EMAIL_SECURE=false
-EMAIL_USER=apikey  # Literal "apikey"
-EMAIL_PASSWORD=SG.xxxxxxxxxxxxxxxxxxxx  # API Key
-EMAIL_FROM_NAME=E2 Soluções
-EMAIL_FROM_ADDRESS=bot@e2solucoes.com.br
-```
-
-5. **Verificar domínio** (para email profissional):
-   - Settings → Sender Authentication → Verify a Single Sender
-   - Preencher dados da empresa
-   - Verificar email de confirmação
-
----
-
-## Etapa 3: Configurar n8n Email Node
-
-### 3.1. Adicionar Credencial SMTP
-
-1. Acesse: http://localhost:5678
-2. Vá em: **Credentials → Add Credential**
-3. Busque: "SMTP"
-4. Selecione: **"SMTP"**
-5. Preencha:
-
+**Configuração testada e aprovada**:
 ```yaml
-Credential Name: E2 Bot Email
-Host: smtp.gmail.com (ou outro)
+Port: 465
+SSL/TLS: habilitado (marcar checkbox)
+Secure: true
+```
+
+**Configuração alternativa (Port 587)**:
+- Usar apenas se Port 465 não funcionar no seu ambiente
+- Requer `Secure: false` (STARTTLS)
+- Erro comum se usar Port 587 + SSL/TLS habilitado:
+  ```
+  error:0A00010B:SSL routines:tls_validate_record_header:wrong version number
+  ```
+
+---
+
+### Passo 1: Habilitar 2-Step Verification
+
+1. **Acessar**: https://myaccount.google.com/security
+2. **2-Step Verification** → **Enable**
+3. Seguir processo de verificação (SMS, autenticador, etc.)
+
+**Aguardar 10 minutos** para propagação da configuração
+
+---
+
+### Passo 2: Criar App Password
+
+1. **Voltar**: https://myaccount.google.com/security
+2. **Buscar**: "App passwords" na barra de pesquisa
+3. **Clicar**: "App passwords"
+4. **Selecionar**:
+   - **App**: Mail
+   - **Device**: Other (Custom name)
+   - **Digite**: "E2 Bot n8n"
+5. **Generate** → Copiar senha de 16 caracteres:
+
+```
+abcd efgh ijkl mnop
+```
+
+**⚠️ IMPORTANTE**: Remover espaços ao configurar no n8n:
+- ✅ `abcdefghijklmnop`
+- ❌ `abcd efgh ijkl mnop`
+
+---
+
+### Passo 3: Configurar docker/.env
+
+```bash
+# Editar arquivo
+nano docker/.env
+
+# Adicionar variáveis SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true  # SSL/TLS direto ✅ RECOMENDADO
+SMTP_USER=bruno.amv@gmail.com
+SMTP_PASSWORD=abcdefghijklmnop  # App Password SEM ESPAÇOS
+EMAIL_FROM=E2 Soluções <bruno.amv@gmail.com>
+```
+
+**Reiniciar n8n** para carregar variáveis:
+```bash
+docker-compose -f docker/docker-compose-dev.yml restart e2bot-n8n-dev
+```
+
+---
+
+## Opção B: SMTP Dedicado (Produção)
+
+### Provedores Recomendados
+
+**1. SendGrid** (https://sendgrid.com)
+- **Free tier**: 100 emails/dia
+- **Vantagem**: Excelente deliverability, fácil configuração
+- **Uso**: Emails transacionais
+
+**Configuração SendGrid**:
+```yaml
+Host: smtp.sendgrid.net
 Port: 587
-User: e2solucoes.bot@gmail.com
-Password: xxxx xxxx xxxx xxxx (App Password)
-SSL/TLS: false (usar STARTTLS)
-From Email: e2solucoes.bot@gmail.com
-From Name: E2 Soluções
+Secure: false  # STARTTLS
+User: apikey  # Literal "apikey"
+Password: SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+From Email: bot@e2solucoes.com.br
 ```
-
-6. Clique em **"Test"** → Deve aparecer "Connection successful"
-7. **"Create"**
-
-### 3.2. Importar Workflow de Email
-
-```bash
-# Workflow já criado: n8n/workflows/07_send_email.json
-```
-
-No n8n:
-1. **Workflows → Import from File**
-2. Selecionar: `n8n/workflows/07_send_email.json`
-3. Configurar credencial SMTP criada
-4. Ativar workflow
 
 ---
 
-## Etapa 4: Templates de Email
+**2. Mailgun** (https://mailgun.com)
+- **Free tier**: 5.000 emails/mês (3 meses)
+- **Vantagem**: API poderosa, boa documentação
+- **Uso**: Emails transacionais e marketing
 
-### 4.1. Templates Disponíveis
-
-Localização: `templates/emails/`
-
-```
-templates/emails/
-├── appointment_confirmation.html     # Confirmação de agendamento
-├── appointment_reminder_24h.html     # Lembrete 24h antes
-├── appointment_reminder_2h.html      # Lembrete 2h antes
-├── lead_notification_comercial.html  # Notificar equipe comercial
-└── appointment_cancelled.html        # Cancelamento de visita
-```
-
-### 4.2. Estrutura de Template
-
-Exemplo: `appointment_confirmation.html`
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 30px;
-      text-align: center;
-      border-radius: 10px 10px 0 0;
-    }
-    .content {
-      background: white;
-      padding: 30px;
-      border: 1px solid #e0e0e0;
-      border-top: none;
-    }
-    .info-box {
-      background: #f5f5f5;
-      padding: 20px;
-      border-radius: 8px;
-      margin: 20px 0;
-    }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      margin: 10px 0;
-    }
-    .button {
-      display: inline-block;
-      background: #667eea;
-      color: white;
-      padding: 12px 30px;
-      text-decoration: none;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
-    .footer {
-      text-align: center;
-      color: #888;
-      font-size: 12px;
-      margin-top: 30px;
-      padding-top: 20px;
-      border-top: 1px solid #e0e0e0;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>✅ Visita Técnica Agendada</h1>
-  </div>
-
-  <div class="content">
-    <p>Olá, <strong>{{lead_name}}</strong>!</p>
-
-    <p>Sua visita técnica foi confirmada com sucesso!</p>
-
-    <div class="info-box">
-      <h3>📋 Detalhes do Agendamento:</h3>
-      <div class="info-row">
-        <span><strong>📅 Data:</strong></span>
-        <span>{{visit_date}}</span>
-      </div>
-      <div class="info-row">
-        <span><strong>🕐 Horário:</strong></span>
-        <span>{{visit_time}}</span>
-      </div>
-      <div class="info-row">
-        <span><strong>📍 Endereço:</strong></span>
-        <span>{{address}}</span>
-      </div>
-      <div class="info-row">
-        <span><strong>⚡ Serviço:</strong></span>
-        <span>{{service_type}}</span>
-      </div>
-    </div>
-
-    <h3>👨‍🔧 O que esperar?</h3>
-    <ul>
-      <li>Nosso técnico chegará no horário agendado</li>
-      <li>Duração aproximada: 1h30</li>
-      <li>Vistoria completa do local</li>
-      <li>Proposta técnica e comercial em até 48h</li>
-    </ul>
-
-    <h3>📱 Precisa reagendar?</h3>
-    <p>Entre em contato conosco:</p>
-    <a href="https://wa.me/5562999999999" class="button">
-      💬 WhatsApp: (62) 99999-9999
-    </a>
-
-    <p style="margin-top: 30px; color: #888; font-size: 14px;">
-      Você receberá lembretes automáticos 24h e 2h antes da visita.
-    </p>
-  </div>
-
-  <div class="footer">
-    <p><strong>E2 Soluções - Engenharia Elétrica</strong></p>
-    <p>Goiânia - GO | (62) 99999-9999</p>
-    <p>www.e2solucoes.com.br</p>
-  </div>
-</body>
-</html>
+**Configuração Mailgun**:
+```yaml
+Host: smtp.mailgun.org
+Port: 587
+Secure: false  # STARTTLS
+User: postmaster@seu-dominio.com
+Password: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+From Email: bot@seu-dominio.com
 ```
 
-### 4.3. Variáveis Suportadas
+---
 
-Cada template suporta variáveis dinâmicas:
+**3. Amazon SES** (https://aws.amazon.com/ses/)
+- **Custo**: $0.10 por 1.000 emails
+- **Vantagem**: Escalável, integração AWS
+- **Uso**: Alto volume de emails
+
+**Configuração Amazon SES**:
+```yaml
+Host: email-smtp.us-east-1.amazonaws.com
+Port: 587
+Secure: false  # STARTTLS
+User: AKIAXXXXXXXXXXXXXXXX  # SMTP credentials
+Password: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+From Email: bot@seu-dominio.com
+```
+
+---
+
+## Configurar Credencial n8n
+
+### Passo 1: Criar Credencial SMTP
+
+1. **Acessar n8n**: http://localhost:5678
+
+2. **Menu lateral** → **Credentials**
+
+3. **New credential** → Buscar **"SMTP"**
+
+4. **Preencher** (Opção A - Gmail):
 
 ```yaml
-appointment_confirmation.html:
-  - {{lead_name}}
-  - {{visit_date}}
-  - {{visit_time}}
-  - {{address}}
-  - {{service_type}}
-  - {{phone}}
-
-appointment_reminder_24h.html:
-  - {{lead_name}}
-  - {{visit_date}}
-  - {{visit_time}}
-  - {{address}}
-  - {{technician_name}}
-
-appointment_reminder_2h.html:
-  - {{lead_name}}
-  - {{visit_time}}
-  - {{technician_name}}
-
-lead_notification_comercial.html:
-  - {{lead_name}}
-  - {{phone}}
-  - {{service_type}}
-  - {{collected_data}}
-  - {{rdstation_link}}
+Credential Name: SMTP - E2 Email
+Host: smtp.gmail.com
+Port: 465
+Secure: true  # ✅ SSL/TLS (MARCAR checkbox SSL/TLS)
+User: bruno.amv@gmail.com
+Password: abcdefghijklmnop  # App Password SEM ESPAÇOS
+From Email: E2 Soluções <bruno.amv@gmail.com>
 ```
+
+**✅ CONFIGURAÇÃO RECOMENDADA**:
+- **Port 465** → **Secure: true** (SSL/TLS) ✅
+- Marcar checkbox "SSL/TLS" no n8n
+
+**Configuração Alternativa**:
+- **Port 587** → **Secure: false** (STARTTLS)
+- Usar apenas se Port 465 não funcionar
+
+5. **Save** (não há botão Test na credencial SMTP)
 
 ---
 
-## Etapa 5: Enviar Emails via n8n
+### Passo 2: Vincular Credencial ao WF07
 
-### 5.1. Workflow de Envio
+1. **Workflows** → **07 Send Email**
 
-O workflow `07_send_email.json` funciona como serviço reutilizável:
+2. **Abrir workflow**
 
-```
-[Webhook Trigger: /webhook/send-email]
-    ↓
-[Load Template]
-    ↓
-[Replace Variables]
-    ↓
-[Send Email (SMTP)]
-    ↓
-[Log in Database]
-    ↓
-[Return Success]
-```
+3. **Localizar node "Send Email" (SMTP)**
 
-### 5.2. Chamar via HTTP Request
+4. **Credential to connect with** → Selecionar **"SMTP - E2 Email"**
 
-De outros workflows, chamar:
+5. **Save workflow** (Ctrl+S)
 
-```javascript
-// No nó HTTP Request
-{
-  "method": "POST",
-  "url": "http://n8n:5678/webhook/send-email",
-  "headers": {
-    "Content-Type": "application/json"
-  },
-  "body": {
-    "to": "cliente@email.com",
-    "template": "appointment_confirmation",
-    "variables": {
-      "lead_name": "João Silva",
-      "visit_date": "15/01/2024",
-      "visit_time": "14:00",
-      "address": "Rua Teste, 123",
-      "service_type": "Energia Solar"
-    }
-  }
-}
-```
+---
 
-### 5.3. Resposta
+## Testar Conexão
 
+### Teste 1: Envio Manual via WF07
+
+**Dados de teste**:
 ```json
 {
-  "success": true,
-  "message_id": "msg_xxxxx",
-  "timestamp": "2024-01-10T14:30:00Z"
+  "lead_email": "bruno.amv@gmail.com",
+  "lead_name": "Teste SMTP",
+  "service_type": "energia_solar",
+  "city": "goiania-go",
+  "calendar_success": true,
+  "scheduled_date": "2026-04-15",
+  "scheduled_time_start": "09:00:00",
+  "scheduled_time_end": "11:00:00"
 }
 ```
 
+**Executar**:
+1. WF07 → **Execute Workflow**
+2. Colar JSON acima no input
+3. **Execute**
+
+**✅ Resultado esperado**:
+- Node "Send Email" → **SUCCESS** (verde)
+- Email recebido em `bruno.amv@gmail.com`
+- Database log criado:
+  ```sql
+  SELECT * FROM email_logs ORDER BY sent_at DESC LIMIT 1;
+  ```
+
+**❌ Se falhar**: Ver [Troubleshooting](#troubleshooting)
+
 ---
 
-## Etapa 6: Notificações Automáticas
+### Teste 2: Verificar Email Recebido
 
-### 6.1. Confirmação de Agendamento
+**Verificar caixa de entrada**:
+1. Inbox de `bruno.amv@gmail.com`
+2. Procurar email de "E2 Soluções"
+3. Subject: "Confirmação de Agendamento - E2 Soluções"
+4. Verificar template renderizado corretamente:
+   - Nome: "Teste SMTP"
+   - Data: "15/04/2026"
+   - Horário: "09:00 às 11:00"
+   - Serviço: "energia_solar"
 
-Trigger: Após criar evento no Google Calendar
+**Se email não chegou**:
+- Verificar pasta **Spam**
+- Verificar logs do WF07 (Executions)
+- Verificar `email_logs` table:
+  ```sql
+  SELECT recipient_email, status, error_message, sent_at
+  FROM email_logs
+  ORDER BY sent_at DESC
+  LIMIT 5;
+  ```
 
+---
+
+### Teste 3: Verificar Log no Banco
+
+```bash
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c "
+  SELECT
+    id,
+    recipient_email,
+    recipient_name,
+    template_used,
+    status,
+    sent_at
+  FROM email_logs
+  ORDER BY sent_at DESC
+  LIMIT 1;
+"
+```
+
+**✅ Resultado esperado**:
+```
+ id | recipient_email      | recipient_name | template_used            | status | sent_at
+----+---------------------+----------------+--------------------------+--------+-------------------------
+  1 | bruno.amv@gmail.com | Teste SMTP     | confirmacao_agendamento  | sent   | 2026-04-08 15:30:00
+```
+
+---
+
+## Troubleshooting
+
+### Erro: "Couldn't connect with these settings"
+
+**Erro completo**:
+```
+50B223A123730000:error:0A00010B:SSL routines:tls_validate_record_header:wrong version number
+```
+
+**Causa**: Configuração incorreta de Port + SSL/TLS
+
+**✅ SOLUÇÃO RECOMENDADA** (testada com sucesso):
+1. Editar credencial SMTP no n8n
+2. **Port**: 465
+3. **SSL/TLS**: habilitado ✅ (marcar checkbox)
+4. **Secure**: true
+5. Save e testar novamente
+
+**Solução Alternativa** (se Port 465 não funcionar):
+1. **Port**: 587
+2. **SSL/TLS**: desabilitado (desmarcar checkbox)
+3. **Secure**: false (STARTTLS)
+
+**Explicação técnica**:
+- **Port 465**: SSL/TLS direto (criptografia desde o início) ✅ **RECOMENDADO**
+- **Port 587**: STARTTLS (upgrade de conexão não criptografada para TLS)
+- Misturar Port 587 + SSL/TLS habilitado causa erro de handshake
+- Port 465 tem melhor compatibilidade e é a configuração oficial do Gmail
+
+---
+
+### Erro: "Authentication failed"
+
+**Causa 1**: App Password incorreto ou com espaços
+
+**Solução**:
+```bash
+# App Password deve ser SEM ESPAÇOS
+✅ abcdefghijklmnop
+❌ abcd efgh ijkl mnop
+
+# Gerar novo App Password:
+# https://myaccount.google.com/apppasswords
+```
+
+**Causa 2**: 2-Step Verification não habilitada
+
+**Solução**:
+1. https://myaccount.google.com/security
+2. Enable 2-Step Verification
+3. **Aguardar 10 minutos**
+4. Criar App Password
+
+---
+
+### Erro: "SMTP timeout" ou "Connection refused"
+
+**Causa**: Porta 587 bloqueada ou firewall
+
+**Solução**:
+```bash
+# Testar conectividade
+telnet smtp.gmail.com 587
+# Deve conectar: "Trying 142.251.XXX.XXX..."
+
+# Se não conectar, verificar firewall
+sudo ufw status
+sudo ufw allow 587/tcp
+
+# Reiniciar Docker network
+docker-compose -f docker/docker-compose-dev.yml restart
+```
+
+---
+
+### Erro: "Recipient address rejected" ou Email inválido
+
+**Causa**: Email de destino inválido ou não existe
+
+**Solução**: Verificar formato do email
 ```javascript
-// No workflow 05_appointment_scheduler.json
-// Após criar evento com sucesso:
-[HTTP Request to /webhook/send-email]
-  template: "appointment_confirmation"
-  to: {{lead_email}}
-```
+// Regex validação
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-### 6.2. Lembrete 24h Antes
+// Exemplos válidos:
+✅ bruno.amv@gmail.com
+✅ contato@e2solucoes.com.br
 
-Workflow `06_appointment_reminders.json`:
-
-```yaml
-Trigger: Cron (a cada 1 hora)
-Query:
-  SELECT * FROM appointments
-  WHERE status = 'confirmed'
-    AND reminder_24h_sent = false
-    AND visit_datetime BETWEEN NOW() + INTERVAL '23 hours'
-                           AND NOW() + INTERVAL '25 hours'
-
-Action:
-  - Enviar email (template: appointment_reminder_24h)
-  - UPDATE reminder_24h_sent = true
-```
-
-### 6.3. Lembrete 2h Antes
-
-```yaml
-Trigger: Cron (a cada 30 minutos)
-Query:
-  SELECT * FROM appointments
-  WHERE status = 'confirmed'
-    AND reminder_2h_sent = false
-    AND visit_datetime BETWEEN NOW() + INTERVAL '1 hour 45 minutes'
-                           AND NOW() + INTERVAL '2 hours 15 minutes'
-
-Action:
-  - Enviar email (template: appointment_reminder_2h)
-  - Enviar WhatsApp
-  - UPDATE reminder_2h_sent = true
-```
-
-### 6.4. Notificação para Comercial
-
-Trigger: Lead qualificado e pronto para contato humano
-
-```javascript
-// No workflow 02_ai_agent_conversation.json
-// Quando conversation_state = 'completed':
-[HTTP Request to /webhook/send-email]
-  template: "lead_notification_comercial"
-  to: comercial@e2solucoes.com.br
-  cc: gerente@e2solucoes.com.br
+// Exemplos inválidos:
+❌ bruno.amv@gmail (sem domínio)
+❌ @gmail.com (sem usuário)
+❌ bruno amv@gmail.com (espaços)
 ```
 
 ---
 
-## Etapa 7: Logs e Auditoria
+### Email vai para Spam
 
-### 7.1. Criar Tabela de Logs
+**Causa**: SPF/DKIM não configurado (apenas se usar domínio próprio)
 
-```sql
-CREATE TABLE email_logs (
-  id SERIAL PRIMARY KEY,
-  recipient VARCHAR(255) NOT NULL,
-  subject VARCHAR(500),
-  template_used VARCHAR(100),
-  message_id VARCHAR(255),
-  status VARCHAR(50),  -- sent, failed, bounced
-  error_message TEXT,
-  sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+**Solução Gmail**: Usar App Password de conta Gmail verificada
 
-  -- Relacionamento
-  lead_id INTEGER REFERENCES leads(id),
-  appointment_id INTEGER REFERENCES appointments(id),
+**Solução SMTP dedicado**: Configurar SPF/DKIM no DNS
 
-  -- Metadata
-  smtp_server VARCHAR(255),
-  retry_count INTEGER DEFAULT 0
-);
-
--- Índices
-CREATE INDEX idx_email_logs_recipient ON email_logs(recipient);
-CREATE INDEX idx_email_logs_sent_at ON email_logs(sent_at);
-CREATE INDEX idx_email_logs_status ON email_logs(status);
-```
-
-### 7.2. Registrar Envios
-
-No workflow `07_send_email.json`, após enviar:
-
-```sql
-INSERT INTO email_logs (
-  recipient,
-  subject,
-  template_used,
-  message_id,
-  status,
-  lead_id,
-  appointment_id
-) VALUES (
-  '{{to}}',
-  '{{subject}}',
-  '{{template}}',
-  '{{response.messageId}}',
-  'sent',
-  {{lead_id}},
-  {{appointment_id}}
-);
-```
-
-### 7.3. Monitorar Falhas
-
-```sql
--- Ver falhas de envio (últimas 24h)
-SELECT
-  recipient,
-  subject,
-  error_message,
-  retry_count,
-  sent_at
-FROM email_logs
-WHERE status = 'failed'
-  AND sent_at >= NOW() - INTERVAL '24 hours'
-ORDER BY sent_at DESC;
-
--- Estatísticas de envio
-SELECT
-  DATE(sent_at) as dia,
-  COUNT(*) as total,
-  SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as enviados,
-  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as falhas,
-  ROUND(100.0 * SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) / COUNT(*), 2) as taxa_sucesso
-FROM email_logs
-WHERE sent_at >= NOW() - INTERVAL '30 days'
-GROUP BY DATE(sent_at)
-ORDER BY dia DESC;
-```
-
----
-
-## Etapa 8: Deliverability (Anti-Spam)
-
-### 8.1. Configurar SPF
-
+**SPF Record** (exemplo):
 ```
 # DNS TXT Record
 v=spf1 include:_spf.google.com ~all
@@ -601,130 +412,143 @@ v=spf1 include:_spf.google.com ~all
 v=spf1 include:sendgrid.net ~all
 ```
 
-### 8.2. Configurar DKIM
-
-Gmail: Configurado automaticamente
-
-SendGrid: Settings → Sender Authentication → Domain Authentication
-
-### 8.3. Configurar DMARC
-
-```
-# DNS TXT Record (_dmarc.e2solucoes.com.br)
-v=DMARC1; p=none; rua=mailto:dmarc-reports@e2solucoes.com.br; pct=100; adkim=r; aspf=r
-```
-
-### 8.4. Boas Práticas Anti-Spam
-
-1. **From Name consistente**
-   - Sempre "E2 Soluções"
-   - Nunca "noreply" ou genérico
-
-2. **Subject claro**
-   - "Confirmação de Visita - E2 Soluções"
-   - Evitar: "RE:", "FWD:", caps lock, muitos !!!
-
-3. **Conteúdo**
-   - Mais texto que imagens
-   - Links funcionais
-   - Botão de unsubscribe (para marketing)
-
-4. **Rate Limiting**
-   - Máx 100 emails/hora (Gmail free)
-   - Máx 500 emails/dia (Gmail free)
-   - Usar fila se necessário
+**Teste deliverability**:
+1. https://www.mail-tester.com/
+2. Enviar email de teste para endereço fornecido
+3. Ver score (objetivo: 8/10 ou melhor)
 
 ---
 
-## Etapa 9: Troubleshooting
+## Variáveis de Ambiente (Referência)
 
-### Problema: "Authentication failed"
+**Arquivo**: `docker/.env`
 
-**Causa:** App Password incorreto ou expirado
-
-**Solução:**
 ```bash
-# Verificar variáveis
-echo "User: $EMAIL_USER"
-echo "Password: ${EMAIL_PASSWORD:0:4}****"  # Primeiros 4 chars
+# ============================================================================
+# SMTP / Email Configuration
+# ============================================================================
 
-# Gerar novo App Password:
-# https://myaccount.google.com/apppasswords
+# Opção A: Gmail App Password
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true  # SSL/TLS direto ✅ RECOMENDADO
+SMTP_USER=bruno.amv@gmail.com
+SMTP_PASSWORD=abcdefghijklmnop  # App Password SEM ESPAÇOS
+EMAIL_FROM=E2 Soluções <bruno.amv@gmail.com>
 
-# Atualizar .env e reiniciar n8n
-docker-compose restart n8n
+# Opção B: SendGrid
+# SMTP_HOST=smtp.sendgrid.net
+# SMTP_PORT=587
+# SMTP_SECURE=false
+# SMTP_USER=apikey
+# SMTP_PASSWORD=SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# EMAIL_FROM=E2 Soluções <bot@e2solucoes.com.br>
+
+# Opção C: Mailgun
+# SMTP_HOST=smtp.mailgun.org
+# SMTP_PORT=587
+# SMTP_SECURE=false
+# SMTP_USER=postmaster@seu-dominio.com
+# SMTP_PASSWORD=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# EMAIL_FROM=E2 Soluções <bot@seu-dominio.com>
 ```
 
-### Problema: "SMTP timeout"
-
-**Causa:** Porta bloqueada ou host incorreto
-
-**Solução:**
+**Carregar variáveis**:
 ```bash
-# Testar conectividade
-telnet smtp.gmail.com 587
-# Deve conectar
-
-# Verificar firewall
-sudo ufw status
-sudo ufw allow 587/tcp
+docker-compose -f docker/docker-compose-dev.yml restart e2bot-n8n-dev
 ```
 
-### Problema: Emails vão para spam
+---
 
-**Causa:** SPF/DKIM não configurado
+## Templates de Email
 
-**Solução:**
-1. Configurar SPF (Step 8.1)
-2. Configurar DKIM (Step 8.2)
-3. Testar: https://www.mail-tester.com/
-4. Objetivo: Score 8/10 ou melhor
+**Localização**: `templates/emails/` (servidos via nginx)
 
-### Problema: "Recipient address rejected"
+**Templates disponíveis**:
+- `confirmacao_agendamento.html` - Confirmação de visita técnica
+- `lembrete_24h.html` - Lembrete 24h antes
+- `lembrete_2h.html` - Lembrete 2h antes
+- `novo_lead.html` - Notificação equipe comercial
+- `apos_visita.html` - Follow-up pós-visita
 
-**Causa:** Email inválido ou não existe
+**Variáveis suportadas**: `{{lead_name}}`, `{{formatted_date}}`, `{{formatted_time}}`, `{{address}}`, `{{service_type}}`, etc.
 
-**Solução:**
+**Acesso via HTTP**:
+```bash
+# Verificar template renderizado
+curl http://localhost:8081/confirmacao_agendamento.html
+```
+
+---
+
+## Checklist de Configuração
+
+Antes de considerar setup completo:
+
+- [ ] 2-Step Verification habilitada na conta Gmail
+- [ ] App Password gerado (16 caracteres)
+- [ ] `docker/.env` atualizado com SMTP_* variables
+- [ ] n8n reiniciado para carregar variáveis
+- [ ] Credencial SMTP criada no n8n:
+  - [ ] Port 465 + Secure: true ✅
+  - [ ] Password SEM ESPAÇOS
+- [ ] WF07 importado e ativo
+- [ ] Credencial SMTP vinculada ao node "Send Email"
+- [ ] Teste manual executado com sucesso
+- [ ] Email recebido (não na spam)
+- [ ] Log criado em `email_logs` table com status "sent"
+- [ ] Template renderizado corretamente (variáveis substituídas)
+
+**Tudo OK?** 🎉 **SMTP configurado com sucesso!**
+
+---
+
+## Boas Práticas
+
+### Rate Limiting
+
+**Gmail Free Account**:
+- Máximo: 500 emails/dia
+- Recomendado: 100 emails/hora
+
+**Implementação** (futuro):
 ```javascript
-// Validar email antes de enviar
-function validateEmail(email) {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return regex.test(email);
-}
+// Queue de emails com delay
+const emailQueue = [];
+const DELAY_MS = 1000; // 1 email/segundo
 
-// No workflow, adicionar validação
-if (!validateEmail(to_email)) {
-  throw new Error('Email inválido: ' + to_email);
+async function processEmailQueue() {
+  while (emailQueue.length > 0) {
+    const email = emailQueue.shift();
+    await sendEmail(email);
+    await sleep(DELAY_MS);
+  }
 }
 ```
 
----
+### Monitoramento
 
-## Etapa 10: Monitoramento
-
-### 10.1. Dashboard de Emails
-
+**Dashboard SQL**:
 ```sql
--- Resumo diário
+-- Resumo diário de envios
 SELECT
   DATE(sent_at) as dia,
-  template_used,
   COUNT(*) as total,
-  SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as ok,
-  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as falha
+  SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as enviados,
+  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as falhas,
+  ROUND(100.0 * SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) / COUNT(*), 2) as taxa_sucesso
 FROM email_logs
 WHERE sent_at >= NOW() - INTERVAL '7 days'
-GROUP BY DATE(sent_at), template_used
-ORDER BY dia DESC, template_used;
+GROUP BY DATE(sent_at)
+ORDER BY dia DESC;
 ```
 
-### 10.2. Alertas de Falha
-
+**Alerta de falhas**:
 ```bash
 #!/bin/bash
 # scripts/check-email-failures.sh
 
-FAILURES=$(psql $DATABASE_URL -t -c "
+FAILURES=$(docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -t -c "
   SELECT COUNT(*)
   FROM email_logs
   WHERE status = 'failed'
@@ -733,73 +557,26 @@ FAILURES=$(psql $DATABASE_URL -t -c "
 
 if [ "$FAILURES" -gt 5 ]; then
   echo "⚠️ ALERTA: $FAILURES emails falharam na última hora!"
-  # Enviar alerta (Discord, SMS, etc)
 fi
 ```
 
-### 10.3. Taxa de Abertura (Opcional)
+---
 
-Para tracking de abertura, adicionar pixel transparente:
+## Documentação Relacionada
 
-```html
-<!-- No final do template -->
-<img src="https://seu-dominio.com/track/open/{{email_log_id}}.png"
-     width="1" height="1" style="display:none" />
-```
+**Setup**:
+- `QUICKSTART.md` - Guia completo de setup (seção 2.3)
+- `SETUP_CREDENTIALS.md` - Todas as credenciais n8n (seção 3)
 
-Criar endpoint que registra:
+**Workflows**:
+- `BUGFIX_WF07_V13_INSERT_SELECT_FIX.md` - WF07 V13 email workflow (INSERT...SELECT pattern)
 
-```javascript
-// Endpoint: GET /track/open/:id.png
-app.get('/track/open/:id.png', async (req, res) => {
-  await db.query(
-    'UPDATE email_logs SET opened_at = NOW() WHERE id = $1',
-    [req.params.id]
-  );
-
-  // Retornar pixel transparente 1x1
-  const pixel = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
-    'base64'
-  );
-
-  res.set('Content-Type', 'image/png');
-  res.send(pixel);
-});
-```
+**Arquitetura**:
+- `ARCHITECTURE.md` - Visão geral do sistema
+- `CLAUDE.md` - Contexto completo do projeto
 
 ---
 
-## Recursos Adicionais
-
-- **Gmail SMTP Docs**: https://support.google.com/mail/answer/7126229
-- **SendGrid Docs**: https://docs.sendgrid.com/
-- **n8n Email Node**: https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.emailsend/
-- **Email Testing**: https://www.mail-tester.com/
-- **SPF Checker**: https://www.kitterman.com/spf/validate.html
-- **Template Testing**: https://www.emailonacid.com/ (pago)
-
----
-
-## Checklist de Configuração
-
-- [ ] Conta de email criada (Gmail ou SMTP customizado)
-- [ ] App Password gerado (se Gmail)
-- [ ] SPF/DKIM configurados (se domínio próprio)
-- [ ] .env.dev atualizado com credenciais SMTP
-- [ ] Teste de conexão SMTP realizado (swaks)
-- [ ] Credencial SMTP configurada no n8n
-- [ ] Workflow 07_send_email.json importado e ativado
-- [ ] Templates HTML validados
-- [ ] Teste de envio realizado com sucesso
-- [ ] Email recebido (não na spam)
-- [ ] Tabela email_logs criada
-- [ ] Logs de envio funcionando
-- [ ] Notificações de confirmação ativas
-- [ ] Lembretes 24h e 2h configurados
-- [ ] Notificações para comercial funcionando
-- [ ] Monitoramento de falhas ativo
-
----
-
-**Configuração completa!** O sistema de emails está pronto para enviar notificações automáticas com templates profissionais.
+**Última Atualização**: 2026-04-08
+**Versão**: 3.0 (Consolidação DEFINITIVA)
+**Mantido por**: E2 Soluções Dev Team

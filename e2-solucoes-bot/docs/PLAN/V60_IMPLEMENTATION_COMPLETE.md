@@ -456,7 +456,7 @@ WHERE created_at > NOW() - INTERVAL '24 hours';
 
 ### Files Pending Update
 5. ⏳ `CLAUDE.md` - After successful deployment
-6. ⏳ `docs/QUICKSTART.md` - Add V60 testing paths
+6. ⏳ `docs/Setups/QUICKSTART.md` - Add V60 testing paths
 
 ---
 

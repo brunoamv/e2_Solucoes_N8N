@@ -51,7 +51,7 @@ curl -I http://localhost:5678
 **❌ Se n8n NÃO está rodando**:
 ```bash
 # Volte para o QUICKSTART principal
-cat docs/QUICKSTART.md
+cat docs/Setups/QUICKSTART.md
 
 # Ou inicie todo o ambiente de desenvolvimento
 cd docker

@@ -1,183 +1,136 @@
 # E2 Bot - Context
 
-> **Prod**: WF01 V2.8.3 | WF02 V74.1.2 | WF05 V3.6 | **Ready**: WF02 V75 | WF05 V7 | **WF07 V13** ✅ | Updated: 2026-04-01
+> **Prod**: WF01 V2.8.3 | WF02 V74.1.2 | WF05 V3.6
+> **Ready**: WF02 V76 ✅ | WF05 V7 | WF06 | WF07 V13
+> **Updated**: 2026-04-08
 
-## 🎯 Stack
+## Stack
 
-WhatsApp AI Bot | n8n 2.14.2 + Claude 3.5 + PostgreSQL + Evolution API v2.3.7 | PT-BR
+n8n 2.14.2 + Claude 3.5 + PostgreSQL + Evolution API v2.3.7 | PT-BR
 **Flow**: WhatsApp → WF01 (dedup) → WF02 (AI) → WF05 (calendar) → WF07 (email)
 
 ---
 
-## 📦 Workflows
+## Workflows
 
-### WF01: Handler V2.8.3 ✅ PROD
-Duplicate detection via PostgreSQL ON CONFLICT → Routes to WF02
+| WF | Prod | Ready | Function |
+|----|------|-------|----------|
+| **01** | V2.8.3 ✅ | - | Dedup via PostgreSQL ON CONFLICT |
+| **02** | V74.1.2 (10 states) | V76 (12 states, proactive UX) | AI conversation: greeting→service→name→phone→email→city→confirm→date/time |
+| **05** | V3.6 (no validation) | V7 (hardcoded hours) | Google Calendar + DB + WF07 trigger |
+| **06** | - | V1 ✅ | Calendar availability microservice for WF02 V76 |
+| **07** | - | V13 ✅ | nginx → HTTP → SMTP → DB (INSERT...SELECT pattern) |
 
-### WF02: AI Agent (8-state conversation)
-- **Prod**: V74.1.2 | **Ready**: V75 (personalized appointment confirmation)
-- **States**: greeting → service → name → phone → email → city → confirm → trigger
-- **Services**: 1-Solar 2-Subestação 3-Projetos 4-BESS 5-Análise
-- **Flow**: Services 1/3 + confirm → WF05 | Others → Handoff
-
-### WF05: Appointment Scheduler
-- **Prod**: V3.6 (no validation) | **Ready**: V7 ✅ (hardcoded business hours)
-- **Function**: Google Calendar + DB + WF07 trigger
-- **V7 Solution**: Hardcoded constants (08:00-18:00, Mon-Fri) - zero `$env` dependency
-
-### WF07: Send Email
-- **Prod**: None | **Ready**: V13 ✅ **INSERT...SELECT Pattern (DEFINITIVE)**
-- **Architecture**: nginx (templates) → HTTP Request → Render → SMTP → DB log
-- **V13 Fix**: INSERT...SELECT pattern (n8n expressions in query string)
-- **Why**: queryReplacement returns [undefined] - use direct `{{ $json.* }}` injection
-
-**V13 Query Pattern**:
-```sql
-INSERT INTO email_logs (...)
-SELECT '{{ $json.to }}' as recipient_email, ...
-RETURNING id, recipient_email, sent_at;
-```
+**Services**: 1-Solar | 2-Subestação | 3-Projetos | 4-BESS | 5-Análise
+**WF02 Flow**: Services 1/3 + confirm → WF06 → WF05 | Others → Handoff
 
 ---
 
-## 📁 Files
+## Files
 
-### Workflows (n8n/workflows/)
+**Workflows** (`n8n/workflows/`):
 ```
-WF01: 01_main_whatsapp_handler_V2.8.3_NO_LOOP.json
-WF02: 02_ai_agent_conversation_V74.1_2_FUNCIONANDO.json (prod)
-      02_ai_agent_conversation_V75_APPOINTMENT_FINAL_MESSAGE.json (ready)
-WF05: 05_appointment_scheduler_v3.6.json (prod)
-      05_appointment_scheduler_v7_hardcoded_values.json (ready ✅)
-WF07: 07_send_email_v13_insert_select.json (ready ✅ DEFINITIVE)
+Active (7):
+  01_main_whatsapp_handler_V2.8.3_NO_LOOP.json
+  02_ai_agent_conversation_V74.1_2_FUNCIONANDO.json | V76_PROACTIVE_UX.json
+  05_appointment_scheduler_v3.6.json | v7_hardcoded_values.json
+  06_calendar_availability_service_v1.json
+  07_send_email_v13_insert_select.json
+
+Old (57): n8n/workflows/old/ - WF02-07 historical versions
 ```
 
-### Database Schema
-```sql
-conversations: phone, lead_name, service, state, next_stage, collected_data
-appointments: lead_name/email, service, scheduled_date, google_calendar_event_id
-appointment_reminders: appointment_id, type, time, status
-email_logs: recipient_email/name, subject, template_used, status, sent_at, metadata
-```
+**DB Schema**:
+- `conversations`: phone, lead_name, service, state, next_stage, collected_data
+- `appointments`: lead_name/email, service, scheduled_date, google_calendar_event_id
+- `email_logs`: recipient_email/name, subject, template_used, status, sent_at
 
 ---
 
-## 🚀 Deploy
+## Deploy
 
-### WF07 V13 (Ready for Production)
+### WF02 V76
 ```bash
-# Import
-http://localhost:5678 → Import → 07_send_email_v13_insert_select.json
+bash scripts/deploy-wf02-v76.sh  # Auto deploy
+bash scripts/test-wf02-v76-e2e.sh  # E2E test
+# Canary: 20% → 50% → 80% → 100%
+# Docs: docs/implementation/WF02_V76_DEPLOYMENT_SUMMARY.md
+```
 
-# Test with execution 18936 data
-{
-  "lead_email": "clima.cocal.2025@gmail.com",
-  "lead_name": "bruno rosa",
-  "service_type": "energia_solar",
-  "city": "cocal-go",
-  "calendar_success": true
-}
-
-# Expected:
-# ✅ Email sent successfully
-# ✅ Database log: RETURNING { id: 1, recipient_email: "...", sent_at: "..." }
-# ✅ Template variables replaced: {{address}} = "Cocal, GO"
-# ✅ No [undefined] errors
-
-# Verify
-docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
-  -c "SELECT id, recipient_email, template_used, sent_at FROM email_logs ORDER BY sent_at DESC LIMIT 1;"
-
-# Deploy: Deactivate old versions → Activate V13 → Monitor logs
+### WF07 V13
+```bash
+# Import: 07_send_email_v13_insert_select.json
+# Test: { lead_email, lead_name, service_type, city, calendar_success }
+# Expected: Email sent + DB log RETURNING
+# Docs: docs/fix/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md
 ```
 
 ---
 
-## 🔧 Commands
+## Commands
 
-**DB Check**:
 ```bash
+# DB
 docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
   -c "SELECT phone_number, lead_name, service_type, current_state FROM conversations ORDER BY updated_at DESC LIMIT 5;"
-```
 
-**Evolution API**:
-```bash
+# Evolution API
 curl -s http://localhost:8080/instance/fetchInstances \
   -H "apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891" | jq
-```
 
-**Logs**:
-```bash
+# Logs
 docker logs -f e2bot-n8n-dev | grep -E "ERROR|V13|INSERT"
 ```
 
 ---
 
-## 📊 Evolution History
+## Critical Learnings
 
-### WF07 Critical Path (V2 → V13)
-| Ver | Issue | Error | Fix |
-|-----|-------|-------|-----|
-| V2-V5 | Template access | fs/path blocked | → V9 |
-| V9 | HTTP char array | Format detection | → V9.3 |
-| V9.3 | Safe property ✅ | None | → V10 |
-| V10 | Credential + service_name | Manual + mapping | → V11 |
-| V11 | {{address}} + DB params | Format + queryReplacement | → V12 |
-| V12 | queryReplacement [undefined] | n8n doesn't resolve ={{ }} | → V13 |
-| **V13** | **✅ DEFINITIVE** | **None** | **INSERT...SELECT** |
+### n8n Limitations
+1. **queryReplacement**: Does NOT resolve `={{ }}` → Use INSERT...SELECT
+2. **$env access**: Blocked (Code + Set) → Use hardcoded values
+3. **Filesystem**: Read/Write blocked → Use HTTP Request + nginx
 
-**Root Cause V12→V13**: n8n `queryReplacement` parameter treats `={{ }}` as literal string, not expression context. Solution: Direct injection in `query` field with INSERT...SELECT pattern.
+### Evolution Path
+- **WF07**: V2-V5 (fs blocked) → V9 (HTTP) → V13 (INSERT...SELECT) ✅
+- **WF05**: V3-V6 ($env blocked) → V7 (hardcoded) ✅
+- **WF02**: V68-V75 (reactive) → V76 (proactive UX) ✅
 
-### WF05 Critical Path (V3 → V7)
-| Ver | Issue | Error | Fix |
-|-----|-------|-------|-----|
-| V3.6 | No validation ✅ | None | PROD |
-| V4-V6 | `$env` access | n8n security blocks ALL env var access | → V7 |
-| **V7** | **✅ DEFINITIVE** | **None** | **Hardcoded constants** |
-
-**Root Cause V4-V6**: n8n blocks `$env` in Code nodes AND Set expressions. Solution: Hardcode business hours in workflow generation.
+### Key Insights
+1. **Proactive UX** > Reactive validation (100% error elimination)
+2. **Microservices** (WF06) enable independent testing/scaling
+3. **INSERT...SELECT** superior to VALUES for n8n PostgreSQL
+4. **Graceful degradation** required for external service integration
 
 ---
 
-## 📚 Documentation
+## Documentation
 
-**Main Docs**:
-- `README.md` - Project overview and quick start
-- `docs/ARCHITECTURE.md` - System architecture and data flow
-- `docs/DEPLOYMENT.md` - Production deployment guide
+**Quick Access**:
+- Setup: `docs/Setups/QUICKSTART.md` (30-45 min)
+- Email: `docs/Setups/SETUP_EMAIL.md` (Port 465 SSL/TLS)
+- Credentials: `docs/Setups/SETUP_CREDENTIALS.md`
+- Index: `docs/INDEX.md` | README: `docs/README.md`
 
-**WF07 Evolution**:
-- `docs/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md` - 🎯 DEFINITIVE (INSERT...SELECT pattern)
-- `docs/PLAN_NGINX_WF07_IMPLEMENTATION.md` - nginx + HTTP Request architecture
-- `docs/SOLUTION_FINAL_HTTP_REQUEST.md` - HTTP Request definitive solution
+**Implementation**:
+- WF02 V76: `docs/implementation/WF02_V76_*.md` (5 docs)
+- WF06: `docs/implementation/WF06_CALENDAR_AVAILABILITY_SERVICE.md`
+- WF07 V13: `docs/fix/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md`
+- WF05 V7: `docs/deployment/DEPLOY_WF05_V7_HARDCODED_FINAL.md`
 
-**WF05 Evolution**:
-- `docs/DEPLOY_WF05_V7_HARDCODED_FINAL.md` - Hardcoded business hours solution
-
-**Setup**:
-- `docs/Setups/SETUP_EMAIL_WF05_INTEGRATION.md` - Email integration guide
-
----
-
-## 🎯 Status Summary
-
-### Production (Stable)
-- ✅ WF01 V2.8.3 - Deduplication working
-- ✅ WF02 V74.1.2 - AI conversation stable
-- ✅ WF05 V3.6 - Calendar integration working (no validation)
-
-### Ready for Production
-- 🚀 WF02 V75 - Personalized appointment confirmation
-- 🚀 WF05 V7 - Business hours validation (hardcoded values)
-- 🚀 **WF07 V13** - Email workflow **DEFINITIVE** ✅
-
-### Key Learnings
-1. **n8n queryReplacement**: Does NOT resolve `={{ }}` expressions - use INSERT...SELECT
-2. **n8n $env access**: Blocked everywhere (Code + Set) - use hardcoded values
-3. **n8n filesystem**: Read/Write blocked outside ~/.n8n-files - use HTTP Request + nginx
-4. **PostgreSQL patterns**: INSERT...SELECT superior to VALUES for n8n workflows
+**Structure** (2026-04-08 reorganization):
+```
+docs/
+├── INDEX.md, README.md
+├── Setups/ (config guides)
+├── Guides/ (user docs)
+├── implementation/ (WF02, WF05, WF06, WF07)
+├── analysis/ (technical analyses)
+├── fix/ (bugfixes)
+├── deployment/ (deploys)
+└── PLAN/ (planning)
+```
 
 ---
 
-**Project**: E2 Soluções WhatsApp Bot | **Stack**: n8n 2.14.2 | **Maintained**: Claude Code
+**Project**: E2 Soluções WhatsApp Bot | n8n 2.14.2 | Maintained: Claude Code

@@ -92,7 +92,7 @@ SPRINT_1.2_COMPLETE.md    ❌
 ```
 docs/status/IMPLEMENTATION_STATUS.md      ✅
 docs/validation/VALIDATION_REPORT.md      ✅
-docs/QUICKSTART.md                        ✅
+docs/Setups/QUICKSTART.md                        ✅
 docs/sprints/SPRINT_1.2_COMPLETE.md       ✅
 ```
 

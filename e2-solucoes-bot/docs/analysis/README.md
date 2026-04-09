@@ -14,7 +14,7 @@ Bem-vindo à documentação completa do E2 Soluções WhatsApp Bot. Este índice
 |-----------|-----------|-------|
 | [README.md](../README.md) | ⭐ Overview completo do projeto | 15 min |
 | [CLAUDE.md](../CLAUDE.md) | ⭐ Contexto otimizado para Claude Code | 10 min |
-| [QUICKSTART.md](./QUICKSTART.md) | Guia rápido de início | 5 min |
+| [QUICKSTART.md](./docs/Setups/QUICKSTART.md) | Guia rápido de início | 5 min |
 
 ### Primeiros Passos
 
@@ -117,7 +117,7 @@ Arquitetura visual está no README principal.
 
 #### 🎯 Para Desenvolvedores
 1. **Setup Inicial**:
-   - [QUICKSTART.md](./QUICKSTART.md)
+   - [QUICKSTART.md](./docs/Setups/QUICKSTART.md)
    - [Setups/SETUP_CREDENTIALS.md](./Setups/SETUP_CREDENTIALS.md)
    - [../docker/README.md](../docker/README.md)
 
@@ -137,7 +137,7 @@ Arquitetura visual está no README principal.
 3. [status/IMPLEMENTATION_STATUS.md](./status/IMPLEMENTATION_STATUS.md) - Detalhes de implementação
 
 #### 🔧 Para Operações
-1. [QUICKSTART.md](./QUICKSTART.md) - Início rápido
+1. [QUICKSTART.md](./docs/Setups/QUICKSTART.md) - Início rápido
 2. [validation/README.md](./validation/README.md) - Procedimentos de teste
 3. [../scripts/](../scripts/) - Scripts de automação
 
@@ -158,7 +158,7 @@ Arquitetura visual está no README principal.
 
 #### 🐳 Infraestrutura Docker
 - [../docker/README.md](../docker/README.md)
-- [QUICKSTART.md](./QUICKSTART.md)
+- [QUICKSTART.md](./docs/Setups/QUICKSTART.md)
 
 #### 💾 Banco de Dados
 - [Setups/DEPLOY_SQL.md](./Setups/DEPLOY_SQL.md)
@@ -229,7 +229,7 @@ docs/
 ### Precisa de...
 
 **Configurar o projeto pela primeira vez?**
-→ [QUICKSTART.md](./QUICKSTART.md) → [validation/README.md](./validation/README.md)
+→ [QUICKSTART.md](./docs/Setups/QUICKSTART.md) → [validation/README.md](./validation/README.md)
 
 **Entender o que foi implementado?**
 → [PROJECT_STATUS.md](./PROJECT_STATUS.md) → [SPRINT_1.1_COMPLETE.md](./SPRINT_1.1_COMPLETE.md)

@@ -437,7 +437,7 @@ case 'confirmacao':
 **V59 PLAN**: `docs/PLAN/V59_UX_TEMPLATES_UPGRADE.md`
 **V58.1 Base**: `n8n/workflows/02_ai_agent_conversation_V58_1_UX_REFACTOR_COMPLETE.json`
 **Database Schema**: V58.1 (verified complete)
-**Testing Guide**: `docs/QUICKSTART.md`
+**Testing Guide**: `docs/Setups/QUICKSTART.md`
 
 **Generator Script** (to be created):
 - `scripts/generate-workflow-v59-ux-templates.py`

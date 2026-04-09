@@ -223,7 +223,7 @@ docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c \
 ```
 
 ### Phase 3: Testing & Validation
-Execute 3 test paths from `docs/QUICKSTART.md`:
+Execute 3 test paths from `docs/Setups/QUICKSTART.md`:
 1. WhatsApp confirmation flow
 2. Alternative phone flow
 3. Error recovery flow
@@ -327,7 +327,7 @@ Execute 3 test paths from `docs/QUICKSTART.md`:
 **Documentation**:
 - Migration guide: `docs/PLAN/V58_1_DATABASE_MIGRATION.md`
 - Implementation report: `docs/PLAN/V58_1_IMPLEMENTATION_REPORT.md`
-- Quick start: `docs/QUICKSTART.md`
+- Quick start: `docs/Setups/QUICKSTART.md`
 
 **Scripts**:
 - Migration: `scripts/run-migration-v58_1-complete.sh`

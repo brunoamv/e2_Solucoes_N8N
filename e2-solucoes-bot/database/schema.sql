@@ -281,6 +281,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- ===== EMAIL LOGS (WF07 - Send Email) =====
+CREATE TABLE email_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recipient_email VARCHAR(255) NOT NULL,
+    recipient_name VARCHAR(255),
+    subject VARCHAR(500),
+    template_used VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'pending',
+    sent_at TIMESTAMP WITH TIME ZONE,
+    metadata JSONB DEFAULT '{}',
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    CONSTRAINT valid_email_status CHECK (status IN ('pending', 'sent', 'failed', 'bounce'))
+);
+
+CREATE INDEX idx_email_logs_recipient ON email_logs(recipient_email);
+CREATE INDEX idx_email_logs_status ON email_logs(status);
+CREATE INDEX idx_email_logs_template ON email_logs(template_used);
+CREATE INDEX idx_email_logs_sent_at ON email_logs(sent_at DESC);
+
 -- Comments
 COMMENT ON TABLE conversations IS 'Armazena conversas do WhatsApp com estado e dados coletados';
 COMMENT ON TABLE messages IS 'Histórico completo de mensagens trocadas';
@@ -288,3 +309,4 @@ COMMENT ON TABLE leads IS 'Leads qualificados prontos para atendimento comercial
 COMMENT ON TABLE appointments IS 'Agendamentos de visitas técnicas';
 COMMENT ON TABLE rdstation_sync_log IS 'Log de sincronização com RD Station CRM';
 COMMENT ON TABLE chat_memory IS 'Memória de conversação para n8n AI Agent';
+COMMENT ON TABLE email_logs IS 'Log de envios de email via WF07';

@@ -1,396 +1,737 @@
-# Setup de Credenciais - Sprint 1.1 Validation
+# E2 Bot - Configuração de Credenciais
 
-**Objetivo**: Configurar todas as credenciais necessárias para validar o Sprint 1.1
-
-**Tempo Estimado**: 30-45 minutos
-
----
-
-## 📋 Credenciais Necessárias para Sprint 1.1
-
-Para validar o sistema RAG, você precisa de **3 credenciais obrigatórias**:
-
-1. ✅ **OpenAI API Key** - Para gerar embeddings
-2. ✅ **Supabase URL** - PostgreSQL com pgvector
-3. ✅ **Supabase Service Key** - Acesso admin ao banco
-
-As demais credenciais serão necessárias nos próximos sprints.
+> **Versão**: 2.0 | **Última Atualização**: 2026-04-08
+> **Objetivo**: Configurar todas as credenciais necessárias para execução dos workflows n8n
 
 ---
 
-## 🔑 Passo a Passo: Obter Credenciais
+## 📋 Índice
 
-### 1. OpenAI API Key (OBRIGATÓRIO)
-
-**Tempo**: 5 minutos
-
-**Passos**:
-1. Acesse: https://platform.openai.com/signup
-2. Faça login ou crie uma conta
-3. Acesse: https://platform.openai.com/api-keys
-4. Clique em "Create new secret key"
-5. Dê um nome: "E2 Bot RAG Embeddings"
-6. Copie a key (começa com `sk-proj-...`)
-
-**Formato**:
-```
-OPENAI_API_KEY=sk-proj-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-```
-
-**Custo Estimado**:
-- Ingest inicial: ~$0.10 (1.380 linhas → 50K tokens)
-- Query: ~$0.00001 por pergunta
-- Mensal (1000 queries): ~$0.01
-
-**IMPORTANTE**:
-- Guarde a key em local seguro (só aparece uma vez!)
-- Configure billing: https://platform.openai.com/account/billing
-- Adicione crédito mínimo: $5
+1. [Visão Geral](#visão-geral)
+2. [Credenciais n8n (Obrigatórias)](#credenciais-n8n-obrigatórias)
+3. [Variáveis de Ambiente](#variáveis-de-ambiente)
+4. [Validação e Testes](#validação-e-testes)
+5. [Troubleshooting](#troubleshooting)
 
 ---
 
-### 2. Supabase Project (OBRIGATÓRIO)
+## Visão Geral
 
-**Tempo**: 10-15 minutos
+### Tabela de Credenciais por Workflow
 
-**Opção A: Supabase Cloud (Recomendado para validação)**
+| Workflow | PostgreSQL | Google Calendar | SMTP | RD Station | Evolution API |
+|----------|------------|-----------------|------|------------|---------------|
+| **WF01** (Handler) | ✅ | ❌ | ❌ | ❌ | ✅ (webhook) |
+| **WF02** (AI Agent) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **WF05** (Scheduler) | ✅ | ✅ | ❌ | ✅ (API) | ❌ |
+| **WF06** (Availability) | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **WF07** (Email) | ✅ | ❌ | ✅ | ❌ | ❌ |
+| **WF08** (RD Sync) | ✅ | ❌ | ❌ | ✅ (OAuth) | ❌ |
 
-1. **Criar Conta**:
-   - Acesse: https://supabase.com/dashboard
-   - Faça login com GitHub ou email
+### Credenciais Consolidadas
 
-2. **Criar Projeto**:
-   - Clique em "New Project"
-   - Nome: "e2-solucoes-bot"
-   - Database Password: Gere uma senha forte (salve!)
-   - Region: South America (São Paulo) ou mais próximo
-   - Plano: Free tier (suficiente para validação)
-   - Clique em "Create new project"
-   - **Aguarde 2-3 minutos** enquanto provisiona
+**Obrigatórias**:
+1. **PostgreSQL** - Banco de dados principal (WF01, WF02, WF05, WF07, WF08)
+2. **Google Calendar OAuth2** - Agendamentos (WF05, WF06)
+3. **SMTP** - Envio de emails (WF07)
 
-3. **Obter Credenciais**:
-   - No painel do projeto, vá em: Settings → API
-   - Copie:
-     - **Project URL**: `https://XXXXXXXX.supabase.co`
-     - **anon public**: (para frontend futuro)
-     - **service_role**: (ESTE é o importante! Usa para backend)
+**Opcionais** (mas recomendadas):
+4. **RD Station CRM** - Integração CRM (WF05, WF08)
+5. **Evolution API** - WhatsApp (WF01 webhook)
 
-4. **Habilitar pgvector**:
-   - Vá em: Database → Extensions
-   - Procure "vector"
-   - Clique em "Enable" ao lado de `vector`
-   - Aguarde confirmação
+---
 
-**Formato**:
+## Credenciais n8n (Obrigatórias)
+
+### 1. PostgreSQL Database
+
+**Utilizado por**: WF01, WF02, WF05, WF07, WF08
+**Credential ID**: `VXA1r8sd0TMIdPvS` (WF01/WF02) e `1` (WF05/WF07/WF08)
+**Nome**: `PostgreSQL - E2 Bot`
+
+#### Passo a Passo (n8n UI)
+
+1. **Acessar n8n**: `http://localhost:5678`
+
+2. **Criar Credencial**:
+   - Menu lateral → **Credentials**
+   - **New credential** → Buscar **"PostgreSQL"**
+   - Preencher dados:
+
+```yaml
+Host: e2bot-postgres-dev  # Nome do container Docker
+Database: e2bot_dev
+User: postgres
+Password: CoraRosa
+Port: 5432
+SSL Mode: disable  # Desenvolvimento local
 ```
-SUPABASE_URL=https://XXXXXXXXXXXXXXXX.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.XXXXXX...
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.XXXXXX...
-```
 
-**Opção B: Supabase Local (Para desenvolvimento avançado)**
+3. **Testar Conexão**:
+   - Clicar em **"Test"** (botão inferior)
+   - Deve retornar: ✅ **"Connection tested successfully"**
+
+4. **Salvar**:
+   - Nome da credencial: `PostgreSQL - E2 Bot`
+   - Clicar em **"Save"**
+
+#### Configuração Docker
+
+Verificar se PostgreSQL está rodando:
 
 ```bash
-# Instalar Supabase CLI
-npm install -g supabase
+docker ps | grep postgres
+# Deve mostrar: e2bot-postgres-dev ... Up X minutes ... 5432/tcp
 
-# Inicializar projeto
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
-supabase init
-
-# Iniciar Supabase local (Docker)
-supabase start
-
-# Copiar credenciais exibidas no terminal
-# API URL: http://localhost:54321
-# Service Role Key: eyJhbGciOi...
+# Testar conexão diretamente
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c "SELECT 1;"
+# Output esperado: 1
 ```
 
 ---
 
-### 3. n8n Workflow Engine (Incluído no Docker)
+### 2. Google Calendar OAuth2 API
 
-**Tempo**: 5 minutos (se usando Docker local)
+**Utilizado por**: WF05 (Appointment Scheduler), WF06 (Calendar Availability)
+**Credential ID**: `VXA1r8sd0TMIdPvS`
+**Nome**: `Google Calendar API - E2 Bot`
 
-**Opção A: n8n via Docker Compose (Recomendado)**
+📘 **Guia completo com passo a passo detalhado**: **[SETUP_GOOGLE_CALENDAR.md](SETUP_GOOGLE_CALENDAR.md)**
+
+#### Resumo de Configuração
+
+**Etapas principais**:
+1. Criar projeto no Google Cloud Console
+2. Habilitar Google Calendar API
+3. Criar OAuth2 Client Credentials
+4. Configurar credencial no n8n
+5. Autenticar via OAuth2 flow
+6. Obter Calendar ID e Credential ID
+7. Configurar variáveis de ambiente
+
+#### Quick Setup (Resumido)
+
+**Google Cloud Console**:
+1. Criar projeto: "E2 Bot n8n Integration"
+2. Habilitar API: Google Calendar API
+3. Criar OAuth2 Client ID:
+   - Type: Web application
+   - Redirect URI: `http://localhost:5678/rest/oauth2-credential/callback`
+4. Copiar Client ID e Client Secret
+
+**n8n**:
+1. Credentials → New → **Google Calendar OAuth2 API**
+2. Preencher Client ID + Secret
+3. Connect my account → Autorizar permissões
+4. Save com nome: `Google Calendar API - E2 Bot`
+
+**Variáveis de Ambiente** (`docker/.env`):
+```bash
+GOOGLE_CALENDAR_ID=seu-calendar-id@gmail.com
+GOOGLE_CALENDAR_CREDENTIAL_ID=VXA1r8sd0TMIdPvS
+GOOGLE_TECHNICIAN_EMAIL=tecnico@e2solucoes.com.br
+CALENDAR_TIMEZONE=America/Sao_Paulo
+```
+
+**Reiniciar n8n**:
+```bash
+docker-compose -f docker/docker-compose-dev.yml restart e2bot-n8n-dev
+```
+
+#### Validação
 
 ```bash
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
-
-# Verificar se docker-compose.yml existe
-ls docker-compose.yml
-
-# Se existir, iniciar stack
-docker-compose up -d
-
-# Aguardar inicialização (30-60 segundos)
-docker-compose ps
-
-# Acessar n8n
-open http://localhost:5678
+# Teste WF06 (Calendar Availability)
+curl -X POST "http://localhost:5678/webhook/calendar-availability" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "next_dates", "count": 3}' | jq
 ```
 
-**Credenciais**:
-```
-N8N_HOST=localhost:5678
-```
+**✅ Deve retornar**: 3 datas disponíveis
 
-**Opção B: n8n Cloud**
+#### Troubleshooting Comum
 
-1. Acesse: https://n8n.io/cloud
-2. Crie conta gratuita
-3. Anote URL: `https://XXXXX.app.n8n.cloud`
+**Erro "invalid_grant"**:
+- Refresh Token expirou → Deletar e recriar credencial
 
-```
-N8N_HOST=XXXXX.app.n8n.cloud
-```
+**Erro "Calendar not found"**:
+- Verificar `GOOGLE_CALENDAR_ID` no docker/.env
+- Verificar conta OAuth é a mesma que tem o calendário
+
+📘 **Para detalhes completos, troubleshooting extenso e testes**: Veja **[SETUP_GOOGLE_CALENDAR.md](SETUP_GOOGLE_CALENDAR.md)**
 
 ---
 
-## 💾 Configurar Arquivo .env
+### 3. SMTP - Email Service
 
-**Passos**:
+**Utilizado por**: WF07 (Send Email)
+**Credential ID**: `1`
+**Nome**: `SMTP - E2 Email`
 
-1. **Copiar Template**:
-```bash
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
-cp .env.example .env
+📘 **Guia completo com passo a passo detalhado**: **[SETUP_EMAIL.md](SETUP_EMAIL.md)**
+
+#### ✅ RECOMENDADO: Port 465 + SSL/TLS
+
+**Gmail SMTP Ports**:
+- **Port 465**: SSL/TLS direto → Usar `Secure: true` ✅ **(RECOMENDADO)**
+- **Port 587**: STARTTLS → Usar `Secure: false` (configuração alternativa)
+
+**Configuração testada e aprovada**:
+```yaml
+Port: 465
+SSL/TLS: habilitado (marcar checkbox)
+Secure: true
 ```
 
-2. **Editar .env**:
-```bash
-# Abrir com editor favorito
-nano .env
-# OU
-vim .env
-# OU
-code .env
-```
-
-3. **Preencher Credenciais Mínimas**:
-```bash
-# Substituir XXXXX pelos valores reais
-
-# OpenAI (obter em platform.openai.com)
-OPENAI_API_KEY=sk-proj-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-
-# Supabase (obter em supabase.com/dashboard)
-SUPABASE_URL=https://XXXXXXXXXXXXXXXX.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.XXXXXX...
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.XXXXXX...
-
-# n8n (se local, usar localhost)
-N8N_HOST=localhost:5678
-```
-
-4. **Salvar e Sair**:
-   - nano: `Ctrl+O` → `Enter` → `Ctrl+X`
-   - vim: `ESC` → `:wq` → `Enter`
-   - code: `Ctrl+S` → Fechar
-
-5. **Verificar Arquivo**:
-```bash
-# Listar arquivo (NÃO exibir conteúdo completo por segurança)
-ls -lh .env
-
-# Verificar se tem conteúdo
-wc -l .env
-# Deve retornar: ~20-30 linhas
-```
+**Configuração alternativa (Port 587)**:
+- Usar apenas se Port 465 não funcionar no seu ambiente
+- Requer `Secure: false` (STARTTLS)
+- Erro comum se usar Port 587 + SSL/TLS habilitado:
+  ```
+  error:0A00010B:SSL routines:tls_validate_record_header:wrong version number
+  ```
 
 ---
 
-## ✅ Validar Configuração
+#### Quick Setup (Gmail App Password)
 
-### Teste 1: Verificar .env Existe e Tem Conteúdo
+1. **Habilitar 2-Step Verification**:
+   - https://myaccount.google.com/security → 2-Step Verification → Enable
+   - Aguardar 10 minutos para propagação
 
-```bash
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
+2. **Criar App Password**:
+   - https://myaccount.google.com/security → App passwords
+   - App: **Mail** | Device: **Other** ("E2 Bot n8n")
+   - **Generate** → Copiar senha de 16 caracteres: `abcd efgh ijkl mnop`
 
-# Verificar arquivo existe
-[ -f .env ] && echo "✅ .env existe" || echo "❌ .env não encontrado"
+3. **Configurar n8n**:
+   - **Credentials** → **New** → **SMTP**
+   - Preencher:
 
-# Verificar tem conteúdo (sem exibir credenciais)
-grep -q "OPENAI_API_KEY=sk-" .env && echo "✅ OpenAI configurado" || echo "❌ OpenAI faltando"
-grep -q "SUPABASE_URL=https://" .env && echo "✅ Supabase URL configurado" || echo "❌ Supabase URL faltando"
-grep -q "SUPABASE_SERVICE_KEY=eyJ" .env && echo "✅ Supabase Key configurado" || echo "❌ Supabase Key faltando"
+```yaml
+Credential Name: SMTP - E2 Email
+Host: smtp.gmail.com
+Port: 465
+Secure: true  # ✅ SSL/TLS (MARCAR checkbox)
+User: bruno.amv@gmail.com
+Password: abcdefghijklmnop  # App Password SEM ESPAÇOS
+From Email: E2 Soluções <bruno.amv@gmail.com>
 ```
 
-**Resultado Esperado**:
-```
-✅ .env existe
-✅ OpenAI configurado
-✅ Supabase URL configurado
-✅ Supabase Key configurado
-```
+**✅ CONFIGURAÇÃO RECOMENDADA**:
+- **Port 465** → **Secure: true** (SSL/TLS) ✅
+- Marcar checkbox "SSL/TLS" no n8n
+- Password SEM ESPAÇOS: `abcdefghijklmnop` ✅ (não `abcd efgh ijkl mnop` ❌)
 
-### Teste 2: Carregar Variáveis de Ambiente
+**Configuração Alternativa**:
+- **Port 587** → **Secure: false** (STARTTLS)
+- Desmarcar checkbox "SSL/TLS"
+- Usar apenas se Port 465 não funcionar
 
-```bash
-# Carregar .env no shell
-set -a
-source .env
-set +a
+4. **Save**
 
-# Testar se variáveis foram carregadas (sem exibir valores completos)
-echo "OpenAI: ${OPENAI_API_KEY:0:10}..."
-echo "Supabase: ${SUPABASE_URL}"
-echo "n8n: ${N8N_HOST}"
-```
+#### Validação
 
-**Resultado Esperado**:
-```
-OpenAI: sk-proj-XX...
-Supabase: https://XXXXXXXX.supabase.co
-n8n: localhost:5678
-```
-
-### Teste 3: Validar OpenAI API Key
-
-```bash
-# Testar conectividade com OpenAI API
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -s | jq -r '.data[0].id' 2>/dev/null || echo "❌ OpenAI API Key inválida"
-```
-
-**Resultado Esperado**:
-```
-gpt-4
-# OU
-text-embedding-3-small
-# OU qualquer modelo válido
-```
-
-Se retornar erro:
-- ❌ Verifique se API key está correta
-- ❌ Verifique se billing está configurado
-- ❌ Verifique se tem créditos disponíveis
-
-### Teste 4: Validar Supabase Connection
-
-```bash
-# Testar conectividade com Supabase
-curl "${SUPABASE_URL}/rest/v1/" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-  -s | jq '.' 2>/dev/null && echo "✅ Supabase conectado" || echo "❌ Supabase falhou"
-```
-
-**Resultado Esperado**:
+**Teste via WF07**:
 ```json
 {
-  "swagger": "2.0",
-  "info": {
-    "title": "PostgREST API",
-    ...
-  }
+  "lead_email": "bruno.amv@gmail.com",
+  "lead_name": "Teste SMTP",
+  "service_type": "energia_solar",
+  "city": "goiania-go",
+  "calendar_success": true,
+  "scheduled_date": "2026-04-15",
+  "scheduled_time_start": "09:00:00",
+  "scheduled_time_end": "11:00:00"
 }
-✅ Supabase conectado
 ```
 
-### Teste 5: Validar n8n Está Rodando
+**Verificar**:
+- ✅ Node "Send Email" → SUCCESS (verde)
+- ✅ Email recebido em `bruno.amv@gmail.com`
+- ✅ Database log criado:
+  ```sql
+  SELECT * FROM email_logs ORDER BY sent_at DESC LIMIT 1;
+  ```
+
+#### Troubleshooting Comum
+
+**Erro "Couldn't connect with these settings"**:
+- **Causa**: Configuração incorreta de Port + SSL/TLS
+- **Solução Recomendada**: Editar credencial → Port 465 + Secure: true ✅
+- **Solução Alternativa**: Port 587 + Secure: false (STARTTLS)
+
+**Erro "Authentication failed"**:
+- **Causa 1**: App Password com espaços → Remover espaços
+- **Causa 2**: 2-Step Verification não habilitada → Habilitar e aguardar 10 min
+
+📘 **Para detalhes completos, troubleshooting extenso e testes**: Veja **[SETUP_EMAIL.md](SETUP_EMAIL.md)**
+
+---
+
+#### Opção 2: SMTP Dedicado (Produção)
+
+Para produção, use serviço SMTP dedicado:
+
+- **SendGrid**: 100 emails/dia grátis
+- **Mailgun**: 5.000 emails/mês grátis
+- **Amazon SES**: $0.10/1000 emails
+
+Exemplo SendGrid:
+
+```yaml
+Host: smtp.sendgrid.net
+Port: 587
+Secure: false
+User: apikey
+Password: SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+From Email: bot@e2solucoes.com.br
+```
+
+---
+
+### 4. RD Station CRM (Opcional)
+
+**Utilizado por**: WF05 (criar tasks), WF08 (sincronizar contacts/deals)
+**Tipo**: HTTP Request com Bearer Token
+
+#### Passo 1: Obter Access Token
+
+1. **RD Station** → Configurações → Integrações
+2. **API** → Gerar **Access Token**
+3. Copiar token: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+
+#### Passo 2: Configurar Variáveis de Ambiente
 
 ```bash
-# Testar se n8n está acessível
-curl -s -o /dev/null -w "%{http_code}" http://${N8N_HOST}/ || echo "❌ n8n não está rodando"
+# Adicionar ao docker/.env
+RDSTATION_API_URL=https://api.rdstation.com/platform/v1
+RDSTATION_ACCESS_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+RDSTATION_USER_TECNICO=12345  # ID do usuário técnico
+RDSTATION_CLIENT_ID=xxxxxxxxxx  # OAuth (WF08)
+RDSTATION_CLIENT_SECRET=xxxxxxxxxx  # OAuth (WF08)
+RDSTATION_REFRESH_TOKEN=xxxxxxxxxx  # OAuth (WF08)
+
+# IDs de stages e sources
+RDSTATION_STAGE_NOVO_LEAD=1
+RDSTATION_SOURCE_BOT=2
 ```
 
-**Resultado Esperado**:
-```
-200
-# OU
-302 (redirect para /workflow)
-```
+#### Passo 3: Validar
 
-Se retornar erro:
 ```bash
-# Iniciar n8n via Docker
-docker-compose up -d
+curl -X GET "https://api.rdstation.com/platform/v1/contacts" \
+  -H "Authorization: Bearer $RDSTATION_ACCESS_TOKEN" \
+  -H "Content-Type: application/json"
+```
 
-# Aguardar 30 segundos
-sleep 30
+**Nota**: WF05 usa HTTP Request sem credencial n8n (Bearer token direto no header).
+WF08 pode usar credencial OAuth2 se preferir autenticação automática.
 
-# Testar novamente
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5678/
+---
+
+### 5. Evolution API - WhatsApp (Webhook)
+
+**Utilizado por**: WF01 (recebe mensagens via webhook)
+**Tipo**: Não requer credencial n8n (autenticação via `apikey` no header HTTP)
+
+#### Configuração Evolution API
+
+A Evolution API está rodando em container separado:
+
+```bash
+docker ps | grep evolution
+# e2bot-evolution-dev ... Up ... 8080/tcp
+```
+
+#### Webhook Configuration
+
+WF01 expõe endpoint webhook:
+```
+http://e2bot-n8n-dev:5678/webhook/whatsapp-evolution
+```
+
+Configurar no Evolution API:
+
+```bash
+# Via Evolution API
+curl -X POST "http://localhost:8080/webhook/set/e2-solucoes-bot" \
+  -H "apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "webhook": {
+      "url": "http://e2bot-n8n-dev:5678/webhook/whatsapp-evolution",
+      "enabled": true,
+      "webhook_by_events": false,
+      "webhook_base64": false,
+      "events": [
+        "MESSAGES_UPSERT",
+        "MESSAGES_UPDATE",
+        "MESSAGES_DELETE",
+        "SEND_MESSAGE",
+        "CONNECTION_UPDATE"
+      ]
+    }
+  }'
+```
+
+#### Validação
+
+```bash
+# Verificar webhook configurado
+curl -s http://localhost:8080/instance/fetchInstances \
+  -H "apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891" | jq '.[] | .webhook'
 ```
 
 ---
 
-## 🚨 Troubleshooting
+## Variáveis de Ambiente
 
-### Problema: "OpenAI API key invalid"
+### Arquivo: `docker/.env`
 
-**Soluções**:
-1. Verificar key está completa (começa com `sk-proj-` ou `sk-`)
-2. Verificar não tem espaços extras: `echo "$OPENAI_API_KEY" | wc -c` (deve ser ~51-56 chars)
-3. Gerar nova key em: https://platform.openai.com/api-keys
-4. Configurar billing: https://platform.openai.com/account/billing
-5. Adicionar crédito mínimo ($5)
+Copiar template e preencher:
 
-### Problema: "Supabase connection failed"
+```bash
+cp docker/.env.dev.example docker/.env
+```
 
-**Soluções**:
-1. Verificar URL está correta (https://XXXXX.supabase.co)
-2. Verificar está usando **service_role** key (não anon key)
-3. Verificar projeto Supabase está ativo (não pausado)
-4. Verificar extensão vector foi habilitada:
-   - Supabase Dashboard → Database → Extensions → vector (Enable)
+### Variáveis Obrigatórias
 
-### Problema: "n8n not accessible"
+```bash
+# ============================================================================
+# PostgreSQL (Container Docker)
+# ============================================================================
+POSTGRES_DB=e2bot_dev
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=e2botpass_dev
+POSTGRES_HOST=e2bot-postgres-dev
+POSTGRES_PORT=5432
 
-**Soluções**:
-1. Verificar Docker está rodando: `docker ps`
-2. Iniciar stack: `docker-compose up -d`
-3. Ver logs: `docker-compose logs n8n`
-4. Verificar porta 5678 não está ocupada: `lsof -i :5678`
-5. Se ocupada, mudar porta em docker-compose.yml
+# ============================================================================
+# n8n Configuration
+# ============================================================================
+N8N_HOST=localhost:5678
+N8N_PORT=5678
+N8N_PROTOCOL=http
+N8N_BASIC_AUTH_ACTIVE=false
+WEBHOOK_URL=http://localhost:5678/
 
-### Problema: ".env not loading"
+# ============================================================================
+# Google Calendar
+# ============================================================================
+GOOGLE_CALENDAR_ID=primary  # ou ID específico
+CALENDAR_TIMEZONE=America/Sao_Paulo
 
-**Soluções**:
-1. Verificar arquivo existe: `ls -la .env`
-2. Verificar permissões: `chmod 600 .env`
-3. Carregar manualmente: `set -a; source .env; set +a`
-4. Verificar sem BOM: `file .env` (deve ser ASCII text)
+# ============================================================================
+# SMTP / Email
+# ============================================================================
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=seu-email@gmail.com
+SMTP_PASSWORD=abcd efgh ijkl mnop  # App Password
+EMAIL_FROM=E2 Soluções Bot <seu-email@gmail.com>
+
+# ============================================================================
+# Evolution API - WhatsApp
+# ============================================================================
+EVOLUTION_API_URL=http://localhost:8080
+EVOLUTION_API_KEY=ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891
+EVOLUTION_INSTANCE_NAME=e2-solucoes-bot
+
+# ============================================================================
+# n8n Workflow IDs (Internos)
+# ============================================================================
+WORKFLOW_ID_EMAIL_CONFIRMATION=7  # WF07
+
+# ============================================================================
+# OPCIONAL: RD Station CRM
+# ============================================================================
+RDSTATION_API_URL=https://api.rdstation.com/platform/v1
+RDSTATION_ACCESS_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+RDSTATION_USER_TECNICO=12345
+RDSTATION_CLIENT_ID=xxxxxxxxxx
+RDSTATION_CLIENT_SECRET=xxxxxxxxxx
+RDSTATION_REFRESH_TOKEN=xxxxxxxxxx
+RDSTATION_STAGE_NOVO_LEAD=1
+RDSTATION_SOURCE_BOT=2
+
+# ============================================================================
+# OPCIONAL: OpenAI / Supabase (RAG - Sprint 1.1)
+# ============================================================================
+OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+SUPABASE_URL=https://xxxxxxxxxxxxxxxxxxxx.supabase.co
+SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxxx
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxxx
+```
+
+### Carregar Variáveis de Ambiente
+
+```bash
+# Docker Compose recarrega automaticamente ao reiniciar
+docker-compose -f docker/docker-compose.dev.yml down
+docker-compose -f docker/docker-compose.dev.yml up -d
+
+# Verificar se variáveis foram carregadas no n8n
+docker exec e2bot-n8n-dev env | grep GOOGLE_CALENDAR_ID
+docker exec e2bot-n8n-dev env | grep SMTP_HOST
+```
 
 ---
 
-## 📝 Checklist Final
+## Validação e Testes
 
-Antes de prosseguir para próxima etapa, confirme:
+### 1. PostgreSQL
 
-- [ ] ✅ .env.example copiado para .env
-- [ ] ✅ OPENAI_API_KEY preenchida e validada
-- [ ] ✅ SUPABASE_URL preenchida e validada
-- [ ] ✅ SUPABASE_SERVICE_KEY preenchida e validada
-- [ ] ✅ N8N_HOST configurado corretamente
-- [ ] ✅ Variáveis carregam sem erro: `source .env`
-- [ ] ✅ OpenAI API responde: `curl test`
-- [ ] ✅ Supabase conecta: `curl test`
-- [ ] ✅ n8n acessível: `http://localhost:5678`
+```bash
+# Teste via Docker
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
+  -c "SELECT COUNT(*) FROM conversations;"
 
-**Status**: Se todos os checkboxes estão marcados, você está pronto para a **Etapa 2: Deploy Funções SQL**
+# Deve retornar número de conversas (ou 0 se banco vazio)
+```
 
----
-
-## 🔐 Segurança
-
-**IMPORTANTE**:
-
-1. ✅ .env está no .gitignore (NUNCA commitar!)
-2. ✅ Usar service_role key APENAS em backend
-3. ✅ Não compartilhar keys publicamente
-4. ✅ Rotacionar keys se expostas
-5. ✅ Usar variáveis de ambiente em produção (não .env)
-
-**Revogar Keys**:
-- OpenAI: https://platform.openai.com/api-keys → Delete
-- Supabase: Settings → API → Reset service_role key
+**n8n Test**:
+1. WF01 → Node "Save Message" → Execute Node
+2. Verificar output: deve mostrar `affectedRows: 1`
 
 ---
 
-**Próximo Documento**: `DEPLOY_SQL.md` - Deploy de funções SQL no Supabase
+### 2. Google Calendar
 
-**Tempo Total Etapa 1**: 30-45 minutos
-**Próxima Etapa**: 10-15 minutos
+**n8n Test**:
+1. WF06 → Activate
+2. Testar endpoint:
+
+```bash
+curl -X POST "http://localhost:5678/webhook/calendar-availability" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "next_dates",
+    "count": 3
+  }'
+
+# Output esperado:
+# {
+#   "dates": [
+#     { "date": "2026-04-09", "dayOfWeek": "Quarta", "available": true },
+#     { "date": "2026-04-10", "dayOfWeek": "Quinta", "available": true },
+#     { "date": "2026-04-11", "dayOfWeek": "Sexta", "available": true }
+#   ]
+# }
+```
+
+---
+
+### 3. SMTP / Email
+
+**n8n Test** (WF07):
+1. Importar WF07
+2. Trigger manual com dados de teste:
+
+```json
+{
+  "lead_email": "seu-email-teste@gmail.com",
+  "lead_name": "Teste Manual",
+  "service_type": "energia_solar",
+  "city": "goiania-go",
+  "calendar_success": true,
+  "scheduled_date": "2026-04-15",
+  "scheduled_time_start": "09:00"
+}
+```
+
+3. Execute
+4. Verificar:
+   - ✅ Email recebido na caixa de entrada
+   - ✅ Database log em `email_logs` table:
+     ```sql
+     SELECT * FROM email_logs ORDER BY sent_at DESC LIMIT 1;
+     ```
+
+---
+
+### 4. RD Station (Opcional)
+
+```bash
+# Testar API
+curl -X GET "https://api.rdstation.com/platform/v1/contacts" \
+  -H "Authorization: Bearer $RDSTATION_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" | jq
+
+# Deve retornar lista de contatos ou {}
+```
+
+**n8n Test** (WF08):
+1. Ativar WF08 (Schedule Trigger)
+2. Execute Manual
+3. Verificar logs:
+   ```sql
+   SELECT * FROM rdstation_sync_log ORDER BY created_at DESC LIMIT 5;
+   ```
+
+---
+
+### 5. Evolution API
+
+```bash
+# Verificar instância WhatsApp
+curl -s http://localhost:8080/instance/fetchInstances \
+  -H "apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891" | jq
+
+# Output esperado:
+# {
+#   "instance_name": "e2-solucoes-bot",
+#   "status": "open",
+#   "webhook": {
+#     "url": "http://e2bot-n8n-dev:5678/webhook/whatsapp-evolution",
+#     "enabled": true
+#   }
+# }
+```
+
+**Test Message Flow**:
+1. Enviar mensagem WhatsApp para bot
+2. Verificar WF01 executou (Executions → Ver histórico)
+3. Verificar database:
+   ```sql
+   SELECT phone_number, lead_name, current_state
+   FROM conversations
+   ORDER BY updated_at DESC LIMIT 1;
+   ```
+
+---
+
+## Troubleshooting
+
+### Erro: "Credential not found"
+
+**Causa**: ID de credencial no workflow não corresponde ao ID salvo no n8n
+
+**Solução**:
+1. n8n → Credentials → Verificar ID da credencial
+2. Workflow → Node com erro → Credential dropdown → Re-selecionar credencial
+3. Save workflow
+
+---
+
+### Erro: Google Calendar "invalid_grant"
+
+**Causa**: Refresh token expirou ou foi revogado
+
+**Solução**:
+1. n8n → Credentials → Google Calendar OAuth2 API
+2. Delete credencial
+3. Criar nova credencial (refazer OAuth flow)
+4. Workflows vão pedir para re-selecionar credencial
+
+---
+
+### Erro: SMTP "Authentication failed"
+
+**Causa 1**: App Password incorreto
+
+**Solução**:
+1. Gerar novo App Password no Google
+2. Atualizar credencial n8n (sem espaços na senha)
+
+**Causa 2**: 2-Step Verification não habilitada
+
+**Solução**:
+1. Google Account → Security → Enable 2-Step Verification
+2. Aguardar 10 minutos para propagação
+3. Criar App Password
+
+---
+
+### Erro: PostgreSQL "Connection refused"
+
+**Causa**: Container PostgreSQL não está rodando
+
+**Solução**:
+```bash
+# Verificar status
+docker ps | grep postgres
+
+# Se não estiver rodando
+docker-compose -f docker/docker-compose.dev.yml up -d e2bot-postgres-dev
+
+# Verificar logs
+docker logs e2bot-postgres-dev
+```
+
+---
+
+### Erro: Evolution API Webhook não recebe mensagens
+
+**Causa**: URL do webhook incorreta ou n8n não acessível
+
+**Solução**:
+1. Verificar webhook configurado:
+   ```bash
+   curl -s http://localhost:8080/instance/fetchInstances \
+     -H "apikey: $EVOLUTION_API_KEY" | jq '.[].webhook'
+   ```
+
+2. Reconfigurar webhook:
+   ```bash
+   curl -X POST "http://localhost:8080/webhook/set/e2-solucoes-bot" \
+     -H "apikey: $EVOLUTION_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"webhook": {"url": "http://e2bot-n8n-dev:5678/webhook/whatsapp-evolution", "enabled": true}}'
+   ```
+
+3. Testar webhook manualmente:
+   ```bash
+   curl -X POST "http://localhost:5678/webhook/whatsapp-evolution" \
+     -H "Content-Type: application/json" \
+     -d '{"key": "test"}'
+   ```
+
+---
+
+### Erro: `$env.GOOGLE_CALENDAR_ID` undefined
+
+**Causa**: Variável de ambiente não carregada no container n8n
+
+**Solução**:
+1. Verificar `docker/.env` contém a variável
+2. Restart container:
+   ```bash
+   docker-compose -f docker/docker-compose.dev.yml restart e2bot-n8n-dev
+   ```
+3. Verificar variável dentro do container:
+   ```bash
+   docker exec e2bot-n8n-dev env | grep GOOGLE_CALENDAR_ID
+   ```
+
+---
+
+## Checklist de Validação Final
+
+Antes de colocar workflows em produção, validar:
+
+- [ ] **PostgreSQL**: Conexão testada com sucesso
+- [ ] **Google Calendar**: OAuth2 autenticado + Calendar ID configurado
+- [ ] **SMTP**: Email de teste enviado e recebido
+- [ ] **Evolution API**: Webhook configurado + instância WhatsApp conectada
+- [ ] **RD Station** (opcional): Access Token válido + API respondendo
+- [ ] **Variáveis de Ambiente**: Todas configuradas em `docker/.env`
+- [ ] **n8n Workflows**: Importados e credenciais vinculadas
+- [ ] **Database Schema**: Tabelas criadas (conversations, appointments, email_logs)
+- [ ] **Teste E2E**: Mensagem WhatsApp → WF01 → WF02 → WF05 → WF07 → Email recebido
+
+---
+
+## Referências
+
+- [n8n Credentials Documentation](https://docs.n8n.io/credentials/)
+- [Google Calendar API Setup](https://developers.google.com/calendar/api/guides/auth)
+- [Gmail SMTP Settings](https://support.google.com/mail/answer/7126229)
+- [RD Station API Docs](https://developers.rdstation.com/)
+- [Evolution API Docs](https://doc.evolution-api.com/)
+
+---
+
+**Última Atualização**: 2026-04-08
+**Mantido por**: E2 Soluções Dev Team

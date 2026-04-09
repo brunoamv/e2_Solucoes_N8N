@@ -1,15 +1,63 @@
-# Setup Google Calendar Integration
+# Setup Google Calendar Integration - OAuth2
 
-## Visão Geral
+> **Versão**: 3.0 (DEFINITIVA) | **Atualização**: 2026-04-08
+> **Método**: OAuth2 (substituiu Service Account)
+> **Objetivo**: Configurar integração Google Calendar para WF05 e WF06
 
-Guia completo para configurar a integração do bot E2 Soluções com Google Calendar para agendamento automatizado de visitas técnicas, envio de lembretes e sincronização de eventos.
+---
 
-## Pré-requisitos
+## 📋 Visão Geral
 
-- Conta Google (Gmail ou Google Workspace)
-- Acesso ao Google Cloud Console
-- Permissões de administrador no calendário
-- Projeto do bot configurado
+Guia completo para configurar integração Google Calendar com n8n usando **OAuth2**.
+
+**Diferença OAuth2 vs Service Account**:
+- ✅ **OAuth2** (V3 - atual): Autenticação via conta Google pessoal/workspace, acesso direto ao calendário
+- ❌ **Service Account** (V1 - deprecado): Requer compartilhamento de calendário, mais complexo
+
+**Este guia usa OAuth2** - método mais simples e recomendado.
+
+---
+
+## 🎯 Workflows que Usam
+
+- **WF05** (Appointment Scheduler): Cria eventos no calendário
+- **WF06** (Calendar Availability): Consulta disponibilidade de datas/horários
+
+---
+
+## 🚨 Pré-requisitos
+
+**Antes de começar**:
+- ✅ Conta Google (Gmail ou Google Workspace)
+- ✅ Acesso ao Google Cloud Console
+- ✅ n8n rodando em `http://localhost:5678`
+- ✅ Containers Docker ativos (PostgreSQL + n8n)
+
+**Verificar n8n rodando**:
+```bash
+curl -I http://localhost:5678
+# Deve retornar: HTTP 200 ou redirecionamento
+```
+
+---
+
+## 📖 Etapas de Configuração
+
+```
+┌─────────────────────────────────────────────────┐
+│ Etapa 1: Criar Projeto no Google Cloud         │
+│ Etapa 2: Habilitar Google Calendar API         │
+│ Etapa 3: Criar OAuth2 Client Credentials       │
+│ Etapa 4: Configurar Credencial no n8n          │
+│ Etapa 5: Autenticar e Obter Access Token       │
+│ Etapa 6: Configurar Variáveis de Ambiente      │
+│ Etapa 7: Testar Integração                     │
+└─────────────────────────────────────────────────┘
+```
+
+**Tempo estimado**: 15-20 minutos
+
+---
 
 ## Etapa 1: Criar Projeto no Google Cloud
 
@@ -17,23 +65,23 @@ Guia completo para configurar a integração do bot E2 Soluções com Google Cal
 
 1. Acesse: https://console.cloud.google.com/
 2. Faça login com sua conta Google
-3. Clique em **"Selecionar Projeto"** no topo
-4. Clique em **"Novo Projeto"**
+3. Clique em **"Select a project"** (topo da página)
+4. Clique em **"NEW PROJECT"**
 
 ### 1.2. Configurar Projeto
 
 ```yaml
-Nome do Projeto: E2 Soluções Bot
-ID do Projeto: e2-solucoes-bot-XXXX (gerado automaticamente)
-Organização: Sem organização (ou sua empresa)
-Local: Sem organização
+Project name: E2 Bot n8n Integration
+Project ID: e2-bot-n8n-XXXX (gerado automaticamente)
+Organization: No organization (ou sua empresa)
+Location: No organization
 ```
 
-Clique em **"Criar"** e aguarde 1-2 minutos.
+Clique em **"CREATE"** e aguarde 1-2 minutos.
 
 ### 1.3. Selecionar Projeto
 
-No topo da página, certifique-se que o projeto **"E2 Soluções Bot"** está selecionado.
+No topo da página, verifique se o projeto **"E2 Bot n8n Integration"** está selecionado.
 
 ---
 
@@ -41,581 +89,453 @@ No topo da página, certifique-se que o projeto **"E2 Soluções Bot"** está se
 
 ### 2.1. Acessar Biblioteca de APIs
 
-1. No menu lateral, vá em: **APIs e Serviços → Biblioteca**
-2. Na busca, digite: "Google Calendar API"
+1. No menu lateral (☰), vá em: **APIs & Services → Library**
+2. Na busca, digite: **"Google Calendar API"**
 3. Clique em **"Google Calendar API"**
-4. Clique em **"Ativar"**
+4. Clique em **"ENABLE"**
 5. Aguarde confirmação (30 segundos)
 
 ### 2.2. Verificar API Ativada
 
-Vá em: **APIs e Serviços → Painel**
+Vá em: **APIs & Services → Dashboard**
 
-Deve aparecer "Google Calendar API" na lista de APIs ativadas.
+Deve aparecer **"Google Calendar API"** na lista de APIs ativadas.
 
----
-
-## Etapa 3: Criar Conta de Serviço
-
-### 3.1. Acessar Contas de Serviço
-
-1. Vá em: **APIs e Serviços → Credenciais**
-2. Clique em **"Criar Credenciais"**
-3. Selecione **"Conta de Serviço"**
-
-### 3.2. Configurar Conta de Serviço
-
-**Etapa 1: Detalhes da conta de serviço**
-
-```yaml
-Nome da conta de serviço: E2 Bot Calendar Service
-ID da conta: e2-bot-calendar (gerado automaticamente)
-Descrição: Conta de serviço para agendamento de visitas técnicas
-```
-
-Clique em **"Criar e continuar"**
-
-**Etapa 2: Conceder acesso ao projeto (opcional)**
-
-```yaml
-Papel: Nenhum necessário (pular esta etapa)
-```
-
-Clique em **"Continuar"**
-
-**Etapa 3: Conceder acesso aos usuários (opcional)**
-
-```yaml
-(Deixar em branco)
-```
-
-Clique em **"Concluir"**
-
-### 3.3. Gerar Chave JSON
-
-1. Na lista de Contas de Serviço, clique na conta criada
-2. Vá na aba **"Chaves"**
-3. Clique em **"Adicionar Chave" → "Criar nova chave"**
-4. Selecione tipo: **JSON**
-5. Clique em **"Criar"**
-
-Um arquivo `e2-solucoes-bot-XXXXX.json` será baixado automaticamente.
-
-**IMPORTANTE:**
-- Guarde este arquivo com segurança!
-- Nunca commite no Git!
-- É a única vez que você verá esta chave!
-
-### 3.4. Anotar Email da Conta de Serviço
-
-No arquivo JSON baixado, localize o campo `client_email`:
-
-```json
-{
-  "type": "service_account",
-  "project_id": "e2-solucoes-bot-xxxxx",
-  "private_key_id": "xxxxx",
-  "private_key": "-----BEGIN PRIVATE KEY-----\n...",
-  "client_email": "e2-bot-calendar@e2-solucoes-bot-xxxxx.iam.gserviceaccount.com",
-  "client_id": "xxxxx",
-  ...
-}
-```
-
-**Anote o `client_email`** - você usará na próxima etapa.
+✅ **API habilitada com sucesso!**
 
 ---
 
-## Etapa 4: Criar e Compartilhar Calendário
+## Etapa 3: Criar OAuth2 Client Credentials
 
-### 4.1. Criar Calendário Dedicado
+### 3.1. Configurar OAuth Consent Screen (Primeira vez)
 
-1. Acesse: https://calendar.google.com/
-2. No lado esquerdo, próximo a "Outros calendários", clique no **"+"**
-3. Selecione **"Criar novo calendário"**
+Se for a primeira vez usando OAuth no projeto:
 
+1. **APIs & Services → OAuth consent screen**
+2. **User Type**: External (ou Internal se Google Workspace)
+3. Clique em **"CREATE"**
+
+**App information**:
 ```yaml
-Nome: Visitas Técnicas E2 Soluções
-Descrição: Agendamento automatizado de visitas técnicas pelo bot
-Fuso horário: (GMT-03:00) Brasília
+App name: E2 Bot n8n Integration
+User support email: seu-email@gmail.com
+Developer contact: seu-email@gmail.com
 ```
 
-Clique em **"Criar calendário"**
+4. Clique em **"SAVE AND CONTINUE"**
+5. **Scopes**: Deixar vazio por enquanto → **"SAVE AND CONTINUE"**
+6. **Test users**: Adicionar seu email → **"SAVE AND CONTINUE"**
+7. **Summary**: Revisar → **"BACK TO DASHBOARD"**
 
-### 4.2. Compartilhar Calendário com Conta de Serviço
+### 3.2. Criar OAuth2 Client ID
 
-1. Na lista de calendários, localize "Visitas Técnicas E2 Soluções"
-2. Clique nos **3 pontos** → **"Configurações e compartilhamento"**
-3. Role até **"Compartilhar com pessoas específicas"**
-4. Clique em **"Adicionar pessoas"**
+1. **APIs & Services → Credentials**
+2. Clique em **"+ CREATE CREDENTIALS"**
+3. Selecione **"OAuth client ID"**
 
+**Configuração**:
 ```yaml
-Email: e2-bot-calendar@e2-solucoes-bot-xxxxx.iam.gserviceaccount.com
-Permissões: Fazer alterações em eventos
+Application type: Web application
+Name: E2 Bot n8n Integration
+
+Authorized JavaScript origins:
+  - http://localhost:5678
+
+Authorized redirect URIs:
+  - http://localhost:5678/rest/oauth2-credential/callback
 ```
 
-Clique em **"Enviar"**
+4. Clique em **"CREATE"**
 
-**IMPORTANTE:** Use o email da conta de serviço (step 3.4), não seu email pessoal!
+### 3.3. Copiar Credenciais
 
-### 4.3. Obter ID do Calendário
+Uma modal aparecerá com:
+- **Client ID**: `xxxxxxxxxxxxx.apps.googleusercontent.com`
+- **Client Secret**: `GOCSPX-xxxxxxxxxxxxxxxxxxxxx`
 
-1. Ainda em "Configurações e compartilhamento"
-2. Role até **"Integrar calendário"**
-3. Localize **"ID do calendário"**
-4. Copie o ID (formato: `xxxxx@group.calendar.google.com`)
+**🚨 IMPORTANTE**: Copie e guarde essas credenciais com segurança!
 
-**Anote o `CALENDAR_ID`** - você usará no .env.
+Você pode baixar o JSON ou copiar manualmente.
+
+**Anotar**:
+```
+Client ID: xxxxxxxxxxxxx.apps.googleusercontent.com
+Client Secret: GOCSPX-xxxxxxxxxxxxxxxxxxxxx
+```
 
 ---
 
-## Etapa 5: Configurar Variáveis de Ambiente
+## Etapa 4: Configurar Credencial no n8n
 
-### 5.1. Copiar Arquivo de Chave
+### 4.1. Criar Credencial OAuth2
 
-Copie o arquivo JSON baixado para o projeto:
+1. Acesse n8n: http://localhost:5678
+2. Menu lateral → **Credentials**
+3. Clique em **"Add credential"**
+4. Buscar: **"Google Calendar OAuth2 API"**
+5. Selecionar **"Google Calendar OAuth2 API"**
+
+### 4.2. Preencher Credenciais
+
+```yaml
+Credential name: Google Calendar API - E2 Bot
+
+Authentication:
+  - Client ID: <Client ID copiado da Etapa 3.3>
+  - Client Secret: <Client Secret copiado da Etapa 3.3>
+
+Scopes (deixar o padrão):
+  - https://www.googleapis.com/auth/calendar
+  - https://www.googleapis.com/auth/calendar.events
+```
+
+**NÃO SALVAR AINDA** - Prossiga para Etapa 5 (autenticação OAuth).
+
+---
+
+## Etapa 5: Autenticar e Obter Access Token
+
+### 5.1. Iniciar OAuth Flow
+
+1. Na tela de credencial (ainda aberta), clique em **"Connect my account"** ou **"Sign in with Google"**
+
+2. **Pop-up do Google abrirá**:
+   - Se o pop-up não abrir, desabilite bloqueador de pop-ups para `localhost:5678`
+
+3. **Selecionar Conta Google**:
+   - Escolha a conta que tem acesso ao calendário que você quer usar
+
+4. **Tela de Permissões** ("E2 Bot n8n Integration wants to access your Google Account"):
+   - ✅ Marque **"Select all"** ou marque individualmente:
+     - View and edit events on all your calendars
+     - View events on all your calendars
+   - Clique em **"Continue"**
+
+5. **Redirecionamento**:
+   - Você será redirecionado de volta para n8n
+   - n8n receberá automaticamente **Access Token** e **Refresh Token**
+
+### 5.2. Confirmar Autenticação
+
+A credencial n8n deve mostrar:
+- ✅ **"OAuth2 authentication successful"**
+- ✅ Status verde com token ativo
+
+### 5.3. Salvar Credencial
+
+Agora sim, clique em **"Save"** (botão inferior direito).
+
+✅ **Credencial Google Calendar OAuth2 configurada com sucesso!**
+
+---
+
+## Etapa 6: Configurar Variáveis de Ambiente
+
+### 6.1. Obter Calendar ID
+
+**Método 1 - Via Google Calendar UI** (mais simples):
+
+1. Acesse: https://calendar.google.com
+2. No lado esquerdo, localize seu calendário
+3. Clique nos **três pontos (⋮)** ao lado do nome do calendário
+4. Selecione **"Settings and sharing"**
+5. Role até seção **"Integrate calendar"**
+6. Copie o **"Calendar ID"**
+
+**Formatos possíveis**:
+- Calendário primário: `seu-email@gmail.com`
+- Calendário secundário: `xxxxxxxxxxxxx@group.calendar.google.com`
+
+**Método 2 - Via n8n Test** (se preferir):
+
+1. n8n → Criar novo workflow temporário
+2. Adicionar node **"Google Calendar"**
+3. Operation: **"Get All Calendars"**
+4. Credential: Selecionar **"Google Calendar API - E2 Bot"**
+5. Execute node
+6. Na saída, copie o `id` do calendário desejado
+
+**Anotar Calendar ID**:
+```
+GOOGLE_CALENDAR_ID=xxxxxxxxxxxxx@group.calendar.google.com
+```
+
+### 6.2. Obter Credential ID (n8n interno)
+
+1. n8n → **Credentials**
+2. Clique na credencial **"Google Calendar API - E2 Bot"**
+3. Na URL, observe o ID no final:
+   ```
+   http://localhost:5678/credentials/VXA1r8sd0TMIdPvS
+                                      ^^^^^^^^^^^^^^^^
+                                      Este é o Credential ID
+   ```
+
+**Anotar Credential ID**:
+```
+GOOGLE_CALENDAR_CREDENTIAL_ID=VXA1r8sd0TMIdPvS
+```
+
+### 6.3. Atualizar docker/.env
+
+Edite o arquivo `docker/.env` e adicione:
 
 ```bash
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
-
-# Criar diretório de credenciais (se não existir)
-mkdir -p docker/credentials
-
-# Copiar arquivo JSON (ajuste o caminho)
-cp ~/Downloads/e2-solucoes-bot-xxxxx.json docker/credentials/google-service-account.json
-
-# Proteger arquivo
-chmod 600 docker/credentials/google-service-account.json
-```
-
-### 5.2. Editar .env
-
-Edite `docker/.env.dev` e adicione:
-
-```bash
-# --- Google Calendar ---
-GOOGLE_SERVICE_ACCOUNT_EMAIL=e2-bot-calendar@e2-solucoes-bot-xxxxx.iam.gserviceaccount.com
-GOOGLE_CALENDAR_ID=xxxxx@group.calendar.google.com
-GOOGLE_SERVICE_ACCOUNT_KEY_PATH=/app/credentials/google-service-account.json
-
-# Configurações de Agendamento
+# ============================================================================
+# Google Calendar Configuration
+# ============================================================================
+GOOGLE_CALENDAR_ID=xxxxxxxxxxxxx@group.calendar.google.com
+GOOGLE_CALENDAR_CREDENTIAL_ID=VXA1r8sd0TMIdPvS
+GOOGLE_TECHNICIAN_EMAIL=tecnico@e2solucoes.com.br
 CALENDAR_TIMEZONE=America/Sao_Paulo
-CALENDAR_DEFAULT_DURATION=90  # minutos (1h30)
-CALENDAR_BUFFER_TIME=30       # minutos entre agendamentos
 
-# Horário de Funcionamento (24h format)
+# Horário de Funcionamento (Opcional - usado por WF05 V7+)
 CALENDAR_WORK_START=08:00
 CALENDAR_WORK_END=18:00
 CALENDAR_WORK_DAYS=1,2,3,4,5  # Segunda a Sexta (0=Dom, 6=Sáb)
 
-# Lembretes
-CALENDAR_REMINDER_24H=true
-CALENDAR_REMINDER_2H=true
+# Configurações de Agendamento (Opcional)
+CALENDAR_DEFAULT_DURATION=90  # minutos (1h30)
+CALENDAR_BUFFER_TIME=30       # minutos entre agendamentos
 ```
 
-### 5.3. Atualizar docker-compose
+### 6.4. Reiniciar n8n para Carregar Variáveis
 
-Edite `docker/docker-compose-dev.yml` e adicione o volume:
+```bash
+docker-compose -f docker/docker-compose-dev.yml restart e2bot-n8n-dev
+```
 
-```yaml
-services:
-  n8n:
-    volumes:
-      - ./credentials:/app/credentials:ro  # Adicionar esta linha
-      # ... outros volumes
+Aguarde 30 segundos para n8n reiniciar.
+
+**Verificar variáveis carregadas**:
+```bash
+docker exec e2bot-n8n-dev env | grep GOOGLE_CALENDAR_ID
+# Deve mostrar: GOOGLE_CALENDAR_ID=xxxxxxxxxxxxx@group.calendar.google.com
 ```
 
 ---
 
-## Etapa 6: Testar Integração
+## Etapa 7: Testar Integração
 
-### 6.1. Teste Manual via n8n
+### 7.1. Teste Básico - WF06 (Calendar Availability)
 
-1. Acesse: http://localhost:5678
-2. Vá em: **Credentials → Add Credential**
-3. Busque: "Google Calendar"
-4. Selecione: **"Service Account"**
-5. Preencha:
-   - Service Account Email: (do .env)
-   - Private Key: (conteúdo do JSON)
-6. Clique em **"Connect"**
-
-Se conectar com sucesso, a credencial está configurada!
-
-### 6.2. Teste via Script
-
-Crie um script de teste:
+**Pré-requisito**: WF06 importado e ativo
 
 ```bash
-#!/bin/bash
-# scripts/test-calendar.sh
-
-set -a
-source docker/.env.dev
-set +a
-
-echo "🧪 Testando Google Calendar Integration..."
-
-# Teste 1: Verificar arquivo de credenciais
-echo "1. Verificando credenciais..."
-if [ -f "docker/credentials/google-service-account.json" ]; then
-  echo "✅ Arquivo de credenciais encontrado"
-else
-  echo "❌ Arquivo de credenciais não encontrado"
-  exit 1
-fi
-
-# Teste 2: Verificar variáveis
-echo "2. Verificando variáveis de ambiente..."
-[ -n "$GOOGLE_SERVICE_ACCOUNT_EMAIL" ] && echo "✅ GOOGLE_SERVICE_ACCOUNT_EMAIL configurado" || echo "❌ Faltando"
-[ -n "$GOOGLE_CALENDAR_ID" ] && echo "✅ GOOGLE_CALENDAR_ID configurado" || echo "❌ Faltando"
-
-# Teste 3: Validar JSON
-echo "3. Validando JSON..."
-if jq empty docker/credentials/google-service-account.json 2>/dev/null; then
-  echo "✅ JSON válido"
-else
-  echo "❌ JSON inválido"
-  exit 1
-fi
-
-echo "✅ Testes básicos passaram!"
-echo "🔹 Próximo: Testar criação de evento via n8n"
+curl -X POST "http://localhost:5678/webhook/calendar-availability" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "next_dates",
+    "count": 3
+  }' | jq
 ```
 
-Execute:
-
-```bash
-chmod +x scripts/test-calendar.sh
-./scripts/test-calendar.sh
-```
-
-### 6.3. Teste de Criação de Evento
-
-Via n8n ou workflow dedicado:
-
-1. Importar workflow `05_appointment_scheduler.json`
-2. Executar teste manual com dados:
-
+**✅ Resultado esperado**:
 ```json
 {
-  "lead_id": 1,
-  "lead_name": "João Teste",
-  "lead_phone": "62999999999",
-  "visit_date": "2024-01-15",
-  "visit_time": "14:00",
-  "service_type": "Energia Solar",
-  "address": "Rua Teste, 123, Goiânia-GO"
-}
-```
-
-3. Verificar se evento aparece no Google Calendar
-4. Verificar se recebeu confirmação no WhatsApp
-
----
-
-## Etapa 7: Configurar Disponibilidade
-
-### 7.1. Horários Bloqueados
-
-Para bloquear horários específicos (almoço, reuniões, etc):
-
-```sql
--- Função SQL já criada: check_calendar_availability()
--- Ela consulta automaticamente o Google Calendar para conflitos
-
--- Adicionar bloqueio manual (se necessário)
-INSERT INTO calendar_blocks (
-  block_date,
-  start_time,
-  end_time,
-  reason,
-  created_by
-) VALUES (
-  '2024-01-15',
-  '12:00',
-  '13:30',
-  'Almoço',
-  'admin'
-);
-```
-
-### 7.2. Feriados
-
-```sql
--- Criar tabela de feriados (se não existir)
-CREATE TABLE IF NOT EXISTS holidays (
-  id SERIAL PRIMARY KEY,
-  holiday_date DATE NOT NULL UNIQUE,
-  name VARCHAR(255) NOT NULL,
-  type VARCHAR(50) DEFAULT 'national', -- national, state, local
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Adicionar feriados de 2024
-INSERT INTO holidays (holiday_date, name, type) VALUES
-('2024-01-01', 'Ano Novo', 'national'),
-('2024-02-12', 'Carnaval', 'national'),
-('2024-02-13', 'Carnaval', 'national'),
-('2024-03-29', 'Sexta-feira Santa', 'national'),
-('2024-04-21', 'Tiradentes', 'national'),
-('2024-05-01', 'Dia do Trabalho', 'national'),
-('2024-05-30', 'Corpus Christi', 'national'),
-('2024-09-07', 'Independência', 'national'),
-('2024-10-12', 'Nossa Senhora Aparecida', 'national'),
-('2024-11-02', 'Finados', 'national'),
-('2024-11-15', 'Proclamação da República', 'national'),
-('2024-12-25', 'Natal', 'national');
-```
-
----
-
-## Etapa 8: Configurar Lembretes
-
-### 8.1. Lembretes no Google Calendar
-
-O bot já cria eventos com lembretes automáticos:
-
-```javascript
-// Configuração no workflow n8n (05_appointment_scheduler)
-{
-  "event": {
-    "summary": "Visita Técnica - {{lead_name}}",
-    "description": "Serviço: {{service_type}}\nEndereço: {{address}}",
-    "start": {
-      "dateTime": "{{visit_datetime}}",
-      "timeZone": "America/Sao_Paulo"
+  "dates": [
+    {
+      "date": "2026-04-09",
+      "dayOfWeek": "Quarta-feira",
+      "available": true
     },
-    "reminders": {
-      "useDefault": false,
-      "overrides": [
-        {"method": "email", "minutes": 1440},  // 24h antes
-        {"method": "popup", "minutes": 120}    // 2h antes
-      ]
+    {
+      "date": "2026-04-10",
+      "dayOfWeek": "Quinta-feira",
+      "available": true
+    },
+    {
+      "date": "2026-04-11",
+      "dayOfWeek": "Sexta-feira",
+      "available": true
     }
-  }
+  ]
 }
 ```
 
-### 8.2. Lembretes via WhatsApp
+### 7.2. Teste Avançado - WF05 (Criar Evento)
 
-Os lembretes via WhatsApp são enviados pelo workflow `06_appointment_reminders.json`:
+**Pré-requisito**: WF05 importado, PostgreSQL configurado
 
-**Cronograma:**
-- **24h antes**: Confirmação detalhada (data, hora, endereço)
-- **2h antes**: Lembrete final ("Técnico a caminho")
+1. **Criar lead de teste no banco**:
+   ```sql
+   INSERT INTO conversations (phone_number, lead_name, service_type, current_state)
+   VALUES ('5561999999999', 'Teste Manual', 'energia_solar', 'confirmation');
+   ```
 
-**Configuração do Cron:**
+2. **Executar WF05 manualmente**:
+   - n8n → Workflow **"05_appointment_scheduler"**
+   - Execute Workflow
 
-```yaml
-# No workflow 06_appointment_reminders.json
-Cron Expression: */30 * * * *  # Executar a cada 30 minutos
+3. **Verificar**:
+   - ✅ Google Calendar → Evento criado com título "Visita Técnica - Teste Manual"
+   - ✅ Database → Tabela `appointments` com novo registro
+   - ✅ Campo `google_calendar_event_id` preenchido
 
-Query SQL:
-SELECT * FROM appointments
-WHERE status = 'confirmed'
-  AND reminder_24h_sent = false
-  AND visit_datetime <= NOW() + INTERVAL '24 hours'
-  AND visit_datetime > NOW()
-```
+### 7.3. Teste de Consulta de Horários Disponíveis
 
----
-
-## Etapa 9: Fluxo Completo de Agendamento
-
-```
-┌─────────────────────────────────────────────────────┐
-│   1. Lead Solicita Agendamento no WhatsApp         │
-└──────────────────┬──────────────────────────────────┘
-                   ↓
-┌─────────────────────────────────────────────────────┐
-│   2. Bot Consulta Disponibilidade                   │
-│      check_calendar_availability(date, time)        │
-│      → Verifica conflitos no Google Calendar        │
-│      → Verifica feriados                            │
-│      → Verifica horário comercial                   │
-└──────────────────┬──────────────────────────────────┘
-                   ↓
-┌─────────────────────────────────────────────────────┐
-│   3. Criar Evento no Google Calendar                │
-│      POST /calendars/{id}/events                    │
-│      → Evento com duração 90min                     │
-│      → Lembretes configurados                       │
-└──────────────────┬──────────────────────────────────┘
-                   ↓
-┌─────────────────────────────────────────────────────┐
-│   4. Salvar no Banco                                │
-│      INSERT INTO appointments (...)                 │
-│      → google_event_id (para updates futuros)       │
-│      → status = 'confirmed'                         │
-└──────────────────┬──────────────────────────────────┘
-                   ↓
-┌─────────────────────────────────────────────────────┐
-│   5. Enviar Confirmação WhatsApp                    │
-│      "✅ Agendado para DD/MM às HH:MM"              │
-└──────────────────┬──────────────────────────────────┘
-                   ↓
-┌─────────────────────────────────────────────────────┐
-│   6. Lembretes Automáticos                          │
-│      24h antes: Confirmação detalhada               │
-│      2h antes: "Técnico a caminho"                  │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Etapa 10: Troubleshooting
-
-### Problema: "Permission denied" ao criar evento
-
-**Causa:** Calendário não foi compartilhado com conta de serviço
-
-**Solução:**
-1. Vá em Google Calendar
-2. Configurações do calendário "Visitas Técnicas E2"
-3. Compartilhar com: `e2-bot-calendar@...iam.gserviceaccount.com`
-4. Permissão: "Fazer alterações em eventos"
-
-### Problema: "Calendar not found"
-
-**Causa:** CALENDAR_ID incorreto
-
-**Solução:**
 ```bash
-# Verificar ID do calendário
-grep GOOGLE_CALENDAR_ID docker/.env.dev
-
-# Formato esperado: xxxxx@group.calendar.google.com
-# NÃO usar: seu-email@gmail.com
+curl -X POST "http://localhost:5678/webhook/calendar-availability" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "available_slots",
+    "date": "2026-04-15"
+  }' | jq
 ```
 
-### Problema: Eventos criados no calendário errado
-
-**Causa:** Usando calendário primário ao invés do dedicado
-
-**Solução:**
-Sempre usar o `GOOGLE_CALENDAR_ID` do calendário criado no Step 4, não o calendário pessoal.
-
-### Problema: "Invalid credentials"
-
-**Causa:** JSON malformado ou chave incorreta
-
-**Solução:**
-```bash
-# Validar JSON
-jq empty docker/credentials/google-service-account.json
-
-# Verificar permissões
-ls -lh docker/credentials/google-service-account.json
-# Deve ser: -rw------- (600)
-
-# Re-baixar chave se necessário (Google Cloud Console)
-```
-
-### Problema: Fuso horário errado
-
-**Causa:** Timezone não configurado
-
-**Solução:**
-```bash
-# Verificar .env
-grep CALENDAR_TIMEZONE docker/.env.dev
-
-# Deve ser: America/Sao_Paulo
-# Lista completa: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+**✅ Resultado esperado**:
+```json
+{
+  "date": "2026-04-15",
+  "slots": [
+    { "time": "08:00", "available": true },
+    { "time": "09:30", "available": true },
+    { "time": "11:00", "available": false },
+    { "time": "14:00", "available": true },
+    { "time": "15:30", "available": true }
+  ]
+}
 ```
 
 ---
 
-## Etapa 11: Monitoramento
+## 🐛 Troubleshooting
 
-### 11.1. Verificar Agendamentos
+### Erro: "invalid_grant" ou "Token has been expired or revoked"
 
-```sql
--- Ver agendamentos futuros
-SELECT
-  a.id,
-  l.name as lead_name,
-  l.phone,
-  a.visit_datetime,
-  a.status,
-  a.reminder_24h_sent,
-  a.reminder_2h_sent,
-  a.google_event_id
-FROM appointments a
-JOIN leads l ON a.lead_id = l.id
-WHERE a.visit_datetime >= NOW()
-ORDER BY a.visit_datetime;
-```
+**Causa**: Refresh Token expirou ou foi revogado
 
-### 11.2. Verificar Lembretes Pendentes
-
-```sql
--- Lembretes 24h que precisam ser enviados
-SELECT * FROM appointments
-WHERE status = 'confirmed'
-  AND reminder_24h_sent = false
-  AND visit_datetime BETWEEN NOW() AND NOW() + INTERVAL '24 hours';
-
--- Lembretes 2h que precisam ser enviados
-SELECT * FROM appointments
-WHERE status = 'confirmed'
-  AND reminder_2h_sent = false
-  AND visit_datetime BETWEEN NOW() AND NOW() + INTERVAL '2 hours';
-```
-
-### 11.3. Dashboard de Ocupação
-
-```sql
--- Agendamentos por dia (próximas 2 semanas)
-SELECT
-  DATE(visit_datetime) as dia,
-  COUNT(*) as total_visitas,
-  STRING_AGG(
-    TO_CHAR(visit_datetime, 'HH24:MI') || ' - ' || l.name,
-    ', '
-  ) as visitas
-FROM appointments a
-JOIN leads l ON a.lead_id = l.id
-WHERE visit_datetime BETWEEN NOW() AND NOW() + INTERVAL '14 days'
-  AND status = 'confirmed'
-GROUP BY DATE(visit_datetime)
-ORDER BY dia;
-```
+**Solução**:
+1. n8n → Credentials → **"Google Calendar API - E2 Bot"**
+2. **Delete** a credencial
+3. Criar nova credencial (refazer Etapas 4-5)
+4. Re-vincular credencial nos workflows WF05 e WF06
 
 ---
 
-## Recursos Adicionais
+### Erro: "Access blocked: E2 Bot n8n Integration has not completed the Google verification process"
 
-- **Google Calendar API Docs**: https://developers.google.com/calendar/api
-- **Service Account Auth**: https://developers.google.com/identity/protocols/oauth2/service-account
-- **Calendar Quickstart**: https://developers.google.com/calendar/api/quickstart/nodejs
-- **Limites de API**: 1.000.000 requests/dia (mais que suficiente)
-- **Quota Monitoring**: https://console.cloud.google.com/apis/api/calendar-json.googleapis.com/quotas
+**Causa**: App não verificado pelo Google (normal em desenvolvimento)
+
+**Solução**:
+1. Na tela de permissões, clique em **"Advanced"**
+2. Clique em **"Go to E2 Bot n8n Integration (unsafe)"**
+3. Autorizar permissões
+4. ✅ Isso é seguro para desenvolvimento local
+
+**Para produção**: Submeter app para verificação Google (processo de 4-6 semanas)
 
 ---
 
-## Checklist de Configuração
+### Erro: "Redirect URI mismatch"
+
+**Causa**: URI configurado no Google Cloud não corresponde ao n8n
+
+**Solução**:
+1. Google Cloud Console → APIs & Services → Credentials
+2. Editar OAuth2 Client ID
+3. **Authorized redirect URIs** → Adicionar:
+   ```
+   http://localhost:5678/rest/oauth2-credential/callback
+   ```
+4. Salvar e aguardar 5 minutos para propagação
+
+---
+
+### Erro: "Calendar not found" ou "404"
+
+**Causa**: `GOOGLE_CALENDAR_ID` incorreto ou calendário não acessível
+
+**Solução**:
+1. Verificar Calendar ID:
+   ```bash
+   grep GOOGLE_CALENDAR_ID docker/.env
+   ```
+
+2. Testar acesso ao calendário:
+   - n8n → Novo workflow temporário
+   - Google Calendar node → Operation: "Get All Calendars"
+   - Execute → Verificar se o calendar ID está na lista
+
+3. Se calendário não aparece:
+   - Verificar se a conta autenticada no OAuth é a mesma que tem o calendário
+   - Re-fazer OAuth flow com conta correta
+
+---
+
+### Erro: "Insufficient permissions"
+
+**Causa**: Scopes OAuth2 incorretos
+
+**Solução**:
+1. n8n → Credentials → Google Calendar OAuth2 API
+2. Verificar **Scopes**:
+   ```
+   https://www.googleapis.com/auth/calendar
+   https://www.googleapis.com/auth/calendar.events
+   ```
+3. Se faltando, adicionar e refazer OAuth flow
+
+---
+
+### Erro: "$env.GOOGLE_CALENDAR_ID is undefined" no workflow
+
+**Causa**: Variável de ambiente não carregada no container n8n
+
+**Solução**:
+1. Verificar `docker/.env` contém a variável:
+   ```bash
+   cat docker/.env | grep GOOGLE_CALENDAR_ID
+   ```
+
+2. Reiniciar container:
+   ```bash
+   docker-compose -f docker/docker-compose-dev.yml restart e2bot-n8n-dev
+   ```
+
+3. Verificar variável dentro do container:
+   ```bash
+   docker exec e2bot-n8n-dev env | grep GOOGLE_CALENDAR_ID
+   ```
+
+---
+
+## ✅ Checklist de Validação
+
+Antes de usar em produção:
 
 - [ ] Projeto criado no Google Cloud Console
 - [ ] Google Calendar API habilitada
-- [ ] Conta de serviço criada
-- [ ] Chave JSON baixada e salva em `docker/credentials/`
-- [ ] Email da conta de serviço anotado
-- [ ] Calendário "Visitas Técnicas E2" criado
-- [ ] Calendário compartilhado com conta de serviço
-- [ ] CALENDAR_ID obtido e anotado
-- [ ] `.env.dev` atualizado com todas as variáveis
-- [ ] `docker-compose-dev.yml` atualizado com volume
-- [ ] Arquivo JSON validado (`jq empty`)
-- [ ] Permissões do arquivo configuradas (chmod 600)
-- [ ] Teste de conexão no n8n realizado
-- [ ] Teste de criação de evento realizado
-- [ ] Workflows de agendamento importados
-- [ ] Lembretes automáticos testados
-- [ ] Feriados cadastrados no banco
-- [ ] Monitoramento configurado
+- [ ] OAuth2 Client ID criado com redirect URI correto
+- [ ] Credencial criada no n8n com OAuth2 autenticado
+- [ ] Calendar ID obtido e configurado em `docker/.env`
+- [ ] Credential ID obtido e configurado em `docker/.env`
+- [ ] Container n8n reiniciado para carregar variáveis
+- [ ] WF06 responde com datas disponíveis (teste curl)
+- [ ] WF05 cria evento no Google Calendar com sucesso
+- [ ] Eventos aparecem no Google Calendar UI
+
+**Tudo OK?** 🎉 **Integração Google Calendar configurada com sucesso!**
 
 ---
 
-**Configuração completa!** O bot agora pode agendar visitas técnicas automaticamente no Google Calendar com lembretes integrados.
+## 📚 Referências
+
+- [Google Calendar API Documentation](https://developers.google.com/calendar/api)
+- [OAuth2 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [n8n Google Calendar Node](https://docs.n8n.io/integrations/builtin/credentials/google/oauth-generic/)
+- [Calendar API Quickstart](https://developers.google.com/calendar/api/quickstart/nodejs)
+
+---
+
+## 🔄 Histórico de Versões
+
+- **V3.0** (2026-04-08): Versão definitiva consolidada com OAuth2
+- **V2.0** (2026-04-06): Migração para OAuth2 (deprecou Service Account)
+- **V1.0** (2024-12-15): Versão inicial com Service Account
+
+---
+
+**Última Atualização**: 2026-04-08
+**Mantido por**: E2 Soluções Dev Team
+**Próximo**: `QUICKSTART.md` seção 2.2 ou `SETUP_CREDENTIALS.md` seção 2

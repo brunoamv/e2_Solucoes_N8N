@@ -917,7 +917,7 @@ _E2 Soluções - 15+ anos de experiência em engenharia elétrica_`
 - V59 Workflow: `n8n/workflows/02_ai_agent_conversation_V59_UX_TEMPLATES_UPGRADE.json` (to be generated)
 
 **Testing**:
-- Quick Start: `docs/QUICKSTART.md`
+- Quick Start: `docs/Setups/QUICKSTART.md`
 - Database: V58.1 schema (contact_phone column present)
 
 ---

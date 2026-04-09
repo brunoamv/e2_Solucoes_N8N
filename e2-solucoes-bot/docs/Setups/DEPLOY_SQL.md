@@ -1,594 +1,498 @@
-# Deploy de Funções SQL - Sprint 1.1 Validation
+# Deploy do Schema PostgreSQL - E2 Bot
 
-**Objetivo**: Fazer deploy das funções SQL do sistema RAG no Supabase
-
-**Tempo Estimado**: 10-15 minutos
-
-**Pré-requisitos**:
-- ✅ Etapa 1 (SETUP_CREDENTIALS.md) completa
-- ✅ Arquivo .env configurado com SUPABASE_URL e SUPABASE_SERVICE_KEY
-- ✅ Projeto Supabase criado e ativo
-- ✅ Extensão pgvector habilitada no Supabase
+> **Versão**: 2.0 | **Atualização**: 2026-04-08
+> **Objetivo**: Deploy do schema completo do E2 Bot com todas as tabelas n8n
 
 ---
 
-## 📋 O que Será Deployado
+## 📋 Visão Geral
 
-O arquivo `database/supabase_functions.sql` contém:
+Este documento cobre o deploy do schema PostgreSQL para os workflows n8n do E2 Bot.
 
-### 1. Tabela `knowledge_documents`
-```sql
-CREATE TABLE knowledge_documents (
-    id TEXT PRIMARY KEY,
-    content TEXT NOT NULL,
-    embedding vector(1536),
-    category VARCHAR(50),
-    source_file VARCHAR(255),
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
-);
-```
+**O que será deployado**:
+- ✅ 7 tabelas: conversations, messages, leads, appointments, rdstation_sync_log, chat_memory, email_logs
+- ✅ Índices de performance para queries otimizadas
+- ✅ Triggers de atualização automática de timestamps
+- ✅ Funções de utilidade para workflows
+- ✅ Extensão UUID para IDs únicos
 
-**Propósito**: Armazenar chunks de conhecimento com seus embeddings vetoriais
-
-### 2. Índices de Performance
-```sql
--- Índice ivfflat para vector search (ANN - Approximate Nearest Neighbor)
-CREATE INDEX knowledge_documents_embedding_idx
-ON knowledge_documents
-USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
-
--- Índices B-tree para filtros comuns
-CREATE INDEX idx_knowledge_documents_category ON knowledge_documents(category);
-CREATE INDEX idx_knowledge_documents_source ON knowledge_documents(source_file);
-
--- Índice GIN para metadata JSONB
-CREATE INDEX idx_knowledge_documents_metadata ON knowledge_documents USING GIN (metadata);
-```
-
-**Propósito**: Otimizar queries de vector similarity e filtros
-
-### 3. Função Principal `match_documents()`
-```sql
-CREATE OR REPLACE FUNCTION match_documents(
-    query_embedding vector(1536),
-    match_threshold FLOAT DEFAULT 0.75,
-    match_count INT DEFAULT 5,
-    filter_category VARCHAR DEFAULT NULL
-)
-RETURNS TABLE (
-    id TEXT,
-    content TEXT,
-    category VARCHAR,
-    source_file VARCHAR,
-    metadata JSONB,
-    similarity FLOAT
-)
-```
-
-**Propósito**: Buscar documentos similares usando cosine distance
-
-### 4. Funções de Utilidade
-- `delete_documents_by_category(category VARCHAR)` - Re-ingest por categoria
-- `delete_documents_by_source(source_file VARCHAR)` - Atualizar arquivo específico
-- `get_documents_stats()` - Estatísticas gerais do banco
-- `get_category_stats()` - Estatísticas por categoria
-
-### 5. Trigger de Timestamp
-```sql
-CREATE TRIGGER update_knowledge_documents_timestamp
-    BEFORE UPDATE ON knowledge_documents
-    FOR EACH ROW
-    EXECUTE FUNCTION update_documents_timestamp();
-```
-
-**Propósito**: Atualizar automaticamente `updated_at` em modificações
+**Tempo Estimado**: 5 minutos
 
 ---
 
-## 🚀 Opção A: Deploy via Supabase Dashboard (Recomendado)
+## 🚨 Pré-requisitos
 
-**Vantagens**: Interface visual, validação automática, fácil debugging
-
-### Passo a Passo
-
-#### 1. Acessar SQL Editor
-
+**Infraestrutura rodando**:
 ```bash
-# Acesse seu projeto Supabase
-# URL: https://supabase.com/dashboard/project/SEU_PROJECT_ID
+# Verificar containers
+docker ps | grep -E "e2bot-postgres-dev|e2bot-n8n-dev"
+
+# Resultado esperado:
+# e2bot-postgres-dev   Up
+# e2bot-n8n-dev        Up
 ```
 
-1. No painel do Supabase, vá em: **SQL Editor** (ícone </> no menu lateral)
-2. Clique em **+ New query**
-
-#### 2. Copiar SQL do Projeto
-
+Se os containers NÃO estiverem rodando:
 ```bash
-# No seu terminal local
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
-
-# Exibir conteúdo do arquivo SQL
-cat database/supabase_functions.sql
-```
-
-Copie TODO o conteúdo do arquivo `database/supabase_functions.sql`
-
-#### 3. Colar e Executar no SQL Editor
-
-1. Cole o SQL completo no editor
-2. Dê um nome à query: **"Sprint 1.1 - RAG Functions"**
-3. Clique em **Run** (ou Ctrl+Enter)
-4. **Aguarde confirmação**: Deve aparecer "Success. No rows returned"
-
-#### 4. Verificar Deployment
-
-Execute estas queries de validação no SQL Editor:
-
-**Teste 1: Verificar Tabela Criada**
-```sql
-SELECT
-    table_name,
-    column_name,
-    data_type
-FROM information_schema.columns
-WHERE table_name = 'knowledge_documents'
-ORDER BY ordinal_position;
-```
-
-**Resultado Esperado**: 8 colunas (id, content, embedding, category, source_file, metadata, created_at, updated_at)
-
-**Teste 2: Verificar Índices**
-```sql
-SELECT
-    indexname,
-    indexdef
-FROM pg_indexes
-WHERE tablename = 'knowledge_documents';
-```
-
-**Resultado Esperado**: 4 índices (primary key + embedding_idx + category + source + metadata)
-
-**Teste 3: Verificar Funções**
-```sql
-SELECT
-    routine_name,
-    routine_type
-FROM information_schema.routines
-WHERE routine_schema = 'public'
-AND routine_name IN (
-    'match_documents',
-    'delete_documents_by_category',
-    'delete_documents_by_source',
-    'get_documents_stats',
-    'get_category_stats'
-);
-```
-
-**Resultado Esperado**: 5 funções listadas
-
-**Teste 4: Verificar Trigger**
-```sql
-SELECT
-    trigger_name,
-    event_manipulation,
-    event_object_table
-FROM information_schema.triggers
-WHERE trigger_name = 'update_knowledge_documents_timestamp';
-```
-
-**Resultado Esperado**: 1 trigger (BEFORE UPDATE na tabela knowledge_documents)
-
-**Teste 5: Testar Inserção**
-```sql
--- Inserir documento de teste
-INSERT INTO knowledge_documents (id, content, category, source_file)
-VALUES ('test/sample/chunk-1', 'Documento de teste para validação do sistema RAG.', 'test', 'test.md');
-
--- Verificar inserção
-SELECT * FROM knowledge_documents WHERE id = 'test/sample/chunk-1';
-
--- Limpar teste
-DELETE FROM knowledge_documents WHERE id = 'test/sample/chunk-1';
-```
-
-**Resultado Esperado**: Insert OK, Select retorna 1 linha, Delete OK
-
----
-
-## 🖥️ Opção B: Deploy via Supabase CLI
-
-**Vantagens**: Automação, versionamento, integração CI/CD
-
-### Pré-requisitos
-
-```bash
-# 1. Instalar Supabase CLI (se ainda não tiver)
-# macOS
-brew install supabase/tap/supabase
-
-# Linux
-brew install supabase/tap/supabase
-# OU
-curl -sL https://github.com/supabase/cli/releases/download/v1.142.2/supabase_1.142.2_linux_amd64.tar.gz | tar xz
-sudo mv supabase /usr/local/bin/
-
-# 2. Verificar instalação
-supabase --version
-```
-
-### Deploy via CLI
-
-#### 1. Fazer Login no Supabase
-
-```bash
-# Login interativo
-supabase login
-
-# Ou usar access token
-supabase login --token YOUR_ACCESS_TOKEN
-```
-
-**Como obter access token**:
-1. Acesse: https://supabase.com/dashboard/account/tokens
-2. Clique em "Generate new token"
-3. Dê um nome: "CLI Deploy"
-4. Copie o token
-
-#### 2. Vincular ao Projeto
-
-```bash
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
-
-# Vincular ao projeto Supabase
-supabase link --project-ref SEU_PROJECT_REF
-
-# Encontrar project-ref:
-# URL do projeto: https://supabase.com/dashboard/project/abcdefghijklmnop
-# project-ref = abcdefghijklmnop
-```
-
-#### 3. Executar SQL
-
-```bash
-# Executar arquivo SQL diretamente
-supabase db push database/supabase_functions.sql
-
-# OU usar psql
-supabase db reset --db-url "$SUPABASE_URL" -f database/supabase_functions.sql
-```
-
-#### 4. Verificar via CLI
-
-```bash
-# Listar tabelas
-supabase db dump --schema public
-
-# Testar função match_documents
-supabase db execute "SELECT routine_name FROM information_schema.routines WHERE routine_name = 'match_documents';"
+cd docker
+docker-compose -f docker-compose-dev.yml up -d e2bot-postgres-dev e2bot-n8n-dev
+sleep 30  # Aguardar inicialização
 ```
 
 ---
 
-## 🐳 Opção C: Deploy via Supabase Local (Desenvolvimento)
+## 🎯 Opção A: Deploy Automático via Docker (Recomendado)
 
-**Uso**: Desenvolvimento e testes locais antes de deploy em produção
+**O schema JÁ FOI DEPLOYADO automaticamente** se você iniciou os containers via docker-compose!
 
-### Setup Local
+### Como funciona?
 
-```bash
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
+O `docker-compose-dev.yml` está configurado para executar automaticamente na primeira inicialização:
 
-# Inicializar Supabase local (se ainda não fez)
-supabase init
+```yaml
+postgres-dev:
+  volumes:
+    # Script 1: Cria database e2bot_dev
+    - ../database/init-e2bot-dev.sh:/docker-entrypoint-initdb.d/00_init_database.sh:ro
 
-# Iniciar containers Docker
-supabase start
+    # Script 2: Aplica schema completo (7 tabelas + índices + triggers)
+    - ../database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
 
-# Aguardar ~30 segundos para inicialização
-# Supabase exibirá credenciais locais:
-# API URL: http://localhost:54321
-# DB URL: postgresql://postgres:postgres@localhost:54322/postgres
-# Studio URL: http://localhost:54323
+    # Script 3: Funções de appointment
+    - ../database/appointment_functions.sql:/docker-entrypoint-initdb.d/02_appointment_functions.sql:ro
 ```
 
-### Executar SQL Localmente
+**Arquivos executados automaticamente**:
+1. `database/init-e2bot-dev.sh` - Cria database `e2bot_dev`
+2. `database/schema.sql` - Cria 7 tabelas + índices + triggers
+3. `database/appointment_functions.sql` - Funções de agendamento
+
+### Verificar se o deploy foi feito
 
 ```bash
-# Opção 1: Via CLI
-supabase db reset -f database/supabase_functions.sql
-
-# Opção 2: Via psql
-psql postgresql://postgres:postgres@localhost:54322/postgres -f database/supabase_functions.sql
-
-# Opção 3: Via Supabase Studio (UI)
-# Acessar http://localhost:54323
-# SQL Editor → New query → Colar SQL → Run
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c "\dt"
 ```
 
-### Validar Local
+**✅ Resultado esperado**: Lista de 7 tabelas
+```
+                  List of relations
+ Schema |         Name         | Type  |  Owner
+--------+----------------------+-------+----------
+ public | appointments         | table | postgres
+ public | chat_memory          | table | postgres
+ public | conversations        | table | postgres
+ public | email_logs           | table | postgres
+ public | leads                | table | postgres
+ public | messages             | table | postgres
+ public | rdstation_sync_log   | table | postgres
+(7 rows)
+```
+
+**❌ Se as tabelas NÃO aparecerem**, vá para **Opção B: Deploy Manual**
+
+---
+
+## 🔧 Opção B: Deploy Manual (Se Automático Falhou)
+
+### Passo 1: Verificar se database existe
 
 ```bash
-# Conectar ao banco local
-psql postgresql://postgres:postgres@localhost:54322/postgres
+docker exec e2bot-postgres-dev psql -U postgres -c "\l" | grep e2bot_dev
+```
 
-# Executar testes (mesmos da Opção A)
-SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'knowledge_documents';
-# Deve retornar: 1
+**Se não existir**, criar manualmente:
+```bash
+docker exec e2bot-postgres-dev psql -U postgres -c "CREATE DATABASE e2bot_dev OWNER postgres;"
+```
 
-\q  # Sair do psql
+### Passo 2: Executar Schema SQL
+
+```bash
+# Copiar schema.sql para container
+docker cp database/schema.sql e2bot-postgres-dev:/tmp/schema.sql
+
+# Executar SQL
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -f /tmp/schema.sql
+
+# Verificar resultado
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c "\dt"
+```
+
+**✅ Deve mostrar 7 tabelas**
+
+### Passo 3: Executar Funções de Appointment (Opcional)
+
+```bash
+# Copiar arquivo
+docker cp database/appointment_functions.sql e2bot-postgres-dev:/tmp/appointment_functions.sql
+
+# Executar SQL
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -f /tmp/appointment_functions.sql
 ```
 
 ---
 
-## ✅ Validação Completa do Deploy
+## 📊 Validação Completa do Deploy
 
-### Checklist de Validação
+### Checklist de Tabelas
 
-Execute este script de validação completo:
-
-```bash
-# Salvar como: scripts/validate-sql-deploy.sh
-cd /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot
-
-# Carregar variáveis de ambiente
-set -a
-source .env
-set +a
-
-# Função de teste
-test_sql() {
-    local test_name=$1
-    local sql_query=$2
-
-    echo "🧪 Teste: $test_name"
-
-    result=$(curl -s "${SUPABASE_URL}/rest/v1/rpc/execute_sql" \
-        -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-        -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-        -H "Content-Type: application/json" \
-        -d "{\"query\": \"$sql_query\"}")
-
-    if [ $? -eq 0 ]; then
-        echo "✅ $test_name: PASSOU"
-        return 0
-    else
-        echo "❌ $test_name: FALHOU"
-        echo "   Erro: $result"
-        return 1
-    fi
-}
-
-# Executar testes
-echo "🔍 Validando Deploy SQL..."
-echo ""
-
-# Teste 1: Tabela existe
-test_sql "Tabela knowledge_documents" \
-    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'knowledge_documents'"
-
-# Teste 2: Função match_documents existe
-test_sql "Função match_documents" \
-    "SELECT COUNT(*) FROM information_schema.routines WHERE routine_name = 'match_documents'"
-
-# Teste 3: Índice ivfflat existe
-test_sql "Índice vector search" \
-    "SELECT COUNT(*) FROM pg_indexes WHERE tablename = 'knowledge_documents' AND indexname LIKE '%embedding%'"
-
-# Teste 4: Funções de utilidade
-test_sql "Funções de utilidade" \
-    "SELECT COUNT(*) FROM information_schema.routines WHERE routine_name IN ('get_documents_stats', 'get_category_stats')"
-
-echo ""
-echo "✅ Validação de Deploy SQL Completa!"
-```
-
-### Executar Validação
+Executar teste para cada tabela:
 
 ```bash
-chmod +x scripts/validate-sql-deploy.sh
-./scripts/validate-sql-deploy.sh
+# Script de validação completo
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev <<-EOSQL
+    -- Teste 1: Verificar 7 tabelas
+    SELECT
+        table_name,
+        (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = t.table_name) as column_count
+    FROM information_schema.tables t
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+    ORDER BY table_name;
+
+    -- Teste 2: Verificar índices
+    SELECT
+        tablename,
+        COUNT(indexname) as index_count
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+    GROUP BY tablename
+    ORDER BY tablename;
+
+    -- Teste 3: Verificar triggers
+    SELECT
+        event_object_table as table_name,
+        trigger_name
+    FROM information_schema.triggers
+    WHERE trigger_schema = 'public'
+    ORDER BY event_object_table;
+EOSQL
 ```
 
-**Resultado Esperado**:
+**✅ Resultado Esperado**:
+
+**Teste 1 - Tabelas**:
 ```
-🔍 Validando Deploy SQL...
-
-🧪 Teste: Tabela knowledge_documents
-✅ Tabela knowledge_documents: PASSOU
-
-🧪 Teste: Função match_documents
-✅ Função match_documents: PASSOU
-
-🧪 Teste: Índice vector search
-✅ Índice vector search: PASSOU
-
-🧪 Teste: Funções de utilidade
-✅ Funções de utilidade: PASSOU
-
-✅ Validação de Deploy SQL Completa!
+     table_name      | column_count
+---------------------+--------------
+ appointments        |           14
+ chat_memory         |            3
+ conversations       |           14
+ email_logs          |           10
+ leads               |           28
+ messages            |            9
+ rdstation_sync_log  |           10
+(7 rows)
 ```
+
+**Teste 2 - Índices** (cada tabela deve ter pelo menos 1 índice):
+```
+     tablename      | index_count
+--------------------+-------------
+ appointments       |           5
+ chat_memory        |           3
+ conversations      |           7
+ email_logs         |           5
+ leads              |           6
+ messages           |           4
+ rdstation_sync_log |           3
+(7 rows)
+```
+
+**Teste 3 - Triggers** (3 triggers UPDATE):
+```
+   table_name   |           trigger_name
+----------------+----------------------------------
+ appointments   | update_appointments_updated_at
+ conversations  | update_conversations_updated_at
+ leads          | update_leads_updated_at
+(3 rows)
+```
+
+---
+
+## 🧪 Teste de Inserção (Validação Funcional)
+
+### Teste 1: Conversation + Message
+
+```bash
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev <<-EOSQL
+    -- Inserir conversation de teste
+    INSERT INTO conversations (phone_number, whatsapp_name, service_type, current_state)
+    VALUES ('5561999999999', 'Teste User', 'energia_solar', 'novo')
+    RETURNING id, phone_number, service_type;
+
+    -- Inserir message de teste
+    INSERT INTO messages (conversation_id, direction, content)
+    SELECT id, 'inbound', 'Olá, quero informações sobre energia solar'
+    FROM conversations WHERE phone_number = '5561999999999'
+    RETURNING id, direction, content;
+
+    -- Limpar teste
+    DELETE FROM conversations WHERE phone_number = '5561999999999';
+EOSQL
+```
+
+**✅ Deve retornar**: UUID da conversation + UUID da message, sem erros
+
+### Teste 2: Email Log (WF07)
+
+```bash
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev <<-EOSQL
+    -- Inserir email log de teste
+    INSERT INTO email_logs (
+        recipient_email,
+        recipient_name,
+        subject,
+        template_used,
+        status,
+        sent_at,
+        metadata
+    ) VALUES (
+        'teste@example.com',
+        'Teste User',
+        'Confirmação de Agendamento',
+        'confirmacao_agendamento',
+        'sent',
+        NOW(),
+        '{"source": "test"}'::jsonb
+    )
+    RETURNING id, recipient_email, status, sent_at;
+
+    -- Limpar teste
+    DELETE FROM email_logs WHERE recipient_email = 'teste@example.com';
+EOSQL
+```
+
+**✅ Deve retornar**: UUID + email + status + timestamp, sem erros
+
+---
+
+## 📚 Estrutura das Tabelas
+
+### 1. conversations
+**Propósito**: Armazena conversas WhatsApp com estado e dados coletados
+
+**Colunas principais**:
+- `id` - UUID (primary key)
+- `phone_number` - VARCHAR(20) UNIQUE
+- `current_state` - Estado da conversa (novo, identificando_servico, etc.)
+- `service_type` - Tipo de serviço escolhido
+- `collected_data` - JSONB com dados coletados
+- `service_id`, `contact_name`, `contact_email`, `city` - Colunas V43 para compatibilidade
+
+**Workflows que usam**: WF01, WF02, WF05
+
+---
+
+### 2. messages
+**Propósito**: Histórico completo de mensagens trocadas
+
+**Colunas principais**:
+- `id` - UUID
+- `conversation_id` - FK para conversations
+- `direction` - 'inbound' ou 'outbound'
+- `content` - Texto da mensagem
+- `message_type` - 'text', 'image', 'document', etc.
+- `whatsapp_message_id` - ID único do WhatsApp
+
+**Workflows que usam**: WF01, WF02
+
+---
+
+### 3. leads
+**Propósito**: Leads qualificados prontos para atendimento comercial
+
+**Colunas principais**:
+- `id` - UUID
+- `conversation_id` - FK para conversations
+- `name`, `email`, `phone_number` - Dados do lead
+- `service_type`, `service_details` - Informações do serviço
+- `status` - 'novo', 'em_atendimento', 'agendado', etc.
+- `rdstation_contact_id`, `rdstation_deal_id` - IDs CRM
+
+**Workflows que usam**: WF05, WF08 (RD Station)
+
+---
+
+### 4. appointments
+**Propósito**: Agendamentos de visitas técnicas
+
+**Colunas principais**:
+- `id` - UUID
+- `lead_id` - FK para leads
+- `conversation_id` - FK para conversations
+- `scheduled_date`, `scheduled_time_start`, `scheduled_time_end` - Data/hora
+- `google_calendar_event_id` - ID do evento no Google Calendar
+- `status` - 'agendado', 'confirmado', 'realizado', etc.
+- `reminder_24h_sent`, `reminder_2h_sent` - Controle de lembretes
+
+**Workflows que usam**: WF05 (Appointment Scheduler)
+
+---
+
+### 5. email_logs
+**Propósito**: Log de envios de email via WF07
+
+**Colunas principais**:
+- `id` - UUID
+- `recipient_email`, `recipient_name` - Destinatário
+- `subject` - Assunto do email
+- `template_used` - Template usado (confirmacao_agendamento, lembrete_24h, etc.)
+- `status` - 'pending', 'sent', 'failed', 'bounce'
+- `sent_at` - Timestamp de envio
+- `metadata` - JSONB com dados adicionais
+
+**Workflows que usam**: WF07 (Send Email)
+
+---
+
+### 6. chat_memory
+**Propósito**: Memória de conversação para n8n AI Agent
+
+**Colunas principais**:
+- `id` - SERIAL
+- `session_id` - ID da sessão (phone_number)
+- `message` - JSONB com histórico de mensagens
+- `created_at` - Timestamp
+
+**Workflows que usam**: WF02 (AI Agent - opcional)
+
+---
+
+### 7. rdstation_sync_log
+**Propósito**: Log de sincronização com RD Station CRM
+
+**Colunas principais**:
+- `id` - UUID
+- `entity_type`, `entity_id` - Entidade sincronizada
+- `rdstation_id` - ID no RD Station
+- `operation` - 'create', 'update', 'delete'
+- `request_payload`, `response_payload` - JSONB
+- `status` - 'pending', 'success', 'failed'
+
+**Workflows que usam**: WF05, WF08 (RD Station Sync)
 
 ---
 
 ## 🚨 Troubleshooting
 
-### Problema: "extension vector does not exist"
+### Problema: "database e2bot_dev does not exist"
 
-**Causa**: Extensão pgvector não habilitada
-
-**Solução**:
-```sql
--- Via Supabase Dashboard SQL Editor
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- Verificar
-SELECT * FROM pg_extension WHERE extname = 'vector';
-```
-
-### Problema: "permission denied for schema public"
-
-**Causa**: Permissões insuficientes (usando anon key em vez de service_role)
-
-**Solução**:
-1. Verifique se está usando `SUPABASE_SERVICE_KEY` (não `SUPABASE_ANON_KEY`)
-2. Confirme que service_role key está correta no .env
-3. Re-execute com credenciais corretas
-
-### Problema: "index method 'ivfflat' does not exist"
-
-**Causa**: Extensão pgvector não instalada corretamente
+**Causa**: Database não foi criada automaticamente
 
 **Solução**:
 ```bash
-# Via Supabase Dashboard
-# Database → Extensions → Procurar "vector" → Enable
+# Criar database manualmente
+docker exec e2bot-postgres-dev psql -U postgres -c "CREATE DATABASE e2bot_dev OWNER postgres;"
 
-# OU via SQL
-CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+# Re-executar schema
+docker cp database/schema.sql e2bot-postgres-dev:/tmp/schema.sql
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -f /tmp/schema.sql
 ```
 
-### Problema: "function match_documents already exists"
+---
 
-**Causa**: Tentando criar função que já existe
+### Problema: "relation 'conversations' already exists"
 
-**Solução**:
-```sql
--- Opção 1: Drop e recriar
-DROP FUNCTION IF EXISTS match_documents CASCADE;
+**Causa**: Tentando executar schema em database que já tem tabelas
 
--- Depois re-execute o SQL completo
-
--- Opção 2: Usar CREATE OR REPLACE (já está no SQL)
--- Simplesmente re-execute o arquivo supabase_functions.sql
-```
-
-### Problema: Deploy via CLI falha com "connection refused"
-
-**Causa**: Supabase local não está rodando ou credenciais cloud incorretas
-
-**Solução Local**:
+**Solução Opção 1 - Verificar tabelas existentes**:
 ```bash
-# Verificar status
-supabase status
-
-# Se não estiver rodando
-supabase start
-
-# Aguardar ~30 segundos
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c "\dt"
 ```
 
-**Solução Cloud**:
+Se as 7 tabelas já existem, **o deploy está completo**, não precisa fazer nada!
+
+**Solução Opção 2 - Recrear database** (⚠️ APAGA TODOS OS DADOS):
 ```bash
-# Verificar projeto vinculado
-supabase projects list
+# Dropar database
+docker exec e2bot-postgres-dev psql -U postgres -c "DROP DATABASE e2bot_dev;"
 
-# Re-vincular se necessário
-supabase link --project-ref SEU_PROJECT_REF
-```
+# Criar novamente
+docker exec e2bot-postgres-dev psql -U postgres -c "CREATE DATABASE e2bot_dev OWNER postgres;"
 
-### Problema: Índice ivfflat lento ou não usado
-
-**Causa**: Tabela vazia ou sem VACUUM/ANALYZE após inserções
-
-**Solução**:
-```sql
--- Após popular a tabela com dados
-VACUUM ANALYZE knowledge_documents;
-
--- Verificar uso do índice
-EXPLAIN ANALYZE
-SELECT * FROM match_documents(
-    (SELECT embedding FROM knowledge_documents LIMIT 1),
-    0.75, 5, NULL
-);
-
--- Deve mostrar: "Index Scan using knowledge_documents_embedding_idx"
+# Re-executar schema
+docker cp database/schema.sql e2bot-postgres-dev:/tmp/schema.sql
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -f /tmp/schema.sql
 ```
 
 ---
 
-## 📊 Verificação de Performance
+### Problema: "permission denied for relation conversations"
 
-### Teste de Performance do Índice
+**Causa**: Credencial n8n usando usuário sem permissões
 
-```sql
--- Criar dados de teste (após ingest real)
-EXPLAIN ANALYZE
-SELECT
-    id,
-    content,
-    1 - (embedding <=> (SELECT embedding FROM knowledge_documents LIMIT 1)) AS similarity
-FROM knowledge_documents
-WHERE 1 - (embedding <=> (SELECT embedding FROM knowledge_documents LIMIT 1)) > 0.75
-ORDER BY similarity DESC
-LIMIT 5;
+**Solução**: A credencial n8n deve usar:
+- **User**: `postgres`
+- **Password**: (conforme docker/.env - padrão: `CoraRosa`)
+- **Database**: `e2bot_dev`
+- **Host**: `e2bot-postgres-dev` (NÃO `localhost`)
+
+---
+
+### Problema: "relation 'email_logs' does not exist"
+
+**Causa**: Schema antigo sem tabela email_logs (adicionada em 2026-04-08)
+
+**Solução**: Executar apenas a criação da tabela email_logs
+```bash
+docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev <<-EOSQL
+    CREATE TABLE IF NOT EXISTS email_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        recipient_email VARCHAR(255) NOT NULL,
+        recipient_name VARCHAR(255),
+        subject VARCHAR(500),
+        template_used VARCHAR(100),
+        status VARCHAR(20) DEFAULT 'pending',
+        sent_at TIMESTAMP WITH TIME ZONE,
+        metadata JSONB DEFAULT '{}',
+        error_message TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        CONSTRAINT valid_email_status CHECK (status IN ('pending', 'sent', 'failed', 'bounce'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON email_logs(recipient_email);
+    CREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(status);
+    CREATE INDEX IF NOT EXISTS idx_email_logs_template ON email_logs(template_used);
+    CREATE INDEX IF NOT EXISTS idx_email_logs_sent_at ON email_logs(sent_at DESC);
+EOSQL
 ```
 
-**Métricas Esperadas**:
-- **Planning Time**: < 5ms
-- **Execution Time**: < 500ms (com ~100 chunks)
-- **Index Scan**: Deve aparecer no query plan
-- **Rows Scanned**: Deve ser << total de rows (prova de uso do índice)
+---
 
-### Monitorar Uso de Índices
+## ✅ Checklist Final de Deploy
 
-```sql
--- Verificar estatísticas de uso de índices
-SELECT
-    schemaname,
-    tablename,
-    indexname,
-    idx_scan as index_scans,
-    idx_tup_read as tuples_read,
-    idx_tup_fetch as tuples_fetched
-FROM pg_stat_user_indexes
-WHERE tablename = 'knowledge_documents';
-```
+Antes de configurar credenciais n8n:
+
+- [ ] Container `e2bot-postgres-dev` rodando (status: Up)
+- [ ] Database `e2bot_dev` existe
+- [ ] 7 tabelas criadas (conversations, messages, leads, appointments, email_logs, chat_memory, rdstation_sync_log)
+- [ ] Índices criados (verificar com `\di` no psql)
+- [ ] Triggers criados (3 triggers de UPDATE)
+- [ ] Teste de inserção em `conversations` funcionou
+- [ ] Teste de inserção em `email_logs` funcionou
+
+**Tudo OK?** 🎉 **Próximo passo**: Configurar credencial PostgreSQL no n8n
 
 ---
 
-## 📝 Checklist Final de Deploy
+## 📖 Documentação Relacionada
 
-Antes de prosseguir para Etapa 3 (Ingest), confirme:
+**Setup**:
+- `QUICKSTART.md` - Guia completo de setup do zero
+- `SETUP_CREDENTIALS.md` - Configuração de credenciais n8n
 
-- [ ] ✅ SQL executado sem erros no Supabase
-- [ ] ✅ Tabela `knowledge_documents` criada com 8 colunas
-- [ ] ✅ 4 índices criados (primary key + embedding + category + source + metadata)
-- [ ] ✅ Função `match_documents()` disponível
-- [ ] ✅ 4 funções de utilidade criadas
-- [ ] ✅ Trigger `update_knowledge_documents_timestamp` ativo
-- [ ] ✅ Extensão `vector` habilitada
-- [ ] ✅ Teste de inserção funcionou
-- [ ] ✅ Script de validação passou todos os testes
+**Workflows**:
+- `WF02_V76_IMPLEMENTATION_GUIDE.md` - AI Agent conversation
+- `WF06_CALENDAR_AVAILABILITY_SERVICE.md` - Calendar availability
+- `BUGFIX_WF07_V13_INSERT_SELECT_FIX.md` - Email workflow
 
-**Status**: Se todos os checkboxes estão marcados, você está pronto para a **Etapa 3: Executar Script de Ingest**
-
----
-
-## 🔐 Segurança
-
-**IMPORTANTE**:
-
-1. ✅ **Service Role Key**: Só usar em backend/scripts, NUNCA expor no frontend
-2. ✅ **Row Level Security (RLS)**: Para produção, habilitar RLS:
-   ```sql
-   ALTER TABLE knowledge_documents ENABLE ROW LEVEL SECURITY;
-
-   -- Política exemplo: Leitura pública, escrita apenas service_role
-   CREATE POLICY "Leitura pública"
-   ON knowledge_documents FOR SELECT
-   TO anon, authenticated
-   USING (true);
-   ```
-3. ✅ **Backup**: Supabase faz backup automático, mas considere exports periódicos
-4. ✅ **Auditoria**: Habilitar pgAudit se necessário para compliance
+**Arquitetura**:
+- `ARCHITECTURE.md` - Visão geral do sistema
+- `CLAUDE.md` - Contexto completo do projeto
 
 ---
 
-**Próximo Documento**: `EXECUTE_INGEST.md` - Executar script de ingestão de conhecimento
-
-**Tempo Total Etapa 2**: 10-15 minutos
-**Próxima Etapa**: 15-20 minutos
+**Última Atualização**: 2026-04-08
+**Versão**: 2.0 (E2 Bot n8n workflows)
+**Mantido por**: E2 Soluções Dev Team

@@ -974,7 +974,7 @@ ORDER BY hour;
 ### Related Documentation
 - [V72 COMPLETE Implementation Plan](./PLAN_V72_COMPLETE_IMPLEMENTATION.md)
 - [V71 Appointment Fix](./V71_APPOINTMENT_FIX_COMPLETE.md)
-- [Google Calendar Setup Guide](./Setups/SETUP_GOOGLE_CALENDAR_V2.md)
+- [Google Calendar Setup Guide](./Setups/SETUP_GOOGLE_CALENDAR.md)
 
 ---
 

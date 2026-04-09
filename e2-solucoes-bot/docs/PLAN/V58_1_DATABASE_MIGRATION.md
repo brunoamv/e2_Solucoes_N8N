@@ -175,7 +175,7 @@ docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev -c \
 4. Activate V58.1 workflow
 
 **Step 4: Test V58.1 Paths**
-Execute 3 test paths from `docs/QUICKSTART.md` section "Test V58.1"
+Execute 3 test paths from `docs/Setups/QUICKSTART.md` section "Test V58.1"
 
 ---
 
@@ -424,7 +424,7 @@ ORDER BY count DESC;
 - **Migration Script**: `scripts/run-migration-v58_1-complete.sh`
 - **V58.1 Workflow**: `n8n/workflows/02_ai_agent_conversation_V58_1_UX_REFACTOR_COMPLETE.json`
 - **Implementation Report**: `docs/PLAN/V58_1_IMPLEMENTATION_REPORT.md`
-- **Quick Start Guide**: `docs/QUICKSTART.md`
+- **Quick Start Guide**: `docs/Setups/QUICKSTART.md`
 - **Database Schema**: Check with `\d conversations` in psql
 
 ---

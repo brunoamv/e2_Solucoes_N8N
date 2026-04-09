@@ -245,7 +245,7 @@ docs/
 ### Para Começar
 1. [CLAUDE.md](../CLAUDE.md) - Contexto principal
 2. [PROJECT_STATUS.md](status/PROJECT_STATUS.md) - Status atual
-3. [QUICKSTART.md](../QUICKSTART.md) - Quick start guide
+3. [QUICKSTART.md](../docs/Setups/QUICKSTART.md) - Quick start guide
 
 ### Para Implementar V27
 1. [V27_ANALYSIS_REPORT.md](V27_ANALYSIS_REPORT.md) - Entender a solução

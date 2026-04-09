@@ -1,6 +1,6 @@
 # E2 Bot Documentation Index
 
-> **Complete documentation catalog** | Updated: 2026-04-01
+> **Complete documentation catalog** | Updated: 2026-04-08
 
 ---
 
@@ -15,27 +15,36 @@
 ## 🚀 Deployment Guides
 
 ### WF02 (AI Agent)
-- **DEPLOY_V75_PRODUCTION.md** - Personalized appointment confirmations
-  - Status: Ready for testing
-  - Changes: Real appointment data in final message
+- **WF02_V76_IMPLEMENTATION_GUIDE.md** - Proactive UX implementation (READY ✅)
+  - Location: `/docs/implementation/`
+  - Status: Ready for Production
+  - Changes: Proactive date/time selection (12 states)
+
+- **WF02_V76_DEPLOYMENT_SUMMARY.md** - V76 deployment checklist
+  - Location: `/docs/implementation/`
+  - Strategy: Canary deployment (20% → 100%)
 
 ### WF05 (Appointment Scheduler)
-- **DEPLOY_WF05_V7_HARDCODED_FINAL.md** - Hardcoded business hours (DEFINITIVE)
-  - Status: Ready for testing ✅
+- **DEPLOY_WF05_V7_HARDCODED_FINAL.md** - Hardcoded business hours (DEFINITIVE ✅)
+  - Location: `/docs/deployment/`
+  - Status: Ready for Production
   - Changes: Zero `$env` dependency, pure JavaScript constants
 
+### WF06 (Calendar Availability Service)
+- **WF06_CALENDAR_AVAILABILITY_SERVICE.md** - Availability microservice (READY ✅)
+  - Location: `/docs/implementation/`
+  - Status: Ready for Production
+  - Function: Provides available dates/slots for WF02 V76
+
 ### WF07 (Email Sender)
-- **PLAN_NGINX_WF07_IMPLEMENTATION.md** - 🎯 Master plan for HTTP Request solution
-  - Status: Implemented in V9+
-  - Solution: nginx container + HTTP Request node
-
-- **TESTING_WF07_V9_HTTP_REQUEST.md** - 🧪 Testing guide for V9
-  - Status: Reference for V9+ testing
-  - Coverage: Unit, integration, production deployment
-
-- **BUGFIX_WF07_V13_INSERT_SELECT_FIX.md** - 🎯 Database logging fix (DEFINITIVE)
-  - Status: Ready for testing ✅
+- **BUGFIX_WF07_V13_INSERT_SELECT_FIX.md** - INSERT...SELECT pattern (DEFINITIVE ✅)
+  - Location: `/docs/fix/`
+  - Status: Ready for Production
   - Changes: INSERT...SELECT pattern, zero queryReplacement dependency
+
+- **PLAN_NGINX_WF07_IMPLEMENTATION.md** - nginx + HTTP Request architecture
+  - Location: `/docs/PLAN/`
+  - Status: Implemented in V9+
 
 ---
 
@@ -109,10 +118,25 @@
 ## ⚙️ Setup Guides
 
 ### Integration Setups (docs/Setups/)
-- **SETUP_EMAIL_WF05_INTEGRATION.md** - Email workflow integration guide
-  - Gmail SMTP configuration
-  - Template setup
-  - WF05 → WF07 integration
+- **QUICKSTART.md** - Complete setup guide (30-45 min) ✅
+  - Location: `/docs/Setups/QUICKSTART.md`
+  - Docker setup, Evolution API, n8n configuration
+  - Port 465 SSL/TLS SMTP (verified working)
+  - Database setup and workflow import
+
+- **SETUP_EMAIL.md** - SMTP configuration guide (V3.0 DEFINITIVA)
+  - Gmail App Password + SMTP dedicado
+  - Port 465 SSL/TLS configuration (RECOMENDADO)
+  - n8n credential setup
+  - Troubleshooting SSL/TLS errors
+
+- **SETUP_GOOGLE_CALENDAR.md** - Google Calendar OAuth2 setup
+  - OAuth2 credential configuration
+  - Calendar API integration
+
+- **SETUP_CREDENTIALS.md** - All n8n credentials configuration
+  - PostgreSQL, SMTP, Google Calendar
+  - Evolution API credentials
 
 ---
 
@@ -132,19 +156,20 @@
 ## 📋 Documentation Categories
 
 ### By Status
-**✅ DEFINITIVE SOLUTIONS**:
-- WF05 V7: Hardcoded business hours
-- WF07 V9: nginx + HTTP Request
+**✅ READY FOR PRODUCTION**:
+- WF02 V76: Proactive UX with zero-error appointment scheduling
+- WF05 V7: Hardcoded business hours validation
+- WF06 V1: Calendar availability microservice
 - WF07 V13: INSERT...SELECT database pattern
 
-**🚀 READY FOR TESTING**:
-- WF02 V75: Personalized confirmations
-- WF05 V7: Environment variable independence
-- WF07 V13: Database logging fix
+**✅ PRODUCTION STABLE**:
+- WF01 V2.8.3: WhatsApp deduplication
+- WF02 V74.1.2: AI conversation (reactive)
+- WF05 V3.6: Calendar integration (no validation)
 
-**📚 HISTORICAL REFERENCE**:
-- WF07 V2-V8: Template access evolution
-- WF05 V4-V6: Environment variable attempts
+**📚 ARCHIVED** (in `/n8n/workflows/old/`):
+- 57 obsolete workflow versions (V68-V75, V2-V12)
+- Historical reference only
 
 ### By Topic
 **Email Workflows**: V6-V13 docs, SMTP setup, template integration
@@ -168,9 +193,10 @@
 ### Find Documentation By Workflow
 | Workflow | Latest Docs | Status |
 |----------|-------------|--------|
-| WF01 | README.md | Stable (V2.8.3) |
-| WF02 | DEPLOY_V75_PRODUCTION.md | Ready (V75) |
+| WF01 | README.md + n8n/workflows/README.md | Stable (V2.8.3) ✅ |
+| WF02 | WF02_V76_IMPLEMENTATION_GUIDE.md | Ready (V76) ✅ |
 | WF05 | DEPLOY_WF05_V7_HARDCODED_FINAL.md | Ready (V7) ✅ |
+| WF06 | WF06_CALENDAR_AVAILABILITY_SERVICE.md | Ready (V1) ✅ |
 | WF07 | BUGFIX_WF07_V13_INSERT_SELECT_FIX.md | Ready (V13) ✅ |
 
 ---
@@ -220,6 +246,8 @@ Examples:
 
 ---
 
-**Last Updated**: 2026-04-01
-**Total Documents**: 40+ (including generators)
-**Critical Paths**: WF05 V7, WF07 V13 (both DEFINITIVE solutions ✅)
+**Last Updated**: 2026-04-08
+**Documentation Structure**: Reorganized with `/docs/implementation/`, `/docs/fix/`, `/docs/deployment/`, `/docs/Setups/`
+**Workflows**: 7 active in `/n8n/workflows/`, 57 archived in `/n8n/workflows/old/`
+**Setup Guide**: `/docs/Setups/QUICKSTART.md` (Port 465 SSL/TLS verified working)
+**Critical Paths**: WF02 V76, WF05 V7, WF06 V1, WF07 V13 (all READY FOR PRODUCTION ✅)
