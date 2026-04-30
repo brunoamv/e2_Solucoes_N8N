@@ -1,184 +1,229 @@
-# E2 Bot - Workflows n8n
+# E2 Soluções - Workflow Organization
 
-> **Organização**: Produção + Ready-to-Deploy | Histórico em `/old`
-> **Última Atualização**: 2026-04-08
+**Last Updated**: 2026-04-29
+**Status**: ✅ Organized and Production V1 Ready
 
----
+## Directory Structure
 
-## 📋 Workflows de Produção
-
-### WF01: WhatsApp Handler
-- **Arquivo**: `01_main_whatsapp_handler_V2.8.3_NO_LOOP.json`
-- **Versão**: V2.8.3
-- **Status**: ✅ **PRODUÇÃO ESTÁVEL**
-- **Função**: Recebe mensagens WhatsApp, faz deduplicação via PostgreSQL
-- **Deploy**: Ativo desde Mar 10
-
-### WF02: AI Agent
-- **Produção**: `02_ai_agent_conversation_V74.1_2_FUNCIONANDO.json`
-- **Versão**: V74.1.2
-- **Status**: ✅ **PRODUÇÃO ESTÁVEL**
-- **Função**: Conversação IA com 10 estados (reactive UX)
-- **Deploy**: Ativo desde Mar 30
-
-### WF05: Appointment Scheduler
-- **Produção**: `05_appointment_scheduler_v3.6.json`
-- **Versão**: V3.6
-- **Status**: ✅ **PRODUÇÃO ESTÁVEL**
-- **Função**: Agendamento Google Calendar (sem validação)
-- **Deploy**: Ativo desde Mar 24
-
----
-
-## 🚀 Workflows Ready for Production
-
-### WF02: AI Agent V76
-- **Arquivo**: `02_ai_agent_conversation_V76_PROACTIVE_UX.json`
-- **Versão**: V76
-- **Status**: 🚀 **READY FOR PRODUCTION**
-- **Mudança**: UX proativa com seleção de data/horário (12 estados)
-- **Deploy**: Aguardando deploy (Apr 6)
-- **Docs**: `/docs/implementation/WF02_V76_IMPLEMENTATION_GUIDE.md`
-
-### WF05: Appointment Scheduler V7
-- **Arquivo**: `05_appointment_scheduler_v7_hardcoded_values.json`
-- **Versão**: V7
-- **Status**: 🚀 **READY FOR PRODUCTION**
-- **Mudança**: Validação de horário comercial (hardcoded 08:00-18:00)
-- **Deploy**: Aguardando deploy (Mar 31)
-- **Docs**: `/docs/deployment/DEPLOY_WF05_V7_HARDCODED_FINAL.md`
-
-### WF06: Calendar Availability Service
-- **Arquivo**: `06_calendar_availability_service_v1.json`
-- **Versão**: V1
-- **Status**: 🚀 **READY FOR PRODUCTION**
-- **Função**: Microservice de disponibilidade para WF02 V76
-- **Deploy**: Aguardando deploy (Apr 6)
-- **Docs**: `/docs/implementation/WF06_CALENDAR_AVAILABILITY_SERVICE.md`
-
-### WF07: Email Sender V13
-- **Arquivo**: `07_send_email_v13_insert_select.json`
-- **Versão**: V13
-- **Status**: 🚀 **READY FOR PRODUCTION**
-- **Mudança**: INSERT...SELECT pattern (solução definitiva)
-- **Deploy**: Aguardando deploy (Apr 1)
-- **Docs**: `/docs/fix/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md`
-
----
-
-## 📁 Organização
-
-### `/n8n/workflows/` (Raiz)
-**7 workflows ativos**:
-- 1 WF em produção estável (WF01)
-- 2 WFs em produção estável (WF02 V74, WF05 V3.6)
-- 4 WFs ready-for-production (WF02 V76, WF05 V7, WF06, WF07 V13)
-
-### `/n8n/workflows/old/`
-**57 workflows obsoletos**:
-- WF02: V68 a V75 (17 versões)
-- WF03-WF04: Workflows não utilizados (2 arquivos)
-- WF05: V2 a V6 (16 versões)
-- WF06: Appointment reminders antigo (1 arquivo)
-- WF07: V2 a V12 (18 versões)
-- WF08-WF13: Workflows descontinuados (6 arquivos)
-- Test workflows (3 arquivos)
-
----
-
-## 🔄 Processo de Deploy
-
-### Canary Deployment (Recomendado para WF02 V76)
-```bash
-# 1. Deploy V76 (inativo)
-# 2. Teste E2E
-bash scripts/test-wf02-v76-e2e.sh
-
-# 3. Canary gradual
-# - 20% tráfego → Monitor 24h
-# - 50% tráfego → Monitor 24h
-# - 80% tráfego → Monitor 24h
-# - 100% tráfego → Desativar V74
-
-# 4. Mover V74 para old/
-mv 02_ai_agent_conversation_V74.1_2_FUNCIONANDO.json old/
+```
+n8n/workflows/
+├── production/          # Production-ready workflows (SINGLE SOURCE OF TRUTH)
+│   ├── wf01/           # WhatsApp Handler
+│   ├── wf02/           # AI Agent Conversation
+│   ├── wf05/           # Appointment Scheduler
+│   ├── wf06/           # Calendar Availability Service
+│   └── wf07/           # Send Email
+├── development/        # Development and testing versions
+│   ├── wf02/          # WF02 development iterations
+│   ├── wf05/          # WF05 experimental versions
+│   └── wf06/          # WF06 development versions
+└── historical/         # Historical versions for reference
+    └── wf02/          # WF02 V77-V114 development history
 ```
 
-### Blue-Green Deployment (Outros Workflows)
-```bash
-# 1. Import novo workflow (inativo)
-# 2. Configurar credenciais
-# 3. Teste completo
-# 4. Desativar versão antiga
-# 5. Ativar nova versão
-# 6. Monitor 1h
-# 7. Mover versão antiga para old/
+**IMPORTANT**: No workflow JSON files exist in the root directory. All workflows are organized in their appropriate subfolders.
+
+---
+
+## Production V1 Workflows
+
+**Deployment Package**: 4 workflows ready for production deployment
+
+| Workflow | Version | File Location | Workflow ID | n8n URL |
+|----------|---------|---------------|-------------|---------|
+| **WF01** | V2.8.3 | `production/wf01/01_main_whatsapp_handler_V2.8.3_NO_LOOP.json` | DCUYzu4nxjvmIVRw | http://localhost:5678/workflow/DCUYzu4nxjvmIVRw |
+| **WF02** | V114 | `production/wf02/02_ai_agent_conversation_V114_FUNCIONANDO.json` | 9tG2gR6KBt6nYyHT | http://localhost:5678/workflow/9tG2gR6KBt6nYyHT |
+| **WF05** | V7 Hardcoded | `production/wf05/05_appointment_scheduler_v7_hardcoded_values.json` | 42eG7UpfmZ2PoBlY | http://localhost:5678/workflow/42eG7UpfmZ2PoBlY |
+| **WF06** | V2.2 | `production/wf06/06_calendar_availability_service_v2_2.json` | - | - |
+| **WF07** | V13 | `production/wf07/07_send_email_v13_insert_select.json` | 0PuyG3BvR2Hpfpix | http://localhost:5678/workflow/0PuyG3BvR2Hpfpix |
+
+---
+
+## Integration Flow
+
+```
+User Message (WhatsApp)
+    ↓
+WF01: WhatsApp Handler V2.8.3
+    → Deduplica mensagens
+    → Valida webhook Evolution API
+    ↓
+WF02: AI Agent Conversation V114 ⭐ PRODUCTION
+    → Claude 3.5 Sonnet integration
+    → State machine com PostgreSQL
+    → Row locking (FOR UPDATE SKIP LOCKED)
+    → WF06 suggestions persistence
+    → PostgreSQL TIME fields extraction
+    ↓
+WF06: Calendar Availability Service V2.2
+    → Google Calendar OAuth integration
+    → Empty calendar handling
+    → Retorna datas e horários disponíveis
+    ↓
+WF05: Appointment Scheduler V7
+    → Hardcoded values para validação
+    → Agendamento de consultas
+    ↓
+WF07: Send Email V13
+    → INSERT...SELECT pattern
+    → Email confirmation
+    → Appointment reminders
 ```
 
 ---
 
-## 📊 Histórico de Evolução
+## WF02 V114 - Production Complete
 
-### WF02 (AI Agent)
-- **V68-V69**: Correções de sintaxe e conexões (Mar 11)
-- **V70-V72**: Appointment integration (Mar 18)
-- **V73**: SQL + State Machine fixes (Mar 24)
-- **V74**: Appointment confirmation (Mar 24-30) ✅ **PROD**
-- **V75**: Final message personalization (Mar 30)
-- **V76**: Proactive UX (Apr 6) 🚀 **READY**
+**Workflow ID**: 9tG2gR6KBt6nYyHT
+**Node Count**: 52 nodes
+**Status**: ✅ PRODUCTION READY WITH ALL CRITICAL FIXES
 
-### WF05 (Appointment Scheduler)
-- **V2-V3.6**: Iterações de funcionalidade (Mar 13-24) ✅ **PROD**
-- **V4**: Integration enhancements (Mar 30)
-- **V5-V6**: Environment variable attempts (Mar 31)
-- **V7**: Hardcoded values (Mar 31) 🚀 **READY**
+### Complete Fix Package
+WF02 V114 includes ALL critical fixes deployed to production:
 
-### WF07 (Email Sender)
-- **V2-V6**: Template access attempts (Mar 26-31)
-- **V8-V9**: HTTP Request solution (Mar 31-Apr 1)
-- **V10-V12**: Format + Database fixes (Apr 1)
-- **V13**: INSERT...SELECT pattern (Apr 1) 🚀 **READY**
+1. **V111: Database Row Locking** (FOR UPDATE SKIP LOCKED)
+   - Prevents race conditions in concurrent executions
+   - Eliminates stale state processing
 
----
+2. **V113.1: WF06 Suggestions Persistence**
+   - Saves `date_suggestions` from WF06 next_dates
+   - Saves `slot_suggestions` from WF06 available_slots
 
-## 🔧 Manutenção
+3. **V114: PostgreSQL TIME Fields** (scheduled_time_start + scheduled_time_end)
+   - Extracts TIME fields from WF06 slot structure
+   - Database-compatible TIME format ("08:00", "10:00")
 
-### Limpeza de Histórico
-Recomendação: Manter apenas últimas 3 versões de cada workflow em `old/`
+4. **V79.1: Schema-Aligned Build Update Queries**
+   - No `contact_phone` references
+   - Fully compliant with database schema
 
+5. **V105: Routing Fix**
+   - Update Conversation State BEFORE Check If WF06
+   - Prevents infinite loop scenarios
+
+### Production Scripts
+- State Machine: `scripts/wf02-v114-slot-time-fields-fix.js` (1054 lines)
+- SQL Queries: `scripts/wf02-v111-build-sql-queries-row-locking.js`
+- WF06 Dates: `scripts/wf02-v113-build-update-queries1-wf06-next-dates.js`
+- WF06 Slots: `scripts/wf02-v113-build-update-queries2-wf06-available-slots.js`
+
+### Complete Integration Test
 ```bash
-# Exemplo: Limpar versões V68-V72 do WF02 (manter apenas V73-V75)
-cd old/
-rm 02_ai_agent_conversation_V68*.json
-rm 02_ai_agent_conversation_V69*.json
-rm 02_ai_agent_conversation_V70*.json
-rm 02_ai_agent_conversation_V71*.json
-rm 02_ai_agent_conversation_V72*.json
-```
+# Test complete flow: "oi" → agendamento → confirmação
+# 1. Send "oi" → Complete user info → Service selection
+# 2. Select "1" (agendar) → WF06 next_dates → Show 3 dates
+# 3. Select date "1" → WF06 available_slots → Show time slots
+# 4. Select slot "1" → Appointment created → Email sent
 
-### Backup
-Recomendação: Backup completo antes de deploy em produção
-
-```bash
-# Backup de workflows ativos
-tar -czf workflows_backup_$(date +%Y%m%d).tar.gz *.json
-
-# Backup incluindo histórico
-tar -czf workflows_full_backup_$(date +%Y%m%d).tar.gz *.json old/
+# Expected: Full flow completes without errors
+# Database: All fields saved correctly (TIME fields included)
 ```
 
 ---
 
-## 📚 Documentação Relacionada
+## File Organization Principles
 
-- **Setup**: `/docs/Setups/QUICKSTART.md`
-- **CLAUDE.md**: `/CLAUDE.md` (contexto completo)
-- **Deployment Guides**: `/docs/deployment/`
-- **Bugfix History**: `/docs/fix/`
-- **Implementation Guides**: `/docs/implementation/`
+### 🎯 Single Source of Truth
+- **Production workflows** exist ONLY in `production/wfXX/` subfolders
+- **No duplicate files** anywhere in the repository
+- Each workflow version has ONE authoritative location
+
+### 📁 Categorization Rules
+
+**production/**:
+- Currently deployed or deployment-ready workflows
+- Fully tested and validated
+- Production V1 package workflows
+
+**development/**:
+- Active development versions
+- Testing and experimental iterations
+- Not yet production-ready
+
+**historical/**:
+- Complete development history (WF02 V77-V114)
+- Reference for rollback scenarios
+- Preserves evolution of workflows
 
 ---
 
-**Projeto**: E2 Soluções WhatsApp Bot
-**Stack**: n8n 2.14.2 + Claude 3.5 + PostgreSQL + Evolution API
-**Mantido por**: E2 Dev Team
+## Version Management
+
+### WF01 - WhatsApp Handler
+- **Production**: V2.8.3 (No Loop Fix)
+- **Location**: `production/wf01/`
+- **Status**: ✅ Production Ready
+
+### WF02 - AI Agent Conversation
+- **Production**: V114 (Complete Fix) ⭐
+- **Historical**: V77-V113 in `historical/wf02/`
+- **Status**: ✅ Production Ready with ALL critical fixes
+
+### WF05 - Appointment Scheduler
+- **Production**: V7 Hardcoded Values
+- **Development**: V3.6, V8 Part 1, V8 Part 2
+- **Status**: ✅ Production Ready
+
+### WF06 - Calendar Availability Service
+- **Production**: V2.2 (Response Mode)
+- **Development**: V2, V2.1 iterations
+- **Status**: ✅ Production Ready
+
+### WF07 - Send Email
+- **Production**: V13 (INSERT...SELECT Pattern)
+- **Location**: `production/wf07/`
+- **Status**: ✅ Production Ready
+
+---
+
+## Deployment Workflow
+
+### Production V1 Deployment
+1. **Review workflows** in `production/` subfolders
+2. **Validate workflow IDs** match n8n deployment
+3. **Import workflows** via n8n UI:
+   - Import from file → Select JSON from `production/wfXX/`
+   - Verify workflow ID matches table above
+4. **Configure credentials**:
+   - Evolution API: WhatsApp webhook
+   - Claude API: AI agent integration
+   - PostgreSQL: Database connection
+   - Google OAuth: Calendar access
+   - SMTP: Email sending
+5. **Test integration flow** end-to-end
+6. **Monitor production** via n8n logs and database
+
+### Development Workflow
+1. **Create development version** in `development/wfXX/`
+2. **Test thoroughly** in development environment
+3. **Validate integration** with dependent workflows
+4. **Move to production/** when stable
+5. **Archive previous version** to `historical/` if needed
+
+---
+
+## Documentation References
+
+- **Production V1 Deployment**: `../../docs/status/PRODUCTION_V1_DEPLOYMENT.md`
+- **Deployment Status**: `../../docs/status/DEPLOYMENT_STATUS.md`
+- **WF02 V114 Production**: `../../docs/WF02_V114_PRODUCTION_DEPLOYMENT.md`
+- **Deployment Guides**: `../../docs/deployment/`
+- **Quick Deploy Guides**: `../../docs/deployment/quick/`
+- **Analysis Documents**: `../../docs/analysis/`
+- **Bugfix Reports**: `../../docs/fix/`
+
+---
+
+## Maintenance
+
+- **Regular cleanup**: Archive old development versions
+- **Documentation updates**: Keep README current
+- **Version tracking**: Maintain clear version numbers
+- **Integration testing**: Validate dependencies after updates
+
+---
+
+**Project**: E2 Soluções WhatsApp Bot
+**Stack**: n8n 2.14.2 + Claude 3.5 + PostgreSQL + Evolution API v2.3.7
+**Maintained by**: E2 Dev Team
+**Last Organization**: 2026-04-29 - Single source of truth structure implemented
