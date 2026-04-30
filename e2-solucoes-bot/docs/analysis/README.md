@@ -1,327 +1,236 @@
-# E2 Soluções Bot - Documentação Completa
+# E2 Bot - Analysis Documentation
 
-> **Índice Central de Documentação** | Última atualização: 2025-12-15
-
-Bem-vindo à documentação completa do E2 Soluções WhatsApp Bot. Este índice organiza toda a documentação por categoria para fácil navegação.
-
----
-
-## 🚀 Começando
-
-### Leitura Essencial (30 minutos)
-
-| Documento | Descrição | Tempo |
-|-----------|-----------|-------|
-| [README.md](../README.md) | ⭐ Overview completo do projeto | 15 min |
-| [CLAUDE.md](../CLAUDE.md) | ⭐ Contexto otimizado para Claude Code | 10 min |
-| [QUICKSTART.md](./docs/Setups/QUICKSTART.md) | Guia rápido de início | 5 min |
-
-### Primeiros Passos
-
-1. **Entender o Projeto**: Ler `README.md` e `CLAUDE.md`
-2. **Configurar Ambiente**: Seguir `QUICKSTART.md`
-3. **Validar Sistema**: Executar guias em `validation/`
-4. **Verificar Status**: Consultar `PROJECT_STATUS.md`
+**Last Updated**: 2026-04-29
+**Status**: ✅ Organized - Historical documentation archived
 
 ---
 
-## 📊 Status e Progresso
+## 📋 Current Analysis Files (Root Directory)
 
-### Status Atual
+**Active Documentation**:
+- **`DOCUMENTATION_REPORT.md`** - Comprehensive documentation report
+- **`TECHNICAL_INDEX.md`** - Technical index and reference guide
 
-| Documento | Descrição | Atualização |
-|-----------|-----------|-------------|
-| [PROJECT_STATUS.md](./PROJECT_STATUS.md) | Status consolidado do projeto | Diária |
-| [SPRINT_1.1_COMPLETE.md](./SPRINT_1.1_COMPLETE.md) | Relatório Sprint 1.1 (RAG) | 2025-01-12 |
-| [status/IMPLEMENTATION_STATUS.md](./status/IMPLEMENTATION_STATUS.md) | Status detalhado de implementação | 2025-01-12 |
-
-### Documentação de Sprints
-
-| Sprint | Status | Documentação |
-|--------|--------|--------------|
-| **Sprint 1.1** | ✅ 100% Implementado | [SPRINT_1.1_COMPLETE.md](./SPRINT_1.1_COMPLETE.md) |
-| **Sprint 1.2** | ✅ 100% Implementado | [sprints/SPRINT_1.2_PLANNING.md](./sprints/SPRINT_1.2_PLANNING.md) |
-
-📂 **Índice Completo**: [sprints/README.md](./sprints/README.md)
+**Purpose**: These files remain in the root for quick access to current analysis documentation.
 
 ---
 
-## 🧪 Validação e Testes
+## 📁 Historical Documentation Structure
 
-### Guias de Validação
-
-**Sprint 1.1 - RAG e Base de Conhecimento** (2-3 horas total):
-
-| Guia | Descrição | Tempo |
-|------|-----------|-------|
-| [validation/README.md](./validation/README.md) | ⭐ Índice e Quick Start | 5 min |
-| [1. SETUP_CREDENTIALS.md](./Setups/SETUP_CREDENTIALS.md) | Configurar credenciais | 30-45 min |
-| [2. DEPLOY_SQL.md](./Setups/DEPLOY_SQL.md) | Deploy funções SQL | 10-15 min |
-| [3. EXECUTE_INGEST.md](./Setups/EXECUTE_INGEST.md) | Popular banco de dados | 15-20 min |
-| [4. IMPORT_N8N_WORKFLOW.md](./Setups/IMPORT_N8N_WORKFLOW.md) | Configurar workflow | 10-15 min |
-| [5. RUN_VALIDATION_TESTS.md](./Setups/RUN_VALIDATION_TESTS.md) | Testes completos | 20-30 min |
-
-**Sprint 1.2 - Sistema de Agendamento** (1-2 horas):
-
-| Guia | Descrição |
-|------|-----------|
-| [validation/SPRINT_1.2_VALIDATION.md](./validation/SPRINT_1.2_VALIDATION.md) | Validação completa de agendamento |
-
-### Relatórios de Validação
-
-| Documento | Descrição |
-|-----------|-----------|
-| [validation/VALIDATION_REPORT.md](./validation/VALIDATION_REPORT.md) | Relatório de validação estrutural |
-| [validation/sprint_1.1_validation.md](./validation/sprint_1.1_validation.md) | Checklist técnico Sprint 1.1 |
-| [validation/sprint_1.1_summary.md](./validation/sprint_1.1_summary.md) | Resumo executivo Sprint 1.1 |
-
----
-
-## 🛠️ Setup e Configuração
-
-### Guias de Integração
-
-| Serviço | Guia | Complexidade |
-|---------|------|--------------|
-| **RD Station CRM** | [Setups/SETUP_RDSTATION.md](./Setups/SETUP_RDSTATION.md) | Alta (462 linhas) |
-| **Docker** | [../docker/README.md](../docker/README.md) | Média |
-
-### Configurações Adicionais
-
-📋 **Templates de Configuração**:
-- `docker/.env.dev.example` - Desenvolvimento
-- `docker/.env.example` - Produção
-
----
-
-## 🏗️ Arquitetura e Planejamento
-
-### Documentação Técnica
-
-| Documento | Descrição | Público |
-|-----------|-----------|---------|
-| [PLAN/implementation_plan.md](./PLAN/implementation_plan.md) | Plano completo de implementação | Desenvolvedores |
-| [analise/analise_gaps.md](./analise/analise_gaps.md) | Análise de gaps | Tech leads |
-
-### Diagramas e Arquitetura
-
-📊 Diagramas disponíveis em `diagrams/` (se existir)
-
-Arquitetura visual está no README principal.
-
----
-
-## 📚 Referência por Categoria
-
-### Por Audiência
-
-#### 🎯 Para Desenvolvedores
-1. **Setup Inicial**:
-   - [QUICKSTART.md](./docs/Setups/QUICKSTART.md)
-   - [Setups/SETUP_CREDENTIALS.md](./Setups/SETUP_CREDENTIALS.md)
-   - [../docker/README.md](../docker/README.md)
-
-2. **Implementação**:
-   - [SPRINT_1.1_COMPLETE.md](./SPRINT_1.1_COMPLETE.md)
-   - [sprints/SPRINT_1.2_PLANNING.md](./sprints/SPRINT_1.2_PLANNING.md)
-   - [PLAN/implementation_plan.md](./PLAN/implementation_plan.md)
-
-3. **Testes e Validação**:
-   - [validation/README.md](./validation/README.md)
-   - Todos os 5 guias de validação Sprint 1.1
-   - [validation/SPRINT_1.2_VALIDATION.md](./validation/SPRINT_1.2_VALIDATION.md)
-
-#### 👔 Para Gestores de Projeto
-1. [PROJECT_STATUS.md](./PROJECT_STATUS.md) - Status consolidado
-2. [sprints/README.md](./sprints/README.md) - Progresso de sprints
-3. [status/IMPLEMENTATION_STATUS.md](./status/IMPLEMENTATION_STATUS.md) - Detalhes de implementação
-
-#### 🔧 Para Operações
-1. [QUICKSTART.md](./docs/Setups/QUICKSTART.md) - Início rápido
-2. [validation/README.md](./validation/README.md) - Procedimentos de teste
-3. [../scripts/](../scripts/) - Scripts de automação
-
-### Por Tópico
-
-#### 🤖 Inteligência Artificial (RAG + Vision)
-- [SPRINT_1.1_COMPLETE.md](./SPRINT_1.1_COMPLETE.md)
-- [Setups/EXECUTE_INGEST.md](./Setups/EXECUTE_INGEST.md)
-- [Setups/RUN_VALIDATION_TESTS.md](./Setups/RUN_VALIDATION_TESTS.md)
-
-#### 📅 Sistema de Agendamento
-- [sprints/SPRINT_1.2_PLANNING.md](./sprints/SPRINT_1.2_PLANNING.md)
-- [validation/SPRINT_1.2_VALIDATION.md](./validation/SPRINT_1.2_VALIDATION.md)
-
-#### 🔄 Integração CRM
-- [Setups/SETUP_RDSTATION.md](./Setups/SETUP_RDSTATION.md)
-- [sprints/SPRINT_1.2_PLANNING.md](./sprints/SPRINT_1.2_PLANNING.md) (seção CRM)
-
-#### 🐳 Infraestrutura Docker
-- [../docker/README.md](../docker/README.md)
-- [QUICKSTART.md](./docs/Setups/QUICKSTART.md)
-
-#### 💾 Banco de Dados
-- [Setups/DEPLOY_SQL.md](./Setups/DEPLOY_SQL.md)
-- [../database/schema.sql](../database/schema.sql)
-- [../database/appointment_functions.sql](../database/appointment_functions.sql)
-
----
-
-## 🗂️ Estrutura Completa de Documentação
+All historical analysis files organized by category in subdirectories:
 
 ```
-docs/
-├── README.md                       # ⭐ Este arquivo - Índice central
-├── QUICKSTART.md                   # Guia rápido de início
-├── PROJECT_STATUS.md               # Status consolidado
-├── SPRINT_1.1_COMPLETE.md          # Relatório Sprint 1.1
+docs/analysis/
+├── DOCUMENTATION_REPORT.md             Current documentation report
+├── TECHNICAL_INDEX.md                  Current technical index
 │
-├── sprints/                        # Documentação por sprint
-│   ├── README.md                   # Índice de sprints
-│   ├── SPRINT_1.2_PLANNING.md      # Sprint 1.2 - Planejamento
-│   └── SPRINT_1.2_COMPLETE.md      # Sprint 1.2 - Relatório
-│
-├── status/                         # Relatórios de status
-│   ├── SPRINT_1.1_STATUS.md        # Status validação Sprint 1.1
-│   └── SPRINT_1.3_IMPLEMENTATION_STATUS.md
-│
-├── validation/                     # Procedimentos de validação
-│   ├── README.md                   # ⭐ Índice validação
-│   ├── IMPORT_N8N_WORKFLOW_GUIDE.md
-│   ├── SPRINT_1.2_VALIDATION.md
-│   ├── VALIDATION_REPORT.md
-│   ├── VALIDATE_STRUCTURE_NO_DATA.md
-│   ├── VALIDATION_COMPLETE.md
-│   ├── sprint_1.1_validation.md
-│   └── sprint_1.1_summary.md
-│
-├── Setups/                         # Guias de configuração (setup)
-│   ├── SETUP_CREDENTIALS.md        # Guia 1/5 - Configurar credenciais
-│   ├── DEPLOY_SQL.md               # Guia 2/5 - Deploy SQL
-│   ├── EXECUTE_INGEST.md           # Guia 3/5 - Popular banco
-│   ├── IMPORT_N8N_WORKFLOW.md      # Guia 4/5 - Import workflow
-│   ├── RUN_VALIDATION_TESTS.md     # Guia 5/5 - Testes finais
-│   ├── SETUP_ANTHROPIC.md          # Setup Anthropic Claude API
-│   ├── SETUP_DISCORD.md            # Setup Discord Webhooks
-│   ├── SETUP_EMAIL.md              # Setup Email/SMTP
-│   ├── SETUP_EVOLUTION_API.md      # Setup Evolution API
-│   ├── SETUP_GOOGLE_CALENDAR.md    # Setup Google Calendar API
-│   └── SETUP_RDSTATION.md          # Setup RD Station CRM (462 linhas)
-│
-├── PLAN/                           # Planejamento e arquitetura
-│   └── implementation_plan.md
-│
-├── analise/                        # Análises técnicas
-│   └── analise_gaps.md
-│
-├── diagrams/                       # Diagramas (se existir)
-├── implementation/                 # Detalhes de implementação (se existir)
-├── deployment/                     # Deploy e produção (se existir)
-├── monitoring/                     # Monitoramento (se existir)
-├── development/                    # Desenvolvimento (se existir)
-└── guidelines/                     # Diretrizes (se existir)
+└── wf02-versions/                      WF02 version analyses (36 files)
+    ├── v16-v70/                        Early versions analysis (23 files)
+    │   ├── V25_*, V26_*, V27_*         V25-V27 version analyses
+    │   ├── V33_*, V34_*, V35_*         V33-V35 version analyses
+    │   ├── V43_*, V45_*, V48_*, V49_*  V43-V49 version analyses
+    │   ├── V52_*, V53_*, V54_*, V55_*  V52-V55 version analyses
+    │   ├── FIX_*                       Fix documentation for early versions
+    │   ├── NEXT_STEPS_V43*.md          Next steps documentation V43-V48
+    │   └── ANALYSIS_V70_PROBLEMS.md    V70 issues analysis
+    │
+    └── v76-v114/                       Recent versions analysis (13 files)
+        ├── WF02_V78_*                  V78 version analyses
+        ├── WF02_V81_*                  V81 version analyses
+        ├── WF02_V85_V86_*              V85-V86 version analyses
+        ├── WF02_V91_*                  V91 version analyses
+        ├── WF02_V108_*                 V108 version analyses
+        ├── WF02_STATE_MACHINE_WF06_INTEGRATION_PROBLEM.md
+        ├── WF02_WF06_HTTP_REQUEST_PROBLEM_ROOT_CAUSE.md
+        └── ANALYSIS_V76_UX_OPTIMIZATION.md
+
+└── wf07-versions/                      WF07 version analyses (1 file)
+    ├── ANALYSIS_WF07_V9.2_COMPLETE.md
+    └── ANALYSIS_WF07_HTTP_REQUEST_PROBLEM_ROOT_CAUSE.md
+
+└── system/                             System-wide analyses (9 files)
+    ├── analise_gaps.md                 Gap analysis
+    ├── CLEANUP_DUPLICATES_SUMMARY.md   Duplicate cleanup summary
+    ├── CLAUDE_MD_REFACTORING.md        CLAUDE.md refactoring analysis
+    ├── PROJECT_STATUS_UPDATE_V2.8.3.md Project status update
+    ├── PHONE_NUMBER_FIX_ANALYSIS.md    Phone number fix analysis
+    ├── PHONE_NUMBER_FIX_SOLUTION.md    Phone number fix solution
+    ├── ANALYSIS_GMAIL_SMTP_N8N_2.14.2_COMPATIBILITY.md
+    ├── ANALYSIS_N8N_VERSION_UPGRADE_VS_WORKAROUNDS.md
+    └── EVOLUTION_API_ISSUE.md
+
+└── migrations/                         Migration analyses (5 files)
+    ├── MIGRATION_GUIDE_V20_TO_V22.md   V20→V22 migration guide
+    ├── WORKFLOW_EVOLUTION_V17_V22.md   V17→V22 evolution analysis
+    ├── ANALYSIS_V3.2_ISO_DATE_FIX.md   V3.2 ISO date fix
+    ├── ANALYSIS_V22_FIX.md             V22 fix analysis
+    └── ANALYSIS_V23_FIX.md             V23 fix analysis
 ```
 
 ---
 
-## 🔍 Busca Rápida
+## 🎯 Organization Principles
 
-### Precisa de...
+### Current Analysis (Root Directory)
+**Files**: 2 active documents (2026-04-29)
+**Purpose**: Quick access to current analysis documentation and technical index
+**Maintenance**: Updated regularly as analysis evolves
 
-**Configurar o projeto pela primeira vez?**
-→ [QUICKSTART.md](./docs/Setups/QUICKSTART.md) → [validation/README.md](./validation/README.md)
-
-**Entender o que foi implementado?**
-→ [PROJECT_STATUS.md](./PROJECT_STATUS.md) → [SPRINT_1.1_COMPLETE.md](./SPRINT_1.1_COMPLETE.md)
-
-**Validar o sistema RAG?**
-→ [validation/README.md](./validation/README.md) (5 guias sequenciais)
-
-**Testar agendamentos?**
-→ [validation/SPRINT_1.2_VALIDATION.md](./validation/SPRINT_1.2_VALIDATION.md)
-
-**Integrar com RD Station?**
-→ [Setups/SETUP_RDSTATION.md](./Setups/SETUP_RDSTATION.md)
-
-**Ver status geral?**
-→ [PROJECT_STATUS.md](./PROJECT_STATUS.md)
-
-**Contribuir com código?**
-→ [../README.md](../README.md) (seção Contribuindo) → [CLAUDE.md](../CLAUDE.md)
-
-**Entender a arquitetura?**
-→ [../README.md](../README.md) (seção Arquitetura) → [PLAN/implementation_plan.md](./PLAN/implementation_plan.md)
+### Historical Archive (Subdirectories)
+**Files**: 51 historical documents organized by category
+**Purpose**: Preserve development history and analysis evolution
+**Maintenance**: Reference only - no regular updates needed
 
 ---
 
-## 📝 Convenções de Documentação
+## 📊 Category Descriptions
 
-### Estrutura de Documentos
+### wf02-versions/ (36 files)
+**Content**: WF02 AI Agent Conversation version analyses
+**Organization**: Two sub-categories for better navigation
+- **v16-v70/** (23 files): Early version analyses showing initial development
+- **v76-v114/** (13 files): Recent version analyses showing mature implementation
 
-Todos os documentos seguem este padrão:
+**Key Analyses**:
+- V25-V27: Initial proactive UX implementation
+- V33-V35: Service selection improvements
+- V43-V55: Multiple iteration analyses and optimizations
+- V70: Problem identification and analysis
+- V76: UX optimization analysis
+- V78-V114: Complete state machine implementation and WF06 integration
 
-```markdown
-# Título do Documento
+### wf07-versions/ (2 files)
+**Content**: WF07 Send Email version analyses
+**Timeline**: V9.2 complete implementation analysis
+**Key Analyses**: V9.2 complete implementation, HTTP Request problem root cause
 
-> **Metadados** | Última atualização: YYYY-MM-DD
+### system/ (9 files)
+**Content**: System-wide analyses, gap analyses, and refactoring documentation
+**Purpose**: Cross-workflow analyses and architectural decisions
+**Key Analyses**:
+- Gap analysis for complete system
+- Duplicate cleanup strategies
+- CLAUDE.md optimization
+- Phone number fix comprehensive analysis
+- Gmail SMTP compatibility
+- n8n version upgrade considerations
+- Evolution API integration issues
 
-Descrição breve do documento.
+### migrations/ (5 files)
+**Content**: Migration guides and version evolution analyses
+**Timeline**: V3.2 through V23 migrations and fixes
+**Purpose**: Document migration paths and version transitions
+**Key Migrations**: V20→V22 comprehensive guide, V17→V22 evolution analysis
 
 ---
 
-## Seções organizadas com headers H2
+## 🔍 Quick Reference
 
-### Subseções com headers H3
+### For Current Analysis
+```bash
+# View active documentation report
+cat docs/analysis/DOCUMENTATION_REPORT.md
 
-**Convenções**:
-- ⭐ = Leitura essencial
-- ✅ = Completo
-- 🚧 = Em progresso
-- ⏳ = Pendente
-- ⚠️ = Atenção necessária
+# View technical index
+cat docs/analysis/TECHNICAL_INDEX.md
 ```
 
-### Códigos de Status
+### For Historical Research
+```bash
+# Browse WF02 early versions (v16-v70)
+ls -l docs/analysis/wf02-versions/v16-v70/
 
-| Emoji | Significado | Uso |
-|-------|-------------|-----|
-| ✅ | Completo | Implementação ou validação concluída |
-| 🚧 | Em Progresso | Trabalho ativo em andamento |
-| ⏳ | Pendente | Planejado mas não iniciado |
-| ⚠️ | Atenção | Requer ação ou tem problemas conhecidos |
-| 📋 | Planejado | Documentado mas aguarda execução |
-| 🧪 | Teste | Fase de validação ou testes |
-| ⭐ | Essencial | Leitura prioritária |
+# Browse WF02 recent versions (v76-v114)
+ls -l docs/analysis/wf02-versions/v76-v114/
 
----
+# Browse WF07 version analyses
+ls -l docs/analysis/wf07-versions/
 
-## 🔄 Atualizações
+# Browse system-wide analyses
+ls -l docs/analysis/system/
 
-### Última Revisão Completa
-**Data**: 2025-12-15
-**Escopo**: Reorganização completa de documentação, criação de CLAUDE.md otimizado, atualização de README.md
+# Browse migration guides
+ls -l docs/analysis/migrations/
 
-### Histórico de Mudanças
-- **2025-12-15**: Reorganização estrutural, criação de índices, otimização para Claude Code
-- **2025-01-12**: Conclusão Sprint 1.2, documentação de agendamento
-- **2025-01-12**: Conclusão Sprint 1.1, documentação de validação
-- **2025-01-11**: Criação inicial do projeto
+# View specific version analysis
+cat docs/analysis/wf02-versions/v76-v114/WF02_STATE_MACHINE_WF06_INTEGRATION_PROBLEM.md
+```
 
 ---
 
-## 📞 Suporte
+## 📈 Statistics
 
-### Problemas Comuns
+**Total Files**: 53 analysis documents
+- **Current Analysis**: 2 files (root directory)
+- **Historical Archive**: 51 files (organized in 5 categories)
 
-Todos os guias de validação contêm seções de **Troubleshooting** com soluções para problemas conhecidos.
+**Organization Date**: 2026-04-29
+**Current Production**: V1 (WF01 V2.8.3, WF02 V114, WF05 V7, WF06 V2.2, WF07 V13)
 
-### Precisa de Ajuda?
-
-1. **Consulte o índice acima** para encontrar a documentação relevante
-2. **Verifique a seção de troubleshooting** no guia correspondente
-3. **Revise o status atual** em `PROJECT_STATUS.md`
-4. **Leia o CLAUDE.md** para contexto técnico completo
+**Category Breakdown**:
+- WF02 v16-v70: 23 files
+- WF02 v76-v114: 13 files
+- WF07 versions: 2 files
+- System analyses: 9 files
+- Migrations: 5 files
+- Root documentation: 2 files
 
 ---
 
-**Mantenedores**: E2 Soluções | **Versão da Documentação**: 2.0
+## 🎯 Maintenance Guidelines
+
+### Adding New Analysis Files
+- **Current analysis**: Place in root directory with descriptive name
+- **Historical documentation**: Place in appropriate subdirectory
+- **Version-specific files**: Use category matching workflow version range (v16-v70 vs v76-v114)
+
+### Archiving Current Files
+When current analysis files become historical:
+1. Move outdated files to appropriate subdirectory
+2. Update README.md to reflect new current analysis
+3. Maintain clear naming conventions for easy identification
+
+### Analysis File Naming Conventions
+- Version analyses: `WF0X_VYY_ANALYSIS_TYPE.md` or `ANALYSIS_VYY_DESCRIPTION.md`
+- System analyses: `ANALYSIS_DESCRIPTION.md`
+- Migration guides: `MIGRATION_GUIDE_VXX_TO_VYY.md`
+- Next steps: `NEXT_STEPS_VXX*.md`
+- Fixes: `FIX_DESCRIPTION.md`
+
+---
+
+## 📞 Related Documentation
+
+- **Main Context**: `../../CLAUDE.md`
+- **Status Files**: `../status/`
+- **Deployment Guides**: `../deployment/`
+- **Bug Reports**: `../fix/`
+- **Implementation Guides**: `../implementation/`
+
+---
+
+## 🔗 Cross-References
+
+### By Workflow Version
+- **WF02 Early Development (V16-V70)**: `wf02-versions/v16-v70/`
+- **WF02 Production Development (V76-V114)**: `wf02-versions/v76-v114/`
+- **WF07 Development**: `wf07-versions/`
+
+### By Analysis Type
+- **Problem Analysis**: Found in version-specific subdirectories with `PROBLEM` or `ISSUE` keywords
+- **Gap Analysis**: `system/analise_gaps.md`
+- **Root Cause Analysis**: Files ending with `ROOT_CAUSE.md`
+- **Optimization Analysis**: Files containing `OPTIMIZATION` or `UX` keywords
+- **Migration Analysis**: `migrations/` directory
+
+### By Time Period
+- **Early Development (V16-V70)**: Foundation and initial proactive UX implementation
+- **Recent Development (V76-V114)**: Complete state machine and WF06 integration
+- **System Evolution**: `migrations/` for version progression analysis
+
+---
+
+**Project**: E2 Soluções WhatsApp Bot
+**Maintained**: Claude Code
+**Last Organization**: 2026-04-29
+**Status**: ✅ Organized and Production V1 Ready
