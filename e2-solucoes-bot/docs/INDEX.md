@@ -23,6 +23,30 @@ docs/
 ├── INDEX.md                            This file - Complete documentation catalog
 ├── README.md                           Documentation overview and navigation
 │
+├── guidelines/ (8 comprehensive guides) ⭐ NEW (2026-04-29)
+│   ├── README.md                       Guidelines organization guide
+│   ├── 00_VISAO_GERAL.md               Arquitetura conceitual do sistema ⭐
+│   ├── 01_N8N_BEST_PRACTICES.md        Limitações n8n 2.x e workarounds ⭐
+│   ├── 02_STATE_MACHINE_PATTERNS.md    Padrão central de conversação ⭐
+│   ├── 03_DATABASE_PATTERNS.md         Schema e queries PostgreSQL ⭐
+│   ├── 04_WORKFLOW_INTEGRATION.md      Comunicação microserviços ⭐
+│   ├── 05_TESTING_VALIDATION.md        Estratégias de teste
+│   ├── 06_DEPLOYMENT_GUIDE.md          Processo de deployment
+│   └── 07_SECURITY_COMPLIANCE.md       Segurança e LGPD
+│
+├── development/ (6 practical guides) ⭐ NEW (2026-04-29)
+│   ├── README.md                       Development navigation guide ⭐
+│   ├── 01_WORKFLOW_MODIFICATION.md     Modificar workflows ⭐
+│   ├── 02_DEBUGGING_GUIDE.md           Debug e troubleshooting ⭐
+│   ├── 03_COMMON_TASKS.md              Tarefas comuns ⭐
+│   ├── 04_CODE_REVIEW_CHECKLIST.md     Checklist de revisão ⭐
+│   └── 05_LOCAL_SETUP.md               Setup ambiente local (30-60 min) ⭐
+│
+├── diagrams/ (3 visual diagrams) ⭐ NEW (2026-04-29)
+│   ├── README.md                       Diagrams navigation guide ⭐
+│   ├── 01_SYSTEM_ARCHITECTURE.md       Arquitetura completa (850 lines) ⭐
+│   └── 02_STATE_MACHINE_FLOW.md        15 estados detalhados (750 lines) ⭐
+│
 ├── analysis/                           Technical analyses (7 subdirectories)
 │   ├── DOCUMENTATION_REPORT.md         Current documentation report
 │   ├── TECHNICAL_INDEX.md              Technical index and reference
@@ -77,12 +101,9 @@ docs/
 │   └── [other setup guides]
 │
 ├── Guides/                             User guides
-├── development/                        Development documentation
-├── guidelines/                         Project guidelines
 ├── validation/                         Validation and testing
 ├── sprints/                            Sprint documentation
 ├── monitoring/                         Monitoring documentation
-├── diagrams/                           Architecture diagrams
 └── errors/                             Error logs and screenshots
 ```
 
@@ -204,8 +225,11 @@ docs/
 
 | Category | Location | Description |
 |----------|----------|-------------|
-| **Setup Guides** | `/docs/Setups/` | Configuration and setup procedures |
-| **Production Status** | `/docs/status/` | Current deployment status and guides |
+| **Guidelines** ⭐ NEW | `/docs/guidelines/` | Conceptual architecture guides (8 comprehensive guides) |
+| **Development** ⭐ NEW | `/docs/development/` | Practical development guides (6 step-by-step guides) |
+| **Diagrams** ⭐ NEW | `/docs/diagrams/` | Visual architecture diagrams (3 ASCII diagrams) |
+| **Setup Guides** | `/docs/Setups/` | Configuration and setup procedures (13 files) |
+| **Production Status** | `/docs/status/` | Current deployment status and guides (47 files) |
 | **Bug Fixes** | `/docs/fix/` | Complete bug fix documentation (82 files) |
 | **Deployments** | `/docs/deployment/` | Deployment procedures (51 files) |
 | **Planning** | `/docs/PLAN/` | Strategic planning documents (137 files) |
