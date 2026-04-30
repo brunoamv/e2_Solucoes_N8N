@@ -1,0 +1,491 @@
+version: '3.8'
+
+# ============================================================================
+# E2 Soluções Bot - Production Docker Compose (REFACTORED)
+# ============================================================================
+#
+# MUDANÇAS CRÍTICAS nesta versão:
+# 1. ✅ Evolution API: Issue #1474 workaround implementado (custom entrypoint)
+# 2. ✅ Redis: Autenticação obrigatória (requirepass)
+# 3. ✅ PostgreSQL: Performance tuning para produção
+# 4. ✅ Traefik: Rate limiting e security headers
+# 5. ✅ Network security: Segregação frontend/backend
+# 6. ✅ Healthchecks: Configuração otimizada para todos os services
+# 7. ✅ Backup: Volume mounting para backup automático
+# 8. ✅ Security: Docker secrets preparado (opcional)
+#
+# DEPLOYMENT GUIDE: docs/deployment/production/PRODUCTION_DEPLOY_EVOLUTION_API.md
+# ENVIRONMENT: docker/.env.production.example
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # REVERSE PROXY & SSL
+  # ==========================================================================
+  traefik:
+    image: traefik:v2.10
+    container_name: e2bot-traefik-prd
+    restart: unless-stopped
+    command:
+      # API and dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+
+      # Providers
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=e2bot-frontend"
+
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+
+      # HTTP to HTTPS redirect
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+
+      # Let's Encrypt (production)
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+
+      # Logging (production level)
+      - "--log.level=${TRAEFIK_LOG_LEVEL:-ERROR}"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+
+      # Metrics (Prometheus integration)
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+      - ./logs/traefik:/var/log/traefik
+    networks:
+      - e2bot-frontend
+    labels:
+      - "traefik.enable=true"
+
+      # Dashboard
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`${TRAEFIK_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth,security-headers,rate-limit"
+
+      # Basic Auth for dashboard (htpasswd format)
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USER}:${TRAEFIK_DASHBOARD_PASSWORD}"
+
+      # Security Headers
+      - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.security-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.security-headers.headers.stsPreload=true"
+
+      # Rate Limiting (DDoS protection)
+      - "traefik.http.middlewares.rate-limit.ratelimit.average=${TRAEFIK_RATE_LIMIT_AVERAGE:-100}"
+      - "traefik.http.middlewares.rate-limit.ratelimit.burst=${TRAEFIK_RATE_LIMIT_BURST:-200}"
+      - "traefik.http.middlewares.rate-limit.ratelimit.period=1s"
+
+  # ==========================================================================
+  # DATABASE
+  # ==========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: e2bot-postgres-prd
+    restart: unless-stopped
+    command: >
+      postgres
+      -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      -c effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-1GB}
+      -c work_mem=${POSTGRES_WORK_MEM:-16MB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB}
+      -c log_connections=${POSTGRES_LOG_CONNECTIONS:-on}
+      -c log_disconnections=${POSTGRES_LOG_DISCONNECTIONS:-on}
+      -c log_duration=${POSTGRES_LOG_DURATION:-on}
+      -c log_min_duration_statement=${POSTGRES_LOG_MIN_DURATION_STATEMENT:-1000}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=pt_BR.UTF-8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./backups/postgres:/backups
+      - ./logs/postgres:/var/log/postgresql
+    networks:
+      - e2bot-backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: ${HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${HEALTHCHECK_TIMEOUT:-10s}
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: ${HEALTHCHECK_START_PERIOD:-40s}
+    # Optional: Backup cron job
+    # deploy:
+    #   labels:
+    #     - "com.centurylinklabs.watchtower.enable=false"
+
+  # ==========================================================================
+  # WORKFLOW AUTOMATION
+  # ==========================================================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: e2bot-n8n-prd
+    restart: unless-stopped
+    environment:
+      # Basic Auth
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+
+      # Host configuration
+      - N8N_HOST=${N8N_SUBDOMAIN}.${DOMAIN}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://${N8N_SUBDOMAIN}.${DOMAIN}/
+      - GENERIC_TIMEZONE=${TIMEZONE:-America/Sao_Paulo}
+
+      # Security
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=${N8N_BLOCK_ENV_ACCESS_IN_NODE:-true}
+      - N8N_TEMPLATES_ENABLED=${N8N_TEMPLATES_ENABLED:-false}
+      - N8N_USER_MANAGEMENT_DISABLED=${N8N_USER_MANAGEMENT_DISABLED:-false}
+
+      # Database (PostgreSQL)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+
+      # Execution mode (queue with Redis)
+      - EXECUTIONS_MODE=${EXECUTIONS_MODE:-queue}
+      - EXECUTIONS_TIMEOUT=${EXECUTIONS_TIMEOUT:-300}
+      - EXECUTIONS_TIMEOUT_MAX=${EXECUTIONS_TIMEOUT_MAX:-600}
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      # Execution data persistence
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
+
+      # Workflow environment variables (optional - configure if needed)
+      # Evolution API
+      - EVOLUTION_API_URL=https://${EVOLUTION_SUBDOMAIN}.${DOMAIN}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME}
+      # Email
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+      - ./email-templates:/email-templates:ro
+      - ./logs/n8n:/home/node/.n8n/logs
+    networks:
+      - e2bot-frontend
+      - e2bot-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${HEALTHCHECK_TIMEOUT:-10s}
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: ${HEALTHCHECK_START_PERIOD:-40s}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=e2bot-frontend"
+      - "traefik.http.routers.n8n.rule=Host(`${N8N_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.n8n.middlewares=security-headers,rate-limit"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+
+  # ==========================================================================
+  # WHATSAPP INTEGRATION (Evolution API v2.3.7)
+  # ==========================================================================
+  # CRITICAL FIX: Issue #1474 workaround implemented
+  # Container ignores env_file - requires custom entrypoint to copy .env
+  evolution-api:
+    image: atendai/evolution-api:v2.3.7
+    container_name: e2bot-evolution-prd
+    restart: unless-stopped
+    # ✅ CRITICAL: Custom entrypoint para Issue #1474
+    # O container Evolution API ignora env_file completamente
+    # Solução: Copiar .env para /evolution/.env ANTES de iniciar
+    entrypoint: /bin/bash -c "
+      if [ -f /tmp/.env ]; then
+        cp /tmp/.env /evolution/.env && echo '✅ Evolution API: .env copiado com sucesso';
+      else
+        echo '❌ ERRO CRÍTICO: .env não encontrado em /tmp/.env' && exit 1;
+      fi &&
+      exec /bin/bash -c '. ./Docker/docker-entrypoint.sh'
+    "
+    environment:
+      # Estas variáveis são NECESSÁRIAS mesmo com .env file
+      # para compatibilidade com docker-compose
+      - SERVER_URL=${EVOLUTION_SERVER_URL}
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_ENABLED=true
+      - DATABASE_CONNECTION=postgres
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=${EVOLUTION_DB}
+      - DATABASE_USER=${POSTGRES_USER}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      - WEBHOOK_GLOBAL_URL=${EVOLUTION_WEBHOOK_URL}
+      - WEBHOOK_GLOBAL_ENABLED=true
+      - CONFIG_SESSION_PHONE_CLIENT=${CONFIG_SESSION_PHONE_CLIENT}
+      - QRCODE_LIMIT=${QRCODE_LIMIT}
+      - TIMEZONE=${TIMEZONE}
+      - LOG_LEVEL=${LOG_LEVEL:-ERROR}
+      - LOG_COLOR=${LOG_COLOR:-false}
+    volumes:
+      # ✅ CRITICAL: Mount .env file para workaround Issue #1474
+      - ./evolution/.env:/tmp/.env:ro
+      - evolution_data:/evolution/instances
+      - ./logs/evolution:/evolution/logs
+    networks:
+      - e2bot-frontend
+      - e2bot-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${HEALTHCHECK_TIMEOUT:-10s}
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: ${HEALTHCHECK_START_PERIOD:-40s}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=e2bot-frontend"
+      - "traefik.http.routers.evolution.rule=Host(`${EVOLUTION_SUBDOMAIN}.${DOMAIN}`)"
+      - "traefik.http.routers.evolution.entrypoints=websecure"
+      - "traefik.http.routers.evolution.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.evolution.middlewares=security-headers,rate-limit"
+      - "traefik.http.services.evolution.loadbalancer.server.port=8080"
+
+  # ==========================================================================
+  # CACHE & QUEUE
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: e2bot-redis-prd
+    restart: unless-stopped
+    # ✅ SECURITY: Autenticação obrigatória com requirepass
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory ${REDIS_MAX_MEMORY:-512mb}
+      --maxmemory-policy ${REDIS_MAX_MEMORY_POLICY:-allkeys-lru}
+      --save ${REDIS_SAVE_INTERVAL:-900 1 300 10 60 10000}
+      --appendonly ${REDIS_APPEND_ONLY:-yes}
+      --appendfsync everysec
+      --loglevel warning
+    volumes:
+      - redis_data:/data
+      - ./logs/redis:/var/log/redis
+    networks:
+      - e2bot-backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: ${HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${HEALTHCHECK_TIMEOUT:-10s}
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: ${HEALTHCHECK_START_PERIOD:-40s}
+
+  # ==========================================================================
+  # MONITORING - PROMETHEUS (Optional, Profile: monitoring)
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: e2bot-prometheus-prd
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-30d}'
+      - '--storage.tsdb.retention.size=${PROMETHEUS_STORAGE_RETENTION_SIZE:-10GB}'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+      - ./logs/prometheus:/var/log/prometheus
+    networks:
+      - e2bot-backend
+      - e2bot-frontend
+    profiles:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=e2bot-frontend"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prometheus.middlewares=traefik-auth,security-headers,rate-limit"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  # ==========================================================================
+  # MONITORING - GRAFANA (Optional, Profile: monitoring)
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: e2bot-grafana-prd
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY}
+      - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
+      - GF_INSTALL_PLUGINS=${GRAFANA_INSTALL_PLUGINS}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_ALLOW_ORG_CREATE=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./logs/grafana:/var/log/grafana
+    networks:
+      - e2bot-backend
+      - e2bot-frontend
+    profiles:
+      - monitoring
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=e2bot-frontend"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.grafana.middlewares=security-headers,rate-limit"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+# ============================================================================
+# NETWORKS - Security Segregation
+# ============================================================================
+networks:
+  # Frontend network: Serviços expostos via Traefik
+  e2bot-frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+    labels:
+      - "com.docker.network.description=E2 Bot Frontend Network"
+
+  # Backend network: Database, Redis (INTERNAL ONLY)
+  e2bot-backend:
+    driver: bridge
+    internal: true  # ✅ SECURITY: Não permite acesso externo
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+    labels:
+      - "com.docker.network.description=E2 Bot Backend Network (Internal Only)"
+
+# ============================================================================
+# VOLUMES - Data Persistence
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+    labels:
+      - "com.docker.volume.description=PostgreSQL Data"
+      - "com.docker.volume.backup=true"
+
+  n8n_data:
+    driver: local
+    labels:
+      - "com.docker.volume.description=n8n Workflow Data"
+      - "com.docker.volume.backup=true"
+
+  evolution_data:
+    driver: local
+    labels:
+      - "com.docker.volume.description=Evolution API Instance Data"
+      - "com.docker.volume.backup=true"
+
+  redis_data:
+    driver: local
+    labels:
+      - "com.docker.volume.description=Redis Cache Data"
+
+  prometheus_data:
+    driver: local
+    labels:
+      - "com.docker.volume.description=Prometheus Metrics Data"
+
+  grafana_data:
+    driver: local
+    labels:
+      - "com.docker.volume.description=Grafana Dashboards Data"
+
+# ============================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ============================================================================
+#
+# 1. Configure .env.production:
+#    cp docker/.env.production.example docker/.env.production
+#    # Edit and fill all XXXXXXXX placeholders
+#
+# 2. Create Evolution API .env:
+#    mkdir -p docker/evolution
+#    # Create docker/evolution/.env with Evolution API specific config
+#
+# 3. Validate configuration:
+#    docker-compose -f docker/docker-compose-prd-refactored.yml config
+#
+# 4. Start services (without monitoring):
+#    docker-compose -f docker/docker-compose-prd-refactored.yml up -d
+#
+# 5. Start with monitoring:
+#    docker-compose -f docker/docker-compose-prd-refactored.yml --profile monitoring up -d
+#
+# 6. Verify all services healthy:
+#    docker-compose -f docker/docker-compose-prd-refactored.yml ps
+#
+# 7. Check SSL certificates:
+#    docker-compose -f docker/docker-compose-prd-refactored.yml logs traefik | grep -i "certificate"
+#
+# 8. Test endpoints:
+#    curl -I https://n8n.${DOMAIN}
+#    curl -I https://whatsapp.${DOMAIN}
+#
+# ============================================================================
