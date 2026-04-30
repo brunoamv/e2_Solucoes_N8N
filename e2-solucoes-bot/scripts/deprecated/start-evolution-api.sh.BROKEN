@@ -1,0 +1,189 @@
+#!/bin/bash
+# ==============================================================================
+# Script de Inicialização da Evolution API com Workaround Issue #1474
+# ==============================================================================
+#
+# Este script resolve o bug crítico da Evolution API v2.2.3 onde as variáveis
+# de ambiente do Docker são ignoradas. A solução é copiar o .env para dentro
+# do container após a inicialização.
+#
+# Issue: https://github.com/EvolutionAPI/evolution-api/issues/1474
+#
+# Uso:
+#   ./scripts/start-evolution-api.sh
+#
+# ==============================================================================
+
+set -e  # Exit on error
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Diretórios
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+DOCKER_DIR="$PROJECT_ROOT/docker"
+ENV_FILE="$DOCKER_DIR/.env"
+
+echo -e "${GREEN}=====================================================================${NC}"
+echo -e "${GREEN}Evolution API - Inicialização com Workaround Issue #1474${NC}"
+echo -e "${GREEN}=====================================================================${NC}"
+echo ""
+
+# Validar que .env existe
+if [ ! -f "$ENV_FILE" ]; then
+    echo -e "${RED}❌ ERRO: Arquivo .env não encontrado em $ENV_FILE${NC}"
+    echo -e "${YELLOW}Copie .env.example para .env e configure as credenciais${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ Arquivo .env encontrado${NC}"
+
+# Parar e remover containers antigos se existirem
+echo ""
+echo -e "${YELLOW}🔄 Removendo containers antigos...${NC}"
+docker rm -f e2bot-evolution-dev 2>/dev/null || true
+docker rm -f e2bot-evolution-redis 2>/dev/null || true
+docker rm -f e2bot-evolution-postgres 2>/dev/null || true
+
+# Criar network se não existir
+echo ""
+echo -e "${YELLOW}🌐 Verificando network Docker...${NC}"
+docker network inspect e2bot-dev-network >/dev/null 2>&1 || \
+    docker network create e2bot-dev-network
+
+echo -e "${GREEN}✅ Network pronta${NC}"
+
+# Criar PostgreSQL
+echo ""
+echo -e "${YELLOW}📦 Iniciando PostgreSQL...${NC}"
+docker run -d \
+  --name e2bot-evolution-postgres \
+  --network e2bot-dev-network \
+  --restart unless-stopped \
+  -e POSTGRES_USER=evolution \
+  -e POSTGRES_PASSWORD=evolution_dev_password \
+  -e POSTGRES_DB=evolution \
+  -v e2bot_evolution_postgres_data:/var/lib/postgresql/data \
+  postgres:15-alpine
+
+echo -e "${GREEN}✅ PostgreSQL iniciado${NC}"
+
+# Aguardar PostgreSQL ficar pronto
+echo -e "${YELLOW}⏳ Aguardando PostgreSQL inicializar...${NC}"
+sleep 5
+
+# Criar Redis
+echo ""
+echo -e "${YELLOW}📦 Iniciando Redis...${NC}"
+docker run -d \
+  --name e2bot-evolution-redis \
+  --network e2bot-dev-network \
+  --restart unless-stopped \
+  -v e2bot_evolution_redis_data:/data \
+  redis:7-alpine redis-server --appendonly yes
+
+echo -e "${GREEN}✅ Redis iniciado${NC}"
+
+# Criar Evolution API
+echo ""
+echo -e "${YELLOW}📦 Iniciando Evolution API v2.2.3...${NC}"
+docker run -d \
+  --name e2bot-evolution-dev \
+  --network e2bot-dev-network \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -v e2bot_evolution_instances:/evolution/instances \
+  -v e2bot_evolution_store:/evolution/store \
+  atendai/evolution-api:v2.2.3
+
+echo -e "${GREEN}✅ Evolution API container criado${NC}"
+
+# Aguardar container iniciar
+echo ""
+echo -e "${YELLOW}⏳ Aguardando container inicializar (15s)...${NC}"
+sleep 15
+
+# WORKAROUND CRÍTICO: Copiar .env para dentro do container
+echo ""
+echo -e "${YELLOW}🔧 Aplicando workaround Issue #1474...${NC}"
+echo -e "${YELLOW}   Copiando .env para /evolution/.env dentro do container${NC}"
+docker cp "$ENV_FILE" e2bot-evolution-dev:/evolution/.env
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Arquivo .env copiado com sucesso${NC}"
+else
+    echo -e "${RED}❌ ERRO ao copiar .env${NC}"
+    exit 1
+fi
+
+# Reiniciar container para carregar novo .env
+echo ""
+echo -e "${YELLOW}🔄 Reiniciando Evolution API para carregar configurações...${NC}"
+docker restart e2bot-evolution-dev
+
+echo -e "${GREEN}✅ Container reiniciado${NC}"
+
+# Aguardar aplicação inicializar
+echo ""
+echo -e "${YELLOW}⏳ Aguardando aplicação inicializar (20s)...${NC}"
+sleep 20
+
+# Testar se API está respondendo
+echo ""
+echo -e "${YELLOW}🔍 Testando conectividade da API...${NC}"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 || echo "000")
+
+if [ "$HTTP_CODE" = "200" ]; then
+    echo -e "${GREEN}✅ Evolution API está respondendo (HTTP $HTTP_CODE)${NC}"
+else
+    echo -e "${RED}❌ Evolution API não está respondendo (HTTP $HTTP_CODE)${NC}"
+    echo -e "${YELLOW}Verifique os logs: docker logs e2bot-evolution-dev${NC}"
+    exit 1
+fi
+
+# Verificar logs para confirmar Prisma migrations
+echo ""
+echo -e "${YELLOW}📋 Verificando logs de inicialização...${NC}"
+if docker logs e2bot-evolution-dev 2>&1 | grep -q "Migration succeeded"; then
+    echo -e "${GREEN}✅ Migrations do banco de dados executadas${NC}"
+else
+    echo -e "${YELLOW}⚠️  Migrations não detectadas nos logs${NC}"
+fi
+
+if docker logs e2bot-evolution-dev 2>&1 | grep -q "Prisma generate succeeded"; then
+    echo -e "${GREEN}✅ Prisma Client gerado${NC}"
+else
+    echo -e "${YELLOW}⚠️  Prisma Client generation não detectada${NC}"
+fi
+
+# Resumo final
+echo ""
+echo -e "${GREEN}=====================================================================${NC}"
+echo -e "${GREEN}✅ Evolution API inicializada com sucesso!${NC}"
+echo -e "${GREEN}=====================================================================${NC}"
+echo ""
+echo -e "${GREEN}Serviços disponíveis:${NC}"
+echo -e "  📍 Evolution API:  ${YELLOW}http://localhost:8080${NC}"
+echo -e "  🔑 API Key:        ${YELLOW}ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891${NC}"
+echo ""
+echo -e "${GREEN}Próximos passos:${NC}"
+echo -e "  1. Criar instância WhatsApp:"
+echo -e "     ${YELLOW}curl -X POST http://localhost:8080/instance/create \\${NC}"
+echo -e "     ${YELLOW}  -H 'Content-Type: application/json' \\${NC}"
+echo -e "     ${YELLOW}  -H 'apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891' \\${NC}"
+echo -e "     ${YELLOW}  -d '{\"instanceName\": \"minha-instancia\", \"qrcode\": true}'${NC}"
+echo ""
+echo -e "  2. Escanear QR code retornado para conectar WhatsApp"
+echo ""
+echo -e "${GREEN}Comandos úteis:${NC}"
+echo -e "  📋 Logs:           ${YELLOW}docker logs -f e2bot-evolution-dev${NC}"
+echo -e "  🛑 Parar:          ${YELLOW}docker stop e2bot-evolution-dev e2bot-evolution-redis e2bot-evolution-postgres${NC}"
+echo -e "  🗑️  Remover:        ${YELLOW}docker rm -f e2bot-evolution-dev e2bot-evolution-redis e2bot-evolution-postgres${NC}"
+echo ""
+echo -e "${YELLOW}⚠️  IMPORTANTE: Este workaround é necessário devido ao Issue #1474${NC}"
+echo -e "${YELLOW}   Sempre execute este script ao reiniciar os containers${NC}"
+echo ""

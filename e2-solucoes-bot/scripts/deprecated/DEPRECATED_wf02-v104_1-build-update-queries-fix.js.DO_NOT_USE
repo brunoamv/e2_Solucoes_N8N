@@ -1,0 +1,19 @@
+// ❌ DEPRECATED - DO NOT USE THIS FILE ❌
+//
+// This is V104.1 which has a DATABASE SCHEMA BUG
+//
+// Bug: References non-existent "contact_phone" column
+// Error: column "contact_phone" of relation "conversations" does not exist
+//
+// ✅ USE V104.2 INSTEAD:
+// File: wf02-v104_2-build-update-queries-schema-fix.js
+//
+// V104.2 fixes both:
+// 1. State reading from collected_data (V104.1 fix)
+// 2. Schema compliance - removes contact_phone references (V104.2 fix)
+//
+// This file kept for reference only - DO NOT DEPLOY!
+//
+// See documentation:
+// - docs/fix/BUGFIX_WF02_V104_2_SCHEMA_MISMATCH.md
+// - docs/deployment/DEPLOY_WF02_V104_2_BUILD_UPDATE_QUERIES_COMPLETE_FIX.md

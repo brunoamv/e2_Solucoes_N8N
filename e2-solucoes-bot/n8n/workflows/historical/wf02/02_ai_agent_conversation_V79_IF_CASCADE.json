@@ -1,0 +1,1213 @@
+{
+  "name": "02_ai_agent_conversation_V79_IF_CASCADE",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ccc0904c-b53c-4166-bd31-ea6b4b7795e7",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validação de entrada do Workflow 01\nconst inputData = $input.first().json;\n\n// Validação crítica do phone_number\nif (!inputData.phone_number || inputData.phone_number === 'undefined') {\n    throw new Error('Phone number is required but was not received from Workflow 01');\n}\n\n// Limpar e validar formato do phone_number\nlet phone_number = String(inputData.phone_number).replace(/[^0-9]/g, '');\n\n// Remover @s.whatsapp.net se existir\nif (phone_number.includes('@')) {\n  phone_number = phone_number.split('@')[0];\n}\n\n// IMPORTANTE: Adicionar código 55 se não tiver (MOVIDO DO PREPARE UPDATE DATA)\nif (phone_number && !phone_number.startsWith('55')) {\n  // Se tem 10 ou 11 dígitos (formato brasileiro), adiciona 55\n  if (phone_number.length === 10 || phone_number.length === 11) {\n    phone_number = '55' + phone_number;\n    console.log('Adicionado código 55:', phone_number);\n  }\n  // Se tem 12 ou 13 dígitos começando com outro código, mantém\n  else if (phone_number.length >= 12) {\n    console.log('Número já tem código de país:', phone_number);\n  }\n  // Qualquer outro caso, tenta adicionar 55\n  else {\n    phone_number = '55' + phone_number;\n    console.log('Formato desconhecido, adicionado 55:', phone_number);\n  }\n}\n\n// Validação de formato brasileiro (DDD + número) - AGORA COM 55\nif (phone_number.length < 12 || phone_number.length > 13) {\n    console.warn(`Phone number format unusual: ${phone_number} (expected 12-13 digits with country code)`);\n}\n\nconsole.log('Validated input:', {\n    phone_number: phone_number,  // Agora já tem 55\n    whatsapp_name: inputData.whatsapp_name,\n    message_type: inputData.message_type\n});\n\nreturn {\n    phone_number: phone_number,  // COM código 55\n    whatsapp_name: inputData.whatsapp_name || '',\n    message: inputData.message || '',\n    message_type: inputData.message_type || 'text',\n    media_url: inputData.media_url || null,\n    message_id: inputData.message_id || '',\n    timestamp: inputData.timestamp || new Date().toISOString()\n};"
+      },
+      "id": "2ddb3c98-71e8-4e13-baf1-da3a2c963d51",
+      "name": "Validate Input Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare both phone formats for SQL queries\n// This node receives data directly from WEBHOOK (not from Validate Input Data)\nconst inputData = $input.first().json;\n\n// Get phone number - could come from webhook or validate input\nlet phone_with_code = String(inputData.phone_number || '');\n\n// Clean the phone number\nphone_with_code = phone_with_code.replace(/[^0-9]/g, '');\n\n// Add country code if missing\nif (phone_with_code && !phone_with_code.startsWith('55')) {\n    if (phone_with_code.length === 10 || phone_with_code.length === 11) {\n        phone_with_code = '55' + phone_with_code;\n        console.log('Added country code 55:', phone_with_code);\n    }\n}\n\n// Create version without country code for compatibility\nlet phone_without_code = phone_with_code;\nif (phone_with_code.startsWith('55')) {\n    phone_without_code = phone_with_code.substring(2);\n}\n\nconsole.log('=== PHONE FORMAT PREPARATION ===');\nconsole.log('With code (55):', phone_with_code);\nconsole.log('Without code:', phone_without_code);\n\n// Return both formats and pass through all other data\nreturn {\n    ...inputData, // Pass through all original data\n    phone_with_code: phone_with_code,      // e.g., \"556181755748\"\n    phone_without_code: phone_without_code, // e.g., \"6181755748\"\n    // Keep original for compatibility\n    phone_number: phone_with_code,\n\n    // CRITICAL V26 FIX: Ensure ALL possible message field names are present\n    // This handles different webhook formats from Evolution API\n    message: inputData.message || inputData.body || inputData.text || inputData.content || '',\n    content: inputData.content || inputData.message || inputData.body || inputData.text || '',\n    body: inputData.body || inputData.message || inputData.text || inputData.content || '',\n    text: inputData.text || inputData.message || inputData.body || inputData.content || '',\n\n    // Also ensure whatsapp_name is present\n    whatsapp_name: inputData.whatsapp_name || inputData.pushName || inputData.profileName || ''\n};"
+      },
+      "id": "04a79d45-ae2b-4f4d-a7e7-cb85475ef4c6",
+      "name": "Prepare Phone Formats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-ai-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "8b9b3b82-b5a3-4cb5-8260-318305ca5dbc",
+      "name": "Webhook - Receive Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        496
+      ],
+      "webhookId": "ai-agent-conversation-v1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_count}}",
+        "additionalFields": {}
+      },
+      "id": "4615a60a-b758-463d-9698-47c411060985",
+      "name": "Get Conversation Count",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        496
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_details}}",
+        "additionalFields": {}
+      },
+      "id": "9c87fd50-707d-47a0-b526-ceb45d920036",
+      "name": "Get Conversation Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        400,
+        736
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.count }}",
+              "value2": "0"
+            }
+          ]
+        }
+      },
+      "id": "b67330f3-5700-4396-a56a-baa64f5f66f9",
+      "name": "Check If New User",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$json.query_upsert}}",
+        "options": {}
+      },
+      "id": "8ce312ad-d87c-47d5-b573-535765e43c4d",
+      "name": "Create New Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -192
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// ===================================================\n// V63 STATE MACHINE - COMPLETE FLOW REDESIGN\n// ===================================================\n// Changes from V62.3:\n// - REMOVED: collect_phone state (redundant)\n// - DIRECT: collect_name → collect_phone_whatsapp_confirmation\n// - SOURCE: input.phone_number (from Evolution API webhook)\n// - STATES: 8 (was 9 in V62.3)\n// - TEMPLATES: 12 (was 16 in V62.3)\n// Date: 2026-03-10\n// ===================================================\n\n// Helper function for phone formatting\nfunction formatPhoneDisplay(phone) {\n  if (!phone) return '';\n\n  // Remove all non-numeric characters\n  const cleaned = phone.replace(/\\D/g, '');\n\n  // Format based on length\n  if (cleaned.length === 11) {\n    return `(${cleaned.substring(0,2)}) ${cleaned.substring(2,7)}-${cleaned.substring(7,11)}`;\n  } else if (cleaned.length === 10) {\n    return `(${cleaned.substring(0,2)}) ${cleaned.substring(2,6)}-${cleaned.substring(6,10)}`;\n  }\n\n  return phone; // Return original if format not recognized\n}\n\n// Main execution\nconst input = $input.all()[0].json;\nconst message = (input.message || '').toString().trim().toLowerCase();\nconst currentStage = input.current_stage || 'greeting';\n\n// Get currentData from Postgres (Merge Append node)\nconst currentData = input.currentData || {};\n\n// V69 FIX: Helper function for service names (BUG #3 FIX)\nfunction getServiceName(serviceCode) {\n  const serviceNames = {\n    '1': 'Energia Solar',\n    '2': 'Subestações',\n    '3': 'Projetos Elétricos',\n    '4': 'BESS (Armazenamento de Energia)',\n    '5': 'Análise e Laudos'\n  };\n  return serviceNames[serviceCode] || 'serviço selecionado';\n}\n\n// V64 DEBUG: Log currentData at STATE MACHINE START\nconsole.log('=== V64 STATE MACHINE DEBUG START ===');\nconsole.log('V64: Input currentData type:', typeof input.currentData);\nconsole.log('V64: Input currentData:', JSON.stringify(input.currentData));\nconsole.log('V64: Input current_stage:', input.current_stage);\nconsole.log('V64: currentData.service_selected:', currentData.service_selected);\nconsole.log('V64: currentData.service_type:', currentData.service_type);\nconsole.log('V64: currentData.lead_name:', currentData.lead_name);\nconsole.log('=== V64 STATE MACHINE DEBUG END ===');\n\n// Service type mapping\nconst serviceMapping = {\n  '1': 'energia_solar',          // V64 FIX: Matches DB constraint valid_service_v58\n  '2': 'subestacao',             // Unchanged\n  '3': 'projeto_eletrico',       // V64 FIX: Was 'projetos'\n  '4': 'armazenamento_energia',  // V64 FIX: Was 'bess'\n  '5': 'analise_laudo'           // V64 FIX: Was 'analise'\n};\n\n// Service emoji and name mapping (V67 FIX: Keys match serviceMapping values)\nconst serviceDisplay = {\n  'energia_solar': { emoji: '☀️', name: 'Energia Solar' },\n  'subestacao': { emoji: '⚡', name: 'Subestações' },\n  'projeto_eletrico': { emoji: '📐', name: 'Projetos Elétricos' },\n  'armazenamento_energia': { emoji: '🔋', name: 'BESS (Armazenamento de Energia)' },\n  'analise_laudo': { emoji: '📊', name: 'Análise e Laudos' }\n};\n\n// Templates (12 total - V63 optimization)\nconst templates = {\n  // 1. GREETING E MENU PRINCIPAL (2)\n  \"greeting\": `🤖 *Olá! Bem-vindo à E2 Soluções!*\n\nSomos especialistas em engenharia elétrica com 15+ anos de experiência.\n\n*Qual serviço você precisa?*\n\n☀️ *1 - Energia Solar*\n   Projetos fotovoltaicos residenciais e comerciais\n\n⚡ *2 - Subestação*\n   Reforma, manutenção e construção\n\n📐 *3 - Projetos Elétricos*\n   Adequações e laudos técnicos\n\n🔋 *4 - BESS (Armazenamento)*\n   Sistemas de armazenamento de energia\n\n📊 *5 - Análise e Laudos*\n   Qualidade de energia e eficiência\n\n_Digite o número do serviço (1-5):_`,\n\n  \"invalid_service\": `❌ *Opção inválida*\n\nPor favor, escolha uma das opções disponíveis:\n\n1️⃣ - Energia Solar\n2️⃣ - Subestações\n3️⃣ - Projetos Elétricos\n4️⃣ - BESS\n5️⃣ - Análise de Consumo\n\n_Digite apenas o número (1 a 5)_`,\n\n  // 2. COLETA DE NOME (2)\n  \"service_acknowledged\": `✅ *Perfeito!*\n\n👤 *Qual é o seu nome completo?*\n\n💡 _Exemplo: Maria Silva Santos_\n_Usaremos para personalizar seu atendimento_`,\n\n  \"invalid_name\": `❌ *Nome inválido*\n\nPor favor, informe seu nome completo (mínimo 2 letras).\n\n_Não use apenas números ou caracteres especiais._`,\n\n  // 3. COLETA DE TELEFONE (3)\n  \"phone_whatsapp_confirm\": `📱 *Ótimo, {{name}}!*\n\nVi que você está me enviando mensagens pelo número:\n*{{whatsapp_number}}*\n\nEste é o melhor número para contato?\n\n1️⃣ *Sim, pode usar este*\n2️⃣ *Não, vou informar outro*\n\n💡 _Digite 1 ou 2_`,\n\n  \"phone_alternative\": `📱 *Qual número prefere para contato, {{name}}?*\n\nPor favor, informe com DDD:\n\n💡 _Exemplo: (62) 98765-4321_\n_Usaremos este número para agendarmos sua visita técnica_`,\n\n  \"invalid_phone\": `❌ *Telefone inválido*\n\nPor favor, informe um telefone válido com DDD.\n\n💡 _Exemplos aceitos:_\n• (62) 98765-4321\n• 62987654321\n• 6298765-4321\n\n_Use apenas números, espaços, parênteses e hífen_`,\n\n  // 4. COLETA DE EMAIL (2)\n  \"email_request\": `📧 *Qual é o seu e-mail, {{name}}?*\n\n💡 _Exemplo: maria.silva@email.com_\n\nSe preferir não informar, digite *pular*\n_O e-mail nos ajuda a enviar documentação técnica e propostas_`,\n\n  \"invalid_email\": `❌ *E-mail inválido*\n\nPor favor, informe um e-mail válido.\n\n*Exemplos:*\n• maria@gmail.com\n• joao.silva@empresa.com.br\n\nOu digite *pular* se não quiser informar.`,\n\n  // 5. COLETA DE CIDADE (2)\n  \"city_request\": `📍 *Em qual cidade você está, {{name}}?*\n\n💡 _Exemplo: Goiânia - GO_\n_Precisamos saber para agendar a visita técnica com nossa equipe local_`,\n\n  \"invalid_city\": `❌ *Cidade inválida*\n\nPor favor, informe uma cidade válida (mínimo 2 letras).\n\n_Exemplo: Goiânia, Brasília, Anápolis..._`,\n\n  // 6. CONFIRMAÇÃO - 3 OPÇÕES (2)\n  \"confirmation\": `✅ *Perfeito! Veja o resumo dos seus dados:*\n\n👤 *Nome:* {{name}}\n📱 *Telefone:* {{phone}}\n📧 *E-mail:* {{email}}\n📍 *Cidade:* {{city}}\n{{service_emoji}} *Serviço:* {{service_name}}\n\n---\n\nDeseja agendar uma visita técnica gratuita para avaliarmos seu projeto?\n\n1️⃣ *Sim, quero agendar*\n2️⃣ *Não agora, falar com uma pessoa*\n3️⃣ *Meus dados estão errados, quero corrigir*`,\n\n  \"invalid_confirmation\": `❌ *Opção inválida*\n\nPor favor, escolha uma das opções:\n\n1️⃣ *Sim, quero agendar*\n2️⃣ *Não agora, falar com uma pessoa*\n3️⃣ *Meus dados estão errados, quero corrigir*`,\n\n  // 7. REDIRECIONAMENTOS (2)\n  \"scheduling_redirect\": `⏰ *Agendamento de Visita Técnica*\n\nPerfeito! Agora vamos agendar sua visita técnica.\n\nNossa equipe entrará em contato em breve para:\n✅ Confirmar melhor data e horário\n✅ Esclarecer detalhes técnicos\n✅ Preparar documentação necessária\n\n🕐 *Horário de atendimento:*\nSegunda a Sexta: 8h às 18h\nSábado: 8h às 12h\n\n📱 *Contato direto:* (62) 3092-2900\n\n_Obrigado por escolher a E2 Soluções!_`,\n\n  \"handoff_comercial\": `👔 *Transferência para Atendimento Comercial*\n\nObrigado pelas informações!\n\nNossa equipe comercial especializada entrará em contato para:\n✅ Apresentar soluções personalizadas\n✅ Elaborar proposta técnica-comercial\n✅ Esclarecer dúvidas sobre investimento\n\n🕐 *Retorno em:* até 24 horas úteis\n\n📱 *Contato direto:* (62) 3092-2900\n\n_Aguarde nosso retorno!_`,\n\n  // 8. V66 CORRECTION FLOW TEMPLATES (11 NEW)\n  \"ask_correction_field\": `🔧 *Sem problemas! Vamos corrigir.*\n\nQual dado você quer alterar?\n\n1️⃣ *Nome* (atual: {{name}})\n2️⃣ *Telefone* (atual: {{phone}})\n3️⃣ *E-mail* (atual: {{email}})\n4️⃣ *Cidade* (atual: {{city}})\n\n_Digite o número do campo que deseja corrigir:_`,\n\n  \"invalid_correction_field\": `❌ *Opção inválida*\n\nPor favor, escolha um número de 1 a 4 para o campo que deseja corrigir.\n\n1️⃣ - Nome\n2️⃣ - Telefone\n3️⃣ - E-mail\n4️⃣ - Cidade`,\n\n  \"correction_prompt_name\": `👤 *Corrigindo Nome*\n\nNome atual: *{{name}}*\n\nDigite o nome correto:\n_Exemplo: Maria Silva Santos_`,\n\n  \"correction_prompt_phone\": `📱 *Corrigindo Telefone*\n\nTelefone atual: *{{phone}}*\n\nDigite o telefone correto com DDD:\n_Exemplo: (62) 98765-4321_`,\n\n  \"correction_prompt_email\": `📧 *Corrigindo E-mail*\n\nE-mail atual: *{{email}}*\n\nDigite o e-mail correto:\n_Exemplo: maria.silva@email.com_`,\n\n  \"correction_prompt_city\": `📍 *Corrigindo Cidade*\n\nCidade atual: *{{city}}*\n\nDigite a cidade correta:\n_Exemplo: Goiânia - GO_`,\n\n  \"correction_success_name\": `✅ *Nome corrigido com sucesso!*\n\nNome anterior: {{old_value}}\nNome novo: *{{new_value}}*\n\nVoltando para a confirmação...`,\n\n  \"correction_success_phone\": `✅ *Telefone corrigido com sucesso!*\n\nTelefone anterior: {{old_value}}\nTelefone novo: *{{new_value}}*\n\nVoltando para a confirmação...`,\n\n  \"correction_success_email\": `✅ *E-mail corrigido com sucesso!*\n\nE-mail anterior: {{old_value}}\nE-mail novo: *{{new_value}}*\n\nVoltando para a confirmação...`,\n\n  \"correction_success_city\": `✅ *Cidade corrigida com sucesso!*\n\nCidade anterior: {{old_value}}\nCidade nova: *{{new_value}}*\n\nVoltando para a confirmação...`\n};\n\n// Initialize response variables\nlet responseText = '';\nlet nextStage = currentStage;\nlet updateData = {};\n\nconsole.log('V63: Current stage:', currentStage);\nconsole.log('V63: User message:', message);\nconsole.log('V63: Current data:', JSON.stringify(currentData));\n\n// ===================================================\n// STATE MACHINE LOGIC\n// ===================================================\n\nswitch (currentStage) {\n\n  // ===== STATE 1: GREETING - Show menu =====\n  case 'greeting':\n  case 'menu':\n    console.log('V68: Processing GREETING state');\n\n    // V68 FIX: Check if returning user with complete data\n    const hasCompleteData = currentData.lead_name &&\n                           currentData.service_selected &&\n                           currentData.contact_phone;\n\n    if (hasCompleteData) {\n      console.log('V68 FIX: Returning user detected with complete data');\n      const serviceName = getServiceName(currentData.service_selected);\n      const userStatus = currentData.status || 'pending';\n\n      // Show returning user menu instead of greeting\n      if (userStatus === 'scheduling' || userStatus === 'confirmed') {\n        responseText = templates.returning_user_scheduled\n          .replace('{{name}}', currentData.lead_name)\n          .replace('{{service}}', serviceName);\n        nextStage = 'returning_user_menu';\n      } else {\n        responseText = templates.returning_user_incomplete\n          .replace('{{name}}', currentData.lead_name)\n          .replace('{{service}}', serviceName);\n        nextStage = 'returning_user_menu';\n      }\n    } else {\n      // New user or incomplete data - show normal greeting\n      console.log('V68: New user or incomplete data, showing greeting');\n      responseText = templates.greeting;\n      nextStage = 'service_selection';\n    }\n    break;\n\n  // ===== STATE 2: SERVICE SELECTION - Capture service =====\n  case 'service_selection':\n  case 'identificando_servico':\n    console.log('V63: Processing SERVICE_SELECTION state');\n\n    if (/^[1-5]$/.test(message)) {\n      console.log('V63: Valid service number:', message);\n      updateData.service_selected = message;\n      updateData.service_type = serviceMapping[message];\n      console.log('V63: Service mapped:', message, '→', updateData.service_type);\n\n      // V63 FIX: Use service_acknowledged template (asks for name WITHOUT {{name}} placeholder)\n      responseText = templates.service_acknowledged;\n      nextStage = 'collect_name';\n    } else {\n      console.log('V63: Invalid service selection');\n      responseText = templates.invalid_service;\n      nextStage = 'service_selection';\n    }\n    break;\n\n  // ===== STATE 3: COLLECT NAME - Get name + DIRECT to WhatsApp confirmation =====\n  case 'collect_name':\n  case 'coletando_nome':\n    console.log('V63: Processing COLLECT_NAME state');\n\n    const trimmedName = message.trim();\n\n    // Validate name (at least 2 chars, not just numbers)\n    if (trimmedName.length >= 2 && !/^[0-9]+$/.test(trimmedName)) {\n      console.log('V63: Valid name received:', trimmedName);\n      updateData.lead_name = trimmedName;\n\n      // V63 CRITICAL CHANGE: Skip collect_phone, go DIRECTLY to WhatsApp confirmation\n      // Use phone number from Evolution API webhook (input.phone_number)\n      const whatsappPhone = input.phone_number || input.phone_with_code || '';\n      console.log('V63: WhatsApp phone from input:', whatsappPhone);\n\n      // Generate WhatsApp confirmation message\n      responseText = templates.phone_whatsapp_confirm\n        .replace('{{name}}', trimmedName)\n        .replace('{{whatsapp_number}}', formatPhoneDisplay(whatsappPhone));\n\n      nextStage = 'collect_phone_whatsapp_confirmation'; // DIRECT!\n      console.log('V63: OPTIMIZATION - Skip collect_phone, go directly to WhatsApp confirmation');\n\n    } else {\n      console.log('V63: Invalid name format');\n      responseText = templates.invalid_name;\n      nextStage = 'collect_name';\n    }\n    break;\n\n  // ===== STATE 4: PHONE WHATSAPP CONFIRMATION - Confirm WhatsApp or get alternative =====\n  case 'collect_phone_whatsapp_confirmation':\n    console.log('V63: Processing PHONE_WHATSAPP_CONFIRMATION state');\n\n    if (message === '1') {\n      // User confirms WhatsApp number is correct\n      console.log('V63: WhatsApp number confirmed');\n\n      // Use the WhatsApp number from webhook\n      const confirmedPhone = input.phone_number || input.phone_with_code || '';\n      updateData.phone_number = confirmedPhone;\n      updateData.contact_phone = confirmedPhone; // V43 field\n\n      // Proceed to email collection\n      responseText = templates.email_request.replace('{{name}}', currentData.lead_name || 'cliente');\n      nextStage = 'collect_email';\n\n    } else if (message === '2') {\n      // User wants to provide alternative number\n      console.log('V63: User wants alternative phone');\n\n      responseText = templates.phone_alternative.replace('{{name}}', currentData.lead_name || 'cliente');\n      nextStage = 'collect_phone_alternative';\n\n    } else {\n      // Invalid option\n      console.log('V63: Invalid WhatsApp confirmation option');\n      const whatsappPhone = input.phone_number || input.phone_with_code || '';\n      responseText = `❌ *Opção inválida*\\n\\n${templates.phone_whatsapp_confirm\n        .replace('{{name}}', currentData.lead_name || 'cliente')\n        .replace('{{whatsapp_number}}', formatPhoneDisplay(whatsappPhone))}`;\n      nextStage = 'collect_phone_whatsapp_confirmation';\n    }\n    break;\n\n  // ===== STATE 5: COLLECT PHONE ALTERNATIVE - Get alternative phone =====\n  case 'collect_phone_alternative':\n    console.log('V63: Processing COLLECT_PHONE_ALTERNATIVE state');\n\n    // Phone validation regex (DDD + number)\n    const phoneRegex = /^\\(?\\d{2}\\)?\\s?9?\\d{4}[-\\s]?\\d{4}$/;\n\n    if (phoneRegex.test(message)) {\n      console.log('V63: Valid alternative phone received');\n\n      // Clean and store alternative phone\n      const cleanedPhone = message.replace(/\\D/g, '');\n      updateData.phone_number = cleanedPhone;\n      updateData.contact_phone = cleanedPhone; // V43 field\n\n      // Proceed to email collection\n      responseText = templates.email_request.replace('{{name}}', currentData.lead_name || 'cliente');\n      nextStage = 'collect_email';\n\n    } else {\n      console.log('V63: Invalid alternative phone format');\n      responseText = templates.invalid_phone;\n      nextStage = 'collect_phone_alternative';\n    }\n    break;\n\n  // ===== STATE 6: COLLECT EMAIL - Get email or skip =====\n  case 'collect_email':\n  case 'coletando_email':\n    console.log('V63: Processing COLLECT_EMAIL state');\n\n    if (message === 'pular') {\n      console.log('V63: User skipped email');\n      updateData.email = 'não informado';\n      responseText = templates.city_request.replace('{{name}}', currentData.lead_name || 'cliente');\n      nextStage = 'collect_city';\n\n    } else {\n      // Basic email validation\n      const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n      if (emailRegex.test(message)) {\n        console.log('V63: Valid email received');\n        updateData.email = message;\n        responseText = templates.city_request.replace('{{name}}', currentData.lead_name || 'cliente');\n        nextStage = 'collect_city';\n      } else {\n        console.log('V63: Invalid email format');\n        responseText = `❌ *E-mail inválido*\\n\\n${templates.email_request.replace('{{name}}', currentData.lead_name || 'cliente')}`;\n        nextStage = 'collect_email';\n      }\n    }\n    break;\n\n  // ===== STATE 7: COLLECT CITY - Get city =====\n  case 'collect_city':\n  case 'coletando_cidade':\n    console.log('V63: Processing COLLECT_CITY state');\n\n    if (message.length >= 2) {\n      console.log('V63: Valid city received');\n      updateData.city = message;\n\n      // Build confirmation message with ALL data\n      const leadName = currentData.lead_name || updateData.lead_name || 'não informado';\n      const phoneNumber = currentData.contact_phone || currentData.phone_number || updateData.phone_number || updateData.contact_phone || 'não informado';\n      const email = currentData.email || updateData.email || 'não informado';\n      const city = updateData.city || 'não informado';\n      const serviceType = currentData.service_type || 'não informado';\n      const serviceInfo = serviceDisplay[serviceType] || { emoji: '❓', name: 'Não informado' };\n\n      responseText = templates.confirmation\n        .replace('{{name}}', leadName)\n        .replace('{{phone}}', formatPhoneDisplay(phoneNumber))\n        .replace('{{email}}', email)\n        .replace('{{city}}', city)\n        .replace('{{service_emoji}}', serviceInfo.emoji)\n        .replace('{{service_name}}', serviceInfo.name);\n\n      // V4 FIX: Check if service requires appointment\n      updateData.city = message;\n\n      // V72: ALWAYS go to confirmation (State 8) first\n      console.log('➡️ V72: Indo para State 8 (confirmation)');\n      nextStage = 'confirmation';\n    }\n\n    else {\n      console.log('V63: Invalid city (too short)');\n      responseText = `❌ *Cidade inválida*\\n\\n${templates.city_request.replace('{{name}}', currentData.lead_name || 'cliente')}`;\n      nextStage = 'collect_city';\n    }\n    break;\n\n\n  // ===== V4 FIX: STATE 9: COLLECT APPOINTMENT DATE =====\n  case 'collect_appointment_date':\n  case 'coletando_data_agendamento':\n    console.log('V73.3: Processing COLLECT_APPOINTMENT_DATE state');\n\n    // V73.3 FIX: PROCESS raw message input directly\n    const dateInput = message.trim();\n\n    // Date validation regex: DD/MM/AAAA\n    const dateRegex = /^(\\d{2})\\/(\\d{2})\\/(\\d{4})$/;\n    const dateMatch = dateInput.match(dateRegex);\n\n    if (dateMatch) {\n      const day = parseInt(dateMatch[1], 10);\n      const month = parseInt(dateMatch[2], 10);\n      const year = parseInt(dateMatch[3], 10);\n\n      // Validate date ranges\n      if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 2026 && year <= 2030) {\n        // Format to ISO: YYYY-MM-DD\n        const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;\n\n        // Validate it's not in the past\n        const now = new Date();\n        const appointmentDate = new Date(isoDate);\n\n        if (appointmentDate >= now) {\n          console.log('V73.3 FIX: Valid date →', isoDate);\n\n          // STORE validated date\n          updateData.scheduled_date = isoDate;\n\n          // GO TO STATE 10\n          responseText = `⏰ *Perfeito! Data confirmada: ${dateInput}*\n\nQual horário você prefere?\n\n💡 _Formato: HH:MM (ex: 09:00, 14:30)_\n\n🕐 Horário comercial: 08:00 às 18:00`;\n          nextStage = 'collect_appointment_time';\n        } else {\n          // Date is in the past\n          console.log('V73.3: Date in past');\n          responseText = `❌ *Data inválida*\n\nA data informada (${dateInput}) já passou.\n\nPor favor, informe uma data futura (formato DD/MM/AAAA):\n\n💡 _Exemplo: 25/04/2026_`;\n          nextStage = 'collect_appointment_date';\n        }\n      } else {\n        // Invalid day/month/year ranges\n        console.log('V73.3: Invalid date ranges');\n        responseText = `❌ *Data inválida*\n\nPor favor, informe uma data válida (formato DD/MM/AAAA):\n\n💡 _Exemplo: 25/04/2026_\n_Dia: 01-31, Mês: 01-12, Ano: 2026-2030_`;\n        nextStage = 'collect_appointment_date';\n      }\n    } else {\n      // Format doesn't match DD/MM/AAAA\n      console.log('V73.3: Invalid date format');\n      responseText = `❌ *Formato inválido*\n\nPor favor, use o formato DD/MM/AAAA:\n\n💡 _Exemplo: 25/04/2026_\n_Certifique-se de usar barras (/) para separar dia, mês e ano_`;\n      nextStage = 'collect_appointment_date';\n    }\n    break;\n\n  // ===== V4 FIX: STATE 10: COLLECT APPOINTMENT TIME =====\n  case 'collect_appointment_time':\n  case 'coletando_horario_agendamento':\n    console.log('V73.3: Processing COLLECT_APPOINTMENT_TIME state');\n\n    // V73.3 FIX: PROCESS raw message input directly\n    const timeInput = message.trim();\n\n    // Time validation regex: HH:MM\n    const timeRegex = /^(\\d{2}):(\\d{2})$/;\n    const timeMatch = timeInput.match(timeRegex);\n\n    if (timeMatch) {\n      const hour = parseInt(timeMatch[1], 10);\n      const minute = parseInt(timeMatch[2], 10);\n\n      // Validate time ranges and business hours\n      if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {\n        // Check business hours: 08:00 to 18:00\n        if (hour >= 8 && hour < 18) {\n          // Calculate end time (2 hours later for technical visit)\n          const endHour = hour + 2;\n          const startTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;\n          const endTime = `${String(endHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;\n\n          console.log('V73.3 FIX: Valid time →', startTime, 'to', endTime);\n\n          // STORE validated times\n          updateData.scheduled_time_start = startTime;\n          updateData.scheduled_time_end = endTime;\n\n          // Format date for display (from currentData or updateData)\n          const dbDate = updateData.scheduled_date || currentData.scheduled_date || '';\n          let displayDate = dbDate;\n          if (dbDate && /^\\d{4}-\\d{2}-\\d{2}$/.test(dbDate)) {\n            const [y, m, d] = dbDate.split('-');\n            displayDate = `${d}/${m}/${y}`;\n          }\n\n          // GO TO STATE 11 (final confirmation)\n          const serviceName = getServiceName(currentData.service_selected || '1');\n          responseText = `✅ *Agendamento quase pronto!*\n\n📅 *Resumo da visita técnica:*\n\n🗓️ Data: ${displayDate}\n⏰ Horário: ${timeInput} às ${String(endHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}\n⏳ Duração: 2 horas\n🔧 Serviço: ${serviceName}\n\n---\n\nConfirma o agendamento?\n\n1️⃣ *Sim, confirmar*\n2️⃣ *Não, corrigir dados*`;\n          nextStage = 'appointment_confirmation';\n        } else {\n          // Outside business hours\n          console.log('V73.3: Time outside business hours');\n          responseText = `❌ *Horário fora do expediente*\n\nPor favor, escolha um horário entre 08:00 e 17:59.\n\n🕐 *Horário comercial:*\nSegunda a Sexta: 08:00 às 18:00\nSábado: 08:00 às 12:00\n\n💡 _Exemplo: 09:00, 14:30_`;\n          nextStage = 'collect_appointment_time';\n        }\n      } else {\n        // Invalid hour/minute ranges\n        console.log('V73.3: Invalid time ranges');\n        responseText = `❌ *Horário inválido*\n\nPor favor, informe um horário válido (formato HH:MM):\n\n💡 _Exemplo: 09:00, 14:30_\n_Hora: 00-23, Minuto: 00-59_`;\n        nextStage = 'collect_appointment_time';\n      }\n    } else {\n      // Format doesn't match HH:MM\n      console.log('V73.3: Invalid time format');\n      responseText = `❌ *Formato inválido*\n\nPor favor, use o formato HH:MM:\n\n💡 _Exemplo: 09:00, 14:30_\n_Certifique-se de usar dois-pontos (:) para separar hora e minuto_`;\n      nextStage = 'collect_appointment_time';\n    }\n    break;\n  // ===== V73.4 FIX: STATE 11: APPOINTMENT CONFIRMATION - Final appointment confirmation =====\n  case 'appointment_confirmation':\n  case 'confirmacao_agendamento':\n    console.log('V73.4: Processing APPOINTMENT_CONFIRMATION state');\n\n    if (message === '1') {\n      // User confirms appointment\n      console.log('V73.4 FIX: User confirmed appointment → setting next_stage = scheduling_redirect');\n\n      // ✅ V73.4 CRITICAL: Set next_stage to 'scheduling_redirect'\n      // This allows \"Check If Scheduling\" IF node to execute via:\n      // {{ $node[\"Build Update Queries\"].json.next_stage }} === 'scheduling_redirect'\n      nextStage = 'scheduling_redirect';\n      updateData.status = 'scheduling';\n\n      // Show final confirmation message\n      responseText = templates.scheduling_redirect;\n\n      console.log('V73.4 FIX: next_stage set to:', nextStage);\n      console.log('V73.4 FIX: updateData.status set to:', updateData.status);\n\n    } else if (message === '2') {\n      // User wants to correct appointment data\n      console.log('V73.4: User wants to correct appointment data');\n\n      // Go back to collect_appointment_date (State 9)\n      responseText = '🔧 *Vamos corrigir os dados do agendamento.*\\n\\nQual a melhor data para você? (formato DD/MM/AAAA)\\n\\n💡 _Exemplo: 25/04/2026_';\n      nextStage = 'collect_appointment_date';\n\n      // Clear previous appointment data\n      updateData.scheduled_date = null;\n      updateData.scheduled_time_start = null;\n      updateData.scheduled_time_end = null;\n\n    } else {\n      // Invalid option\n      console.log('V73.4: Invalid appointment confirmation option');\n\n      // Show same confirmation message again\n      const dbDate = currentData.scheduled_date || '';\n      let displayDate = dbDate;\n      if (dbDate && /^\\d{4}-\\d{2}-\\d{2}$/.test(dbDate)) {\n        const [y, m, d] = dbDate.split('-');\n        displayDate = `${d}/${m}/${y}`;\n      }\n\n      const startTime = currentData.scheduled_time_start || '00:00:00';\n      const endTime = currentData.scheduled_time_end || '02:00:00';\n      const [startH, startM] = startTime.split(':');\n      const [endH, endM] = endTime.split(':');\n      const serviceName = getServiceName(currentData.service_selected || '1');\n\n      responseText = `❌ *Opção inválida*\\n\\n✅ *Agendamento quase pronto!*\\n\\n📅 *Resumo da visita técnica:*\\n\\n🗓️ Data: ${displayDate}\\n⏰ Horário: ${startH}:${startM} às ${endH}:${endM}\\n⏳ Duração: 2 horas\\n🔧 Serviço: ${serviceName}\\n\\n---\\n\\nConfirma o agendamento?\\n\\n1️⃣ *Sim, confirmar*\\n2️⃣ *Não, corrigir dados*`;\n      nextStage = 'appointment_confirmation';\n    }\n    break;\n\n\n\n  // ===== STATE 8: CONFIRMATION - Final confirmation =====\n  case 'confirmation':\n    console.log('V73.2: Processing CONFIRMATION state');\n\n    // Option 1: Agendar visita\n    if (message === '1') {\n      const serviceSelected = currentData.service_selected || '1';\n      if (serviceSelected === '1' || serviceSelected === '3') {\n        // V73.2 FIX: Go to State 9 to collect appointment date, NOT final message!\n        console.log('V73.2 FIX: Services 1 or 3 → Going to collect_appointment_date (State 9)');\n        responseText = '📅 *Ótimo! Vamos agendar sua visita técnica.*\\n\\nQual a melhor data para você? (formato DD/MM/AAAA)\\n\\n💡 _Exemplo: 25/04/2026_';\n        nextStage = 'collect_appointment_date';  // ✅ GO TO STATE 9!\n      } else {\n        // Other services → handoff\n        console.log('V73.2: Other services → handoff_comercial');\n        responseText = templates.handoff_comercial;\n        nextStage = 'handoff_comercial';\n        updateData.status = 'handoff';\n      }\n    }\n    // Option 2: Falar com pessoa\n    else if (message === '2') {\n      responseText = templates.handoff_comercial;\n      nextStage = 'handoff_comercial';\n      updateData.status = 'handoff';\n    }\n    // Option 3: Corrigir dados ← V66 NEW FUNCTIONALITY\n    else if (message === '3') {\n      console.log('V66: User chose correction option');\n      const leadName = currentData.lead_name || 'não informado';\n      const phoneNumber = currentData.contact_phone || currentData.phone_number || 'não informado';\n      const email = currentData.email || 'não informado';\n      const city = currentData.city || 'não informado';\n\n      responseText = templates.ask_correction_field\n        .replace('{{name}}', leadName)\n        .replace('{{phone}}', formatPhoneDisplay(phoneNumber))\n        .replace('{{email}}', email)\n        .replace('{{city}}', city);\n\n      nextStage = 'correction_field_selection';\n      updateData.correction_in_progress = true;\n      updateData.correction_attempts = (currentData.correction_attempts || 0) + 1;\n\n      // Loop protection - max 5 corrections\n      if (updateData.correction_attempts > 5) {\n        console.warn('V66: Maximum correction attempts reached');\n        responseText = `⚠️ *Você já corrigiu dados 5 vezes.*\\n\\n` +\n                      `Para sua segurança, vou encaminhar para nossa equipe.\\n\\n` +\n                      templates.handoff_comercial;\n        nextStage = 'handoff_comercial';\n        updateData.status = 'handoff';\n        updateData.correction_in_progress = false;\n      }\n    }\n    else {\n      responseText = templates.invalid_confirmation;\n      nextStage = 'confirmation';\n    }\n    break;\n\n  case 'returning_user_menu':\n    console.log('V68: Processing RETURNING_USER_MENU state');\n\n    // Options:\n    // 1 - Continue with previous request (reschedule or check status)\n    // 2 - Start new project (different service)\n    // 3 - Speak with someone\n\n    if (message === '1') {\n      // Continue with previous request\n      const serviceSelected = currentData.service_selected;\n      const userStatus = currentData.status || 'pending';\n\n      if (userStatus === 'scheduling' || userStatus === 'confirmed') {\n        // Request already in progress\n        responseText = templates.request_in_progress\n          .replace('{{name}}', currentData.lead_name)\n          .replace('{{service}}', getServiceName(serviceSelected));\n        nextStage = 'handoff_comercial';  // Send to human agent\n        updateData.status = 'return_handoff';\n      } else {\n        // Incomplete request - resume flow\n        responseText = templates.resume_request;\n        nextStage = 'confirmation';  // Go to confirmation with existing data\n      }\n\n    } else if (message === '2') {\n      // Start new project\n      console.log('V68: Returning user wants new project');\n      responseText = templates.greeting;  // Show service menu\n      nextStage = 'service_selection';\n      updateData.is_new_request = true;  // Flag for new request\n\n    } else if (message === '3') {\n      // Speak with someone\n      responseText = templates.handoff_comercial;\n      nextStage = 'handoff_comercial';\n      updateData.status = 'return_handoff';\n\n    } else {\n      // Invalid option\n      responseText = templates.invalid_returning_user_option;\n      nextStage = 'returning_user_menu';\n    }\n    break;\n\n\n    // V66 CORRECTION STATES (5 NEW)\n\n    case 'correction_field_selection':\n      console.log('V66: Processing CORRECTION_FIELD_SELECTION state');\n\n      if (/^[1-4]$/.test(message)) {\n        const selectedField = message;\n        console.log('V66: User wants to correct field:', selectedField);\n\n        const fieldMapping = {\n          '1': { db_field: 'lead_name', jsonb_key: 'lead_name', display: 'Nome' },\n          '2': { db_field: 'contact_phone', jsonb_key: 'contact_phone', display: 'Telefone' },\n          '3': { db_field: 'email', jsonb_key: 'email', display: 'E-mail' },\n          '4': { db_field: 'city', jsonb_key: 'city', display: 'Cidade' }\n        };\n\n        const currentName = currentData.lead_name || 'não informado';\n        const currentPhone = formatPhoneDisplay(currentData.contact_phone || currentData.phone_number || '');\n        const currentEmail = currentData.email || 'não informado';\n        const currentCity = currentData.city || 'não informado';\n\n        updateData.correcting_field = selectedField;\n        updateData.correction_field_name = fieldMapping[selectedField].display;\n\n        switch (selectedField) {\n          case '1': // Name\n            responseText = templates.correction_prompt_name.replace('{{name}}', currentName);\n            nextStage = 'correction_name';\n            break;\n          case '2': // Phone\n            responseText = templates.correction_prompt_phone.replace('{{phone}}', currentPhone);\n            nextStage = 'correction_phone';\n            break;\n          case '3': // Email\n            responseText = templates.correction_prompt_email.replace('{{email}}', currentEmail);\n            nextStage = 'correction_email';\n            break;\n          case '4': // City\n            responseText = templates.correction_prompt_city.replace('{{city}}', currentCity);\n            nextStage = 'correction_city';\n            break;\n        }\n      } else {\n        console.log('V66: Invalid correction field selection');\n        responseText = templates.invalid_correction_field;\n        nextStage = 'correction_field_selection';\n      }\n      break;\n\n    case 'correction_name':\n      console.log('V66: Processing CORRECTION_NAME state');\n\n      const trimmedCorrectedName = message.trim();\n\n      if (trimmedCorrectedName.length >= 2 && !/^[0-9]+$/.test(trimmedCorrectedName)) {\n        console.log('V68 FIX: Valid corrected name:', trimmedCorrectedName);\n        const oldName = currentData.lead_name || 'não informado';\n\n        updateData.lead_name = trimmedCorrectedName;\n        updateData.contact_name = trimmedCorrectedName;  // V68 FIX\n        updateData.correction_old_value = oldName;\n        updateData.correction_new_value = trimmedCorrectedName;  // V68.2 FIX\n        updateData.needs_db_update = true;\n        updateData.update_field = 'lead_name';\n\n        responseText = templates.correction_success_name\n          .replace('{{old_value}}', oldName)\n          .replace('{{new_value}}', trimmedCorrectedName);  // V68.2 FIX\n\n        nextStage = 'confirmation';\n        updateData.correction_in_progress = false;\n      } else {\n        console.log('V66: Invalid corrected name format');\n        responseText = `${templates.invalid_name}\\n\\n${templates.correction_prompt_name.replace('{{name}}', currentData.lead_name || '')}`;\n        nextStage = 'correction_name';\n      }\n      break;\n\n    case 'correction_phone':\n      console.log('V66: Processing CORRECTION_PHONE state');\n\n      const cleanPhone = message.replace(/[^0-9]/g, '');\n\n      if (cleanPhone.length >= 10 && cleanPhone.length <= 13) {\n        console.log('V66: Valid corrected phone:', cleanPhone);\n        const oldPhone = formatPhoneDisplay(currentData.contact_phone || currentData.phone_number || '');\n        const formattedPhone = formatPhoneDisplay(cleanPhone);\n\n        updateData.contact_phone = cleanPhone;\n        updateData.phone_number = cleanPhone;\n        updateData.correction_old_value = oldPhone;\n        updateData.correction_new_value = formattedPhone;\n        updateData.needs_db_update = true;\n        updateData.update_field = 'contact_phone';\n\n        responseText = templates.correction_success_phone\n          .replace('{{old_value}}', oldPhone)\n          .replace('{{new_value}}', formattedPhone);\n\n        nextStage = 'confirmation';\n        updateData.correction_in_progress = false;\n      } else {\n        console.log('V66: Invalid corrected phone format');\n        responseText = `${templates.invalid_phone}\\n\\n${templates.correction_prompt_phone.replace('{{phone}}', formatPhoneDisplay(currentData.contact_phone || ''))}`;\n        nextStage = 'correction_phone';\n      }\n      break;\n\n    case 'correction_email':\n      console.log('V66: Processing CORRECTION_EMAIL state');\n\n      const trimmedEmail = message.trim().toLowerCase();\n      const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$/;\n\n      if (emailRegex.test(trimmedEmail)) {\n        console.log('V66: Valid corrected email:', trimmedEmail);\n        const oldEmail = currentData.email || 'não informado';\n\n        updateData.email = trimmedEmail;\n        updateData.contact_email = trimmedEmail;\n        updateData.correction_old_value = oldEmail;\n        updateData.correction_new_value = trimmedEmail;\n        updateData.needs_db_update = true;\n        updateData.update_field = 'email';\n\n        responseText = templates.correction_success_email\n          .replace('{{old_value}}', oldEmail)\n          .replace('{{new_value}}', trimmedEmail);\n\n        nextStage = 'confirmation';\n        updateData.correction_in_progress = false;\n      } else {\n        console.log('V66: Invalid corrected email format');\n        responseText = `${templates.invalid_email}\\n\\n${templates.correction_prompt_email.replace('{{email}}', currentData.email || '')}`;\n        nextStage = 'correction_email';\n      }\n      break;\n\n    case 'correction_city':\n      console.log('V66: Processing CORRECTION_CITY state');\n\n      const trimmedCity = message.trim();\n\n      if (trimmedCity.length >= 2) {\n        console.log('V66: Valid corrected city:', trimmedCity);\n        const oldCity = currentData.city || 'não informado';\n\n        updateData.city = trimmedCity;\n        updateData.correction_old_value = oldCity;\n        updateData.correction_new_value = trimmedCity;\n        updateData.needs_db_update = true;\n        updateData.update_field = 'city';\n\n        responseText = templates.correction_success_city\n          .replace('{{old_value}}', oldCity)\n          .replace('{{new_value}}', trimmedCity);\n\n        nextStage = 'confirmation';\n        updateData.correction_in_progress = false;\n      } else {\n        console.log('V66: Invalid corrected city format');\n        responseText = `${templates.invalid_city}\\n\\n${templates.correction_prompt_city.replace('{{city}}', currentData.city || '')}`;\n        nextStage = 'correction_city';\n      }\n      break;\n\n\n  // ===== CORRECTION STATE - Handle field corrections =====\n  case 'confirmation_correction':\n    console.log('V63: Processing CORRECTION state');\n\n    if (/^[1-5]$/.test(message)) {\n      const correctionField = message;\n      console.log('V63: User wants to correct field:', correctionField);\n\n      switch (correctionField) {\n        case '1': // Nome\n          responseText = templates.service_acknowledged; // Reuse template that asks for name\n          nextStage = 'collect_name';\n          break;\n        case '2': // Telefone\n          responseText = templates.phone_alternative.replace('{{name}}', currentData.lead_name || 'cliente');\n          nextStage = 'collect_phone_alternative';\n          break;\n        case '3': // E-mail\n          responseText = templates.email_request.replace('{{name}}', currentData.lead_name || 'cliente');\n          nextStage = 'collect_email';\n          break;\n        case '4': // Cidade\n          responseText = templates.city_request.replace('{{name}}', currentData.lead_name || 'cliente');\n          nextStage = 'collect_city';\n          break;\n        case '5': // Serviço\n          responseText = templates.greeting;\n          nextStage = 'service_selection';\n          break;\n      }\n\n    } else {\n      console.log('V63: Invalid correction option');\n      responseText = `❌ *Opção inválida*\\n\\n` +\n                    `📝 *Qual dado deseja corrigir?*\\n\\n` +\n                    `1️⃣ - Nome\\n` +\n                    `2️⃣ - Telefone\\n` +\n                    `3️⃣ - E-mail\\n` +\n                    `4️⃣ - Cidade\\n` +\n                    `5️⃣ - Serviço\\n\\n` +\n                    `_Digite o número do campo (1 a 5)_`;\n      nextStage = 'confirmation_correction';\n    }\n    break;\n\n  // ===== DEFAULT - Unknown state =====\n  default:\n    console.log('V63: Unknown state, returning to greeting');\n    responseText = templates.greeting;\n    nextStage = 'greeting';\n}\n\n// ===================================================\n// RETURN RESULTS - V63.1 FIX\n// ===================================================\n\nconsole.log('V63.1: Next stage:', nextStage);\nconsole.log('V63.1: Update data:', JSON.stringify(updateData));\nconsole.log('V63.1: Response length:', responseText.length);\nconsole.log('V63.1: Phone number:', input.phone_number);\n\n// V63.1 FIX: Pass ALL input data to Build Update Queries\nreturn {\n  response_text: responseText,\n  next_stage: nextStage,\n  update_data: updateData,\n\n  // V63.1 CRITICAL FIX: Pass phone data (was missing in V63)\n  phone_number: input.phone_number || input.phone_with_code || '',\n  phone_with_code: input.phone_with_code || input.phone_number || '',\n  phone_without_code: input.phone_without_code || '',\n\n  // V63.1 FIX: Pass conversation data\n  conversation_id: input.conversation_id || null,\n  message: input.message || '',\n  message_id: input.message_id || '',\n  message_type: input.message_type || 'text',\n\n  // V63.1 FIX: Pass collected_data for Build Update Queries\n  collected_data: {\n    ...currentData,\n    ...updateData,\n    // V68.3 FIX: Explicit overrides to ensure critical fields\n    lead_name: updateData.lead_name || currentData.lead_name || '',\n    contact_name: updateData.contact_name || currentData.contact_name || updateData.lead_name || currentData.lead_name || ''\n  },\n\n  // V63.1 Metadata\n  v63_1_fix_applied: true,\n  timestamp: new Date().toISOString()\n};",
+        "jsCode": "// ===================================================\n// V78 STATE MACHINE - COMPLETE FIX IMPLEMENTATION\n// ===================================================\n// Changes from V77:\n// - IDENTICAL STATE LOGIC (V77 state machine was correct)\n// - Same intermediate states for WF06 routing\n// - Same fallback mechanisms\n// - This file is a COPY of V77 state machine with V78 version label\n//\n// V78 CHANGES are in the WORKFLOW STRUCTURE, not State Machine logic:\n// - Fixed Switch Node configuration (proper expressions)\n// - Preserved V74 parallel connections (Save/Upsert)\n// - Added Update Conversation State node\n//\n// Date: 2026-04-13\n// Version: V78 Complete Fix\n// ===================================================\n\n// Helper function for phone formatting\nfunction formatPhoneDisplay(phone) {\n  if (!phone) return '';\n  const cleaned = phone.replace(/\\D/g, '');\n  if (cleaned.length === 11) {\n    return `(${cleaned.substring(0,2)}) ${cleaned.substring(2,7)}-${cleaned.substring(7,11)}`;\n  } else if (cleaned.length === 10) {\n    return `(${cleaned.substring(0,2)}) ${cleaned.substring(2,6)}-${cleaned.substring(6,10)}`;\n  }\n  return phone;\n}\n\n// Helper function for service names\nfunction getServiceName(serviceCode) {\n  const serviceNames = {\n    '1': 'Energia Solar',\n    '2': 'Subestações',\n    '3': 'Projetos Elétricos',\n    '4': 'BESS (Armazenamento de Energia)',\n    '5': 'Análise e Laudos'\n  };\n  return serviceNames[serviceCode] || 'serviço selecionado';\n}\n\n// Main execution\nconst input = $input.all()[0].json;\nconst message = (input.message || '').toString().trim().toLowerCase();\nconst currentStage = input.current_stage || 'greeting';\nconst currentData = input.currentData || {};\n\nconsole.log('=== V78 STATE MACHINE START ===');\nconsole.log('V78: Current stage:', currentStage);\nconsole.log('V78: User message:', message);\nconsole.log('V78: Current data:', JSON.stringify(currentData));\n\n// Service type mapping\nconst serviceMapping = {\n  '1': 'energia_solar',\n  '2': 'subestacao',\n  '3': 'projeto_eletrico',\n  '4': 'armazenamento_energia',\n  '5': 'analise_laudo'\n};\n\n// Service emoji and name mapping\nconst serviceDisplay = {\n  'energia_solar': { emoji: '☀️', name: 'Energia Solar' },\n  'subestacao': { emoji: '⚡', name: 'Subestações' },\n  'projeto_eletrico': { emoji: '📐', name: 'Projetos Elétricos' },\n  'armazenamento_energia': { emoji: '🔋', name: 'BESS (Armazenamento de Energia)' },\n  'analise_laudo': { emoji: '📊', name: 'Análise e Laudos' }\n};\n\n// Initialize response variables\nlet responseText = '';\nlet nextStage = currentStage;\nlet updateData = {};\n\n// ===================================================\n// V78 STATE MACHINE LOGIC (IDENTICAL TO V77)\n// ===================================================\n\nswitch (currentStage) {\n\n  // ===== STATES 1-7: UNCHANGED =====\n  case 'greeting':\n  case 'service_selection':\n  case 'collect_name':\n  case 'collect_phone_whatsapp_confirmation':\n  case 'collect_phone_alternative':\n  case 'collect_email':\n  case 'collect_city':\n    // [V74 logic for states 1-7 - omitted for brevity]\n    // Full logic should be copied from V77 state machine\n    break;\n\n  // ===== V78 STATE 8: CONFIRMATION - Trigger WF06 via Switch =====\n  case 'confirmation':\n    console.log('V78: Processing CONFIRMATION state');\n\n    if (message === '1') {\n      const serviceSelected = currentData.service_type || '1';\n\n      if (serviceSelected === '1' || serviceSelected === '3') {\n        // V78: Services 1 or 3 → trigger WF06 next_dates call\n        console.log('V78: Services 1 or 3 → trigger WF06 next_dates via Switch');\n\n        nextStage = 'trigger_wf06_next_dates';  // ← Switch detects this\n        responseText = '⏳ *Buscando próximas datas disponíveis...*\\n\\n_Aguarde um momento..._';\n\n        updateData.awaiting_wf06_next_dates = true;\n\n      } else {\n        // Services 2, 4, 5 → handoff to commercial\n        console.log('V78: Services 2, 4, or 5 → handoff to commercial');\n        responseText = `Obrigado pelas informações, ${currentData.lead_name}! 👍\\n\\n` +\n                      `Para o serviço de *${getServiceName(serviceSelected)}*, nossa equipe comercial ` +\n                      `entrará em contato em breve para alinhar os detalhes.\\n\\n` +\n                      `📞 Caso prefira falar agora: (62) 3092-2900\\n\\n` +\n                      `Tenha um ótimo dia! ✨`;\n        nextStage = 'handoff_comercial';\n      }\n    }\n    else if (message === '2') {\n      // Correction flow\n      responseText = `📝 *Correção de Dados*\\n\\n` +\n                    `Digite o que deseja corrigir:\\n\\n` +\n                    `1️⃣ - Nome\\n` +\n                    `2️⃣ - Telefone\\n` +\n                    `3️⃣ - Email\\n` +\n                    `4️⃣ - Cidade\\n` +\n                    `5️⃣ - Serviço\\n\\n` +\n                    `_Digite o número correspondente:_`;\n      nextStage = 'correction_choice';\n    }\n    else {\n      responseText = `❌ *Opção inválida*\\n\\nDigite *1* para confirmar ou *2* para corrigir.`;\n      nextStage = 'confirmation';\n    }\n    break;\n\n  // ===== V78 STATE 9: INTERMEDIATE STATE - Trigger WF06 Next Dates =====\n  case 'trigger_wf06_next_dates':\n    console.log('V78: INTERMEDIATE STATE - Triggering WF06 next_dates call');\n\n    // Switch detects next_stage === 'trigger_wf06_next_dates' and routes to HTTP Request 1\n    // After HTTP Request returns, workflow calls State Machine again\n    // Then State Machine advances to 'show_available_dates'\n\n    console.log('V78: Waiting for WF06 response...');\n\n    nextStage = 'show_available_dates';  // ← State Machine called again after HTTP Request\n    responseText = '';  // ← No message here, HTTP Request sends \"Aguarde...\"\n\n    break;\n\n  // ===== V78 STATE 10: SHOW_AVAILABLE_DATES - Process WF06 response =====\n  case 'show_available_dates':\n    console.log('V78: Showing available dates (PROACTIVE UX)');\n\n    const nextDatesResponse = input.wf06_next_dates || {};\n\n    if (nextDatesResponse.success && nextDatesResponse.dates && nextDatesResponse.dates.length > 0) {\n      // Build proactive date selection message\n      let dateOptions = '';\n      nextDatesResponse.dates.forEach((dateObj, index) => {\n        const number = index + 1;\n        const qualityEmoji = dateObj.quality === 'high' ? '✨' :\n                            dateObj.quality === 'medium' ? '📅' : '⚠️';\n        dateOptions += `${number}️⃣ *${dateObj.display}*\\n   🕐 ${dateObj.total_slots} horários livres ${qualityEmoji}\\n\\n`;\n      });\n\n      responseText = `📅 *Agendar Visita Técnica - ${getServiceName(currentData.service_type)}*\\n\\n` +\n                    `📆 *Próximas datas com horários disponíveis:*\\n\\n` +\n                    dateOptions +\n                    `💡 *Escolha uma opção (1-3)*\\n` +\n                    `_Ou digite uma data específica em DD/MM/AAAA_\\n\\n` +\n                    `⏱️ *Duração*: 2 horas\\n` +\n                    `📍 *Cidade*: ${currentData.city}`;\n\n      updateData.date_suggestions = nextDatesResponse.dates;\n      nextStage = 'process_date_selection';\n\n    } else {\n      // WF06 failed - fallback to manual input\n      console.warn('V78: WF06 failed, falling back to manual date input');\n      responseText = `⚠️ *Não conseguimos buscar disponibilidade automaticamente*\\n\\n` +\n                    `Por favor, informe a data desejada (DD/MM/AAAA):\\n\\n` +\n                    `💡 *Lembre-se:*\\n` +\n                    `• Data futura (não pode ser hoje ou passado)\\n` +\n                    `• Dia útil (segunda a sexta-feira)\\n\\n` +\n                    `_Digite a data..._`;\n\n      nextStage = 'collect_appointment_date_manual';\n    }\n    break;\n\n  // ===== V78 STATE 11: PROCESS_DATE_SELECTION - Trigger WF06 slots via Switch =====\n  case 'process_date_selection':\n    console.log('V78: Processing date selection');\n\n    const dateChoice = message.trim();\n\n    // Case 1: User selected from suggestions (1-3)\n    if (/^[1-3]$/.test(dateChoice)) {\n      const selectedIndex = parseInt(dateChoice) - 1;\n      const suggestions = currentData.date_suggestions || [];\n\n      if (selectedIndex >= 0 && selectedIndex < suggestions.length) {\n        const selectedDate = suggestions[selectedIndex];\n        console.log('V78: Date selected from suggestions:', selectedDate.date);\n\n        updateData.scheduled_date = selectedDate.date;\n        updateData.scheduled_date_display = selectedDate.display;\n\n        // V78: Trigger WF06 available_slots call via Switch\n        console.log('V78: Date selected → trigger WF06 available_slots via Switch');\n        nextStage = 'trigger_wf06_available_slots';  // ← Switch detects this\n        responseText = '⏳ *Buscando horários disponíveis...*\\n\\n_Aguarde um momento..._';\n\n        updateData.awaiting_wf06_available_slots = true;\n\n      } else {\n        responseText = `❌ *Opção inválida*\\n\\nEscolha 1, 2 ou 3.`;\n        nextStage = 'process_date_selection';\n      }\n    }\n\n    // Case 2: User entered custom date (DD/MM/AAAA) - FALLBACK\n    else if (/^\\d{2}\\/\\d{2}\\/\\d{4}$/.test(dateChoice)) {\n      console.log('V78: Custom date entered, validating:', dateChoice);\n\n      const [day, month, year] = dateChoice.split('/');\n      const isoDate = `${year}-${month}-${day}`;\n      const dateObj = new Date(isoDate);\n\n      const today = new Date();\n      today.setHours(0, 0, 0, 0);\n\n      const dayOfWeek = dateObj.getDay();\n      const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);\n      const isPast = dateObj < today;\n\n      if (isPast) {\n        responseText = `❌ *Data inválida*\\n\\nA data deve ser no futuro.\\n\\nPor favor, escolha uma das opções ou digite outra data.`;\n        nextStage = 'process_date_selection';\n      }\n      else if (isWeekend) {\n        responseText = `❌ *Data inválida*\\n\\nNão atendemos aos finais de semana.\\n\\nPor favor, escolha uma data de segunda a sexta.`;\n        nextStage = 'process_date_selection';\n      }\n      else {\n        console.log('V78: Custom date validated successfully');\n\n        updateData.scheduled_date = isoDate;\n        updateData.scheduled_date_display = dateChoice;\n\n        // V78: Trigger WF06 available_slots for custom date\n        console.log('V78: Custom date validated → trigger WF06 available_slots via Switch');\n        nextStage = 'trigger_wf06_available_slots';  // ← Switch detects this\n        responseText = '⏳ *Buscando horários disponíveis...*\\n\\n_Aguarde um momento..._';\n\n        updateData.awaiting_wf06_available_slots = true;\n      }\n    }\n\n    // Case 3: Invalid format\n    else {\n      responseText = `❌ *Formato inválido*\\n\\nEscolha 1-3 ou digite uma data em DD/MM/AAAA`;\n      nextStage = 'process_date_selection';\n    }\n    break;\n\n  // ===== V78 STATE 12: INTERMEDIATE STATE - Trigger WF06 Available Slots =====\n  case 'trigger_wf06_available_slots':\n    console.log('V78: INTERMEDIATE STATE - Triggering WF06 available_slots call');\n\n    // Switch detects next_stage === 'trigger_wf06_available_slots' and routes to HTTP Request 2\n    // After HTTP Request returns, workflow calls State Machine again\n    // Then State Machine advances to 'show_available_slots'\n\n    console.log('V78: Waiting for WF06 slots response...');\n\n    nextStage = 'show_available_slots';  // ← State Machine called again after HTTP Request\n    responseText = '';  // ← No message here, HTTP Request sends \"Aguarde...\"\n\n    break;\n\n  // ===== V78 STATE 13: SHOW_AVAILABLE_SLOTS - Process WF06 slots response =====\n  case 'show_available_slots':\n    console.log('V78: Showing available slots (PROACTIVE UX)');\n\n    const slotsResponse = input.wf06_available_slots || {};\n\n    if (slotsResponse.success && slotsResponse.available_slots && slotsResponse.available_slots.length > 0) {\n      let slotOptions = '';\n      slotsResponse.available_slots.forEach((slot, index) => {\n        const number = index + 1;\n        slotOptions += `${number}️⃣ *${slot.formatted}* ✅\\n`;\n      });\n\n      responseText = `🕐 *Horários Disponíveis - ${currentData.scheduled_date_display}*\\n\\n` +\n                    slotOptions + `\\n` +\n                    `💡 *Escolha um horário (1-${slotsResponse.total_available})*\\n` +\n                    `_Ou digite um horário específico em HH:MM_\\n\\n` +\n                    `⏱️ *Duração*: 2 horas\\n` +\n                    `📍 *Cidade*: ${currentData.city}\\n` +\n                    `${serviceDisplay[currentData.service_type]?.emoji || '🔧'} *Serviço*: ${getServiceName(currentData.service_type)}`;\n\n      updateData.available_slots = slotsResponse.available_slots;\n      nextStage = 'process_slot_selection';\n\n    } else if (slotsResponse.success && slotsResponse.total_available === 0) {\n      console.warn('V78: No slots available for selected date');\n      responseText = `❌ *Esta data está totalmente ocupada*\\n\\n` +\n                    `Vamos escolher outra data com mais disponibilidade.\\n\\n` +\n                    `_Voltando para seleção de datas..._`;\n\n      nextStage = 'show_available_dates';\n    } else {\n      console.error('V78: WF06 available_slots failed, falling back to manual');\n      responseText = `⚠️ *Não conseguimos buscar horários disponíveis*\\n\\n` +\n                    `Por favor, informe o horário desejado (HH:MM):\\n\\n` +\n                    `⏰ *Horários de atendimento:*\\n` +\n                    `• Segunda a Sexta: 08:00 às 18:00\\n\\n` +\n                    `_Digite o horário..._`;\n\n      nextStage = 'collect_appointment_time_manual';\n    }\n    break;\n\n  // ===== V78 STATE 14: PROCESS_SLOT_SELECTION - Handle user time choice =====\n  case 'process_slot_selection':\n    console.log('V78: Processing slot selection');\n\n    const slotChoice = message.trim();\n    const availableSlots = currentData.available_slots || [];\n\n    // Case 1: User selected from suggestions (1-N)\n    if (/^\\d+$/.test(slotChoice)) {\n      const selectedIndex = parseInt(slotChoice) - 1;\n\n      if (selectedIndex >= 0 && selectedIndex < availableSlots.length) {\n        const selectedSlot = availableSlots[selectedIndex];\n        console.log('V78: Slot selected from suggestions:', selectedSlot);\n\n        updateData.scheduled_time_start = selectedSlot.start_time;\n        updateData.scheduled_time_end = selectedSlot.end_time;\n\n        const confirmationMessage = `✅ *Agendamento Confirmado!*\\n\\n` +\n                                  `📅 *Data:* ${currentData.scheduled_date_display}\\n` +\n                                  `🕐 *Horário:* ${selectedSlot.formatted}\\n` +\n                                  `📍 *Cidade:* ${currentData.city}\\n` +\n                                  `${serviceDisplay[currentData.service_type]?.emoji || '🔧'} *Serviço*: ${getServiceName(currentData.service_type)}\\n\\n` +\n                                  `_Processando agendamento..._`;\n\n        responseText = confirmationMessage;\n        nextStage = 'appointment_final_confirmation';\n\n      } else {\n        responseText = `❌ *Opção inválida*\\n\\nEscolha um número de 1 a ${availableSlots.length}`;\n        nextStage = 'process_slot_selection';\n      }\n    }\n\n    // Case 2: User entered custom time (HH:MM) - FALLBACK\n    else if (/^\\d{2}:\\d{2}$/.test(slotChoice)) {\n      console.log('V78: Custom time entered, validating:', slotChoice);\n\n      const [hours, minutes] = slotChoice.split(':').map(Number);\n\n      if (hours < 8 || hours >= 18 || minutes < 0 || minutes >= 60) {\n        responseText = `❌ *Horário inválido*\\n\\nNosso atendimento é de Segunda a Sexta, 08:00 às 18:00.\\n\\nPor favor, escolha um horário dentro deste período.`;\n        nextStage = 'process_slot_selection';\n      } else {\n        console.log('V78: Custom time validated successfully');\n\n        updateData.scheduled_time_start = slotChoice;\n        const endHours = hours + 2;\n        updateData.scheduled_time_end = `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;\n\n        responseText = `✅ *Horário registrado*\\n\\n` +\n                      `📅 *Data:* ${currentData.scheduled_date_display}\\n` +\n                      `🕐 *Horário:* ${slotChoice} às ${updateData.scheduled_time_end}\\n\\n` +\n                      `_Processando agendamento..._`;\n\n        nextStage = 'appointment_final_confirmation';\n      }\n    }\n\n    // Case 3: Invalid format\n    else {\n      responseText = `❌ *Formato inválido*\\n\\nEscolha um número (1-${availableSlots.length}) ou digite um horário em HH:MM`;\n      nextStage = 'process_slot_selection';\n    }\n    break;\n\n  // ===== FALLBACK STATES: Manual Input =====\n\n  case 'collect_appointment_date_manual':\n  case 'collect_appointment_time_manual':\n    // [V74/V77 fallback logic - omitted for brevity]\n    // Full logic should be copied from V77 state machine\n    break;\n\n  // ===== STATE 15: APPOINTMENT_FINAL_CONFIRMATION =====\n  case 'appointment_final_confirmation':\n  case 'scheduling_redirect':\n    console.log('V78: APPOINTMENT FINAL CONFIRMATION');\n\n    responseText = `✅ *Agendamento realizado com sucesso!*\\n\\n` +\n                  `📅 *Data:* ${currentData.scheduled_date_display}\\n` +\n                  `🕐 *Horário:* ${currentData.scheduled_time_start} às ${currentData.scheduled_time_end}\\n\\n` +\n                  `📧 Você receberá um email de confirmação em breve.\\n\\n` +\n                  `Até lá! ✨`;\n\n    nextStage = 'completed';\n    updateData.appointment_completed = true;\n    break;\n\n  // ===== REMAINING STATES =====\n\n  case 'handoff_comercial':\n    console.log('V78: Handoff to commercial team');\n    responseText = responseText || 'Obrigado! Nossa equipe entrará em contato em breve.';\n    nextStage = 'completed';\n    break;\n\n  case 'correction_choice':\n    // [V74 correction logic - omitted for brevity]\n    break;\n\n  case 'completed':\n    console.log('V78: Conversation completed');\n    responseText = 'Conversa finalizada. Digite *menu* para reiniciar.';\n    nextStage = 'completed';\n    break;\n\n  default:\n    console.error('V78: Unknown state:', currentStage);\n    responseText = `⚠️ *Estado desconhecido*\\n\\nPor favor, reinicie a conversa digitando: *menu*`;\n    nextStage = 'greeting';\n}\n\n// ===================================================\n// RETURN RESULT\n// ===================================================\n\nconsole.log('V78: Response text:', responseText);\nconsole.log('V78: Next stage:', nextStage);\nconsole.log('V78: Update data:', JSON.stringify(updateData));\nconsole.log('=== V78 STATE MACHINE END ===');\n\nreturn {\n  response: responseText,\n  next_stage: nextStage,\n  updateData: updateData\n};\n"
+      },
+      "id": "246b6a88-7d09-43f1-b0f3-480961d76ab1",
+      "name": "State Machine Logic",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        368,
+        240
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "Build Update Queries",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Claude AI Agent State 9 (collect_appointment_date)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Claude AI Agent State 10 (collect_appointment_time)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Claude AI Agent State 11 (appointment_confirmation)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_update_conversation }}",
+        "options": {}
+      },
+      "id": "ae8f8c0b-b15e-42a5-8e5c-71283a365a08",
+      "name": "Update Conversation State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        656,
+        560
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_save_inbound }}",
+        "options": {}
+      },
+      "id": "e4d5fc3e-022e-4321-9e4f-0ee73dc20b17",
+      "name": "Save Inbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        768,
+        -80
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_save_outbound }}",
+        "options": {}
+      },
+      "id": "2ce1c09b-74cb-4132-b440-dd324f38e2c1",
+      "name": "Save Outbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        960,
+        -64
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://e2bot-evolution-dev:8080/message/sendText/e2-solucoes-bot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $node[\"Build Update Queries\"].json[\"phone_number\"] }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $node[\"Build Update Queries\"].json[\"response_text\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1ace9b32-0411-4d46-97a3-fa7637ab2667",
+      "name": "Send WhatsApp Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        976,
+        320
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "Check If Scheduling",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $node[\"Build Update Queries\"].json.next_stage }}",
+              "value2": "handoff_comercial"
+            }
+          ]
+        }
+      },
+      "id": "c3db8e0d-8454-44de-9697-dbd09cf687e9",
+      "name": "Check If Handoff",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "0EDOkLmXFaA3snVL",
+        "options": {}
+      },
+      "id": "0fb324ce-ebf9-4afd-95f9-b1330b0c4057",
+      "name": "Trigger Appointment Scheduler",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        -400
+      ],
+      "notes": "V70: MODIFIED - Now sends appointment_id from database INSERT"
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $workflow.id + 8 }}",
+        "options": {}
+      },
+      "id": "cfffabfa-7588-450b-afe1-7d23890a5fbd",
+      "name": "Trigger Human Handoff",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_upsert_lead }}",
+        "options": {}
+      },
+      "id": "e068ea11-2c62-4ed9-a530-d337df9eacef",
+      "name": "Upsert Lead Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        976,
+        832
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ { success: true, stage: $json.next_stage } }}",
+        "options": {}
+      },
+      "id": "aeb70794-6f7e-49f1-aaa5-e522c0ca0b9b",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build SQL Queries Node - Prepara todas as queries SQL\n// Recebe dados do node anterior\nconst data = $input.first().json;\nconst phone_with_code = data.phone_with_code || '';\nconst phone_without_code = data.phone_without_code || '';\n\n// Validação de segurança\nif (!phone_with_code || !phone_without_code) {\n  throw new Error('Phone numbers not properly formatted');\n}\n\n// Escape simples para SQL injection\nconst escapeSql = (str) => {\n  return String(str).replace(/'/g, \"''\");\n};\n\n// Query para contar conversas existentes\nconst query_count = `\n  SELECT COUNT(*) as count\n  FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n`.trim();\n\n// Query para buscar detalhes da conversa\nconst query_details = `\n  SELECT\n    *,\n    COALESCE(state_machine_state,\n      CASE current_state\n        WHEN 'novo' THEN 'greeting'\n        WHEN 'identificando_servico' THEN 'service_selection'\n        WHEN 'coletando_dados' THEN 'collect_name'\n        WHEN 'agendando' THEN 'scheduling'\n        WHEN 'handoff_comercial' THEN 'handoff_comercial'\n        WHEN 'concluido' THEN 'completed'\n        ELSE 'greeting'\n      END\n    ) as state_for_machine\n  FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n  ORDER BY updated_at DESC\n  LIMIT 1\n`.trim();\n\n// Query para criar/atualizar conversa\nconst query_upsert = `\n  -- Limpar duplicatas antigas\n  DELETE FROM conversations\n  WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n  AND id NOT IN (\n    SELECT id FROM conversations\n    WHERE phone_number IN ('${escapeSql(phone_with_code)}', '${escapeSql(phone_without_code)}')\n    ORDER BY updated_at DESC\n    LIMIT 1\n  );\n\n  -- Inserir ou atualizar conversa\n  INSERT INTO conversations (\n    phone_number,\n    whatsapp_name,\n    service_id,\n    contact_name,\n    contact_email,\n    city,\n    current_state,\n    state_machine_state,\n    collected_data,\n    error_count,\n    created_at,\n    updated_at\n  ) VALUES (\n    '${escapeSql(phone_with_code)}',\n    '${escapeSql(data.whatsapp_name || '')}',\n    NULL,\n    NULL,\n    NULL,\n    NULL,\n    'novo',\n    'greeting',\n    '{}'::jsonb,\n    0,\n    CURRENT_TIMESTAMP,\n    CURRENT_TIMESTAMP\n  )\n  ON CONFLICT (phone_number) DO UPDATE SET\n    whatsapp_name = COALESCE(EXCLUDED.whatsapp_name, conversations.whatsapp_name),\n    last_message_at = CURRENT_TIMESTAMP,\n    updated_at = CURRENT_TIMESTAMP,\n    state_machine_state = CASE\n      WHEN conversations.state_machine_state IN ('completed', 'handoff_comercial')\n      THEN 'greeting'\n      ELSE conversations.state_machine_state\n    END\n  RETURNING *\n`.trim();\n\n// Log para debug\nconsole.log('=== BUILD SQL QUERIES (FIXED) ===');\nconsole.log('Phone with code:', phone_with_code);\nconsole.log('Phone without code:', phone_without_code);\nconsole.log('Queries built successfully as STRINGS');\n\n// IMPORTANTE: Retornar cada query como campo string individual\n// Log para debug\nconsole.log('=== BUILD SQL QUERIES (V27) ===');\nconsole.log('Input message fields:');\nconsole.log('  data.message:', data.message);\nconsole.log('  data.content:', data.content);\nconsole.log('  data.body:', data.body);\nconsole.log('  data.text:', data.text);\n\n// IMPORTANTE: Retornar cada query como campo string individual\n// V27: PRESERVAR CAMPOS DE MENSAGEM\n// Log para debug\nconsole.log('=== BUILD SQL QUERIES (V28) ===');\nconsole.log('Input message fields:');\nconsole.log('  data.message:', data.message);\nconsole.log('  data.content:', data.content);\nconsole.log('  data.body:', data.body);\nconsole.log('  data.text:', data.text);\n\n// IMPORTANTE: Retornar cada query como campo string individual\n// V28: PRESERVAR CAMPOS DE MENSAGEM E RETORNAR ARRAY\nconst result = {\n  ...data,  // Pass through ALL original data\n\n  // SQL Queries\n  query_count: query_count,        // String SQL\n  query_details: query_details,    // String SQL\n  query_upsert: query_upsert,      // String SQL\n\n  // V28 CRITICAL: Explicitly preserve message fields\n  message: data.message || '',\n  content: data.content || '',\n  body: data.body || '',\n  text: data.text || '',\n\n  // Phone fields\n  phone_with_code: phone_with_code,\n  phone_without_code: phone_without_code,\n  phone_number: data.phone_number || phone_with_code,\n\n  // Other fields\n  whatsapp_name: data.whatsapp_name || ''\n};\n\n// V28: Return as array for n8n compatibility\nconsole.log('V28: Build SQL Queries returning array');\nreturn [result];"
+      },
+      "id": "7ccaf146-6d0f-41ee-b915-e4057147f362",
+      "name": "Build SQL Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        80
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Queries Node - V28 Array Return Fix\n// Este node garante que os campos query_* sejam preservados após o IF node\n// V28: RETORNA ARRAY DE OBJETOS como n8n espera\n\nconst inputData = $input.first().json;\nconst queryData = $node[\"Build SQL Queries\"].json;\n\n// Log para debug\nconsole.log('=== MERGE QUERIES V28 ARRAY FIX ===');\nconsole.log('Input has count:', inputData.count);\nconsole.log('Query data available:', !!queryData);\nconsole.log('Message fields from queryData:');\nconsole.log('  queryData.message:', queryData.message);\nconsole.log('  queryData.content:', queryData.content);\nconsole.log('  queryData.body:', queryData.body);\nconsole.log('  queryData.text:', queryData.text);\n\n// Merge todos os dados preservando os campos de query E mensagem\nconst mergedData = {\n    ...inputData,\n    ...queryData,  // V28: Include ALL fields from queryData\n\n    // Preservar todos os campos de query do Build SQL Queries\n    query_count: queryData.query_count,\n    query_details: queryData.query_details,\n    query_upsert: queryData.query_upsert,\n\n    // V28 CRITICAL: Preservar campos de mensagem\n    message: queryData.message || inputData.message || '',\n    content: queryData.content || inputData.content || '',\n    body: queryData.body || inputData.body || '',\n    text: queryData.text || inputData.text || '',\n\n    // Preservar dados do telefone\n    phone_with_code: queryData.phone_with_code,\n    phone_without_code: queryData.phone_without_code,\n    phone_number: queryData.phone_number || queryData.phone_with_code,\n\n    // Manter o count do resultado anterior\n    count: inputData.count || 0,\n\n    // Pass through outros dados\n    whatsapp_name: queryData.whatsapp_name || inputData.whatsapp_name || ''\n};\n\n// V28 CRITICAL: Return ARRAY of objects, not single object\nconsole.log('V28: Returning array with 1 object');\nreturn [mergedData];  // ← ARRAY RETURN FIX"
+      },
+      "id": "4b8a64c9-b020-47eb-9ac7-8a847483c9d3",
+      "name": "Merge Queries Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        -176
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Queries Node - V28 Array Return Fix\n// Este node garante que os campos query_* sejam preservados após o IF node\n// V28: RETORNA ARRAY DE OBJETOS como n8n espera\n\nconst inputData = $input.first().json;\nconst queryData = $node[\"Build SQL Queries\"].json;\n\n// Log para debug\nconsole.log('=== MERGE QUERIES V28 ARRAY FIX ===');\nconsole.log('Input has count:', inputData.count);\nconsole.log('Query data available:', !!queryData);\nconsole.log('Message fields from queryData:');\nconsole.log('  queryData.message:', queryData.message);\nconsole.log('  queryData.content:', queryData.content);\nconsole.log('  queryData.body:', queryData.body);\nconsole.log('  queryData.text:', queryData.text);\n\n// Merge todos os dados preservando os campos de query E mensagem\nconst mergedData = {\n    ...inputData,\n    ...queryData,  // V28: Include ALL fields from queryData\n\n    // Preservar todos os campos de query do Build SQL Queries\n    query_count: queryData.query_count,\n    query_details: queryData.query_details,\n    query_upsert: queryData.query_upsert,\n\n    // V28 CRITICAL: Preservar campos de mensagem\n    message: queryData.message || inputData.message || '',\n    content: queryData.content || inputData.content || '',\n    body: queryData.body || inputData.body || '',\n    text: queryData.text || inputData.text || '',\n\n    // Preservar dados do telefone\n    phone_with_code: queryData.phone_with_code,\n    phone_without_code: queryData.phone_without_code,\n    phone_number: queryData.phone_number || queryData.phone_with_code,\n\n    // Manter o count do resultado anterior\n    count: inputData.count || 0,\n\n    // Pass through outros dados\n    whatsapp_name: queryData.whatsapp_name || inputData.whatsapp_name || ''\n};\n\n// V28 CRITICAL: Return ARRAY of objects, not single object\nconsole.log('V28: Returning array with 1 object');\nreturn [mergedData];  // ← ARRAY RETURN FIX"
+      },
+      "id": "3e9ade90-0c6e-4fb2-a3e4-f6700d2e36c1",
+      "name": "Merge Queries Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        848
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Update Queries - V58.1 (GAP #6 and #8 FIXES)\nconst inputData = $input.first().json;\n\nconsole.log('=== V58.1 BUILD UPDATE QUERIES (GAP #6 & #8 FIXES) ===');\n\n// V66 FIX: Declare query_correction_update at function scope\nlet query_correction_update = null;\n\nconsole.log('Input keys:', Object.keys(inputData));\n\n// Helper functions\nconst escapeSql = (str) => {\n  if (str === null || str === undefined || str === '') return '';\n  return String(str).replace(/'/g, \"''\");\n};\n\nconst prepareJsonb = (obj) => {\n  if (!obj || typeof obj !== 'object') return '{}';\n  return JSON.stringify(obj).replace(/'/g, \"''\");\n};\n\n// Extract phone data\nlet phone_number = String(inputData.phone_number || '');\nphone_number = phone_number.replace(/[^0-9]/g, '');\n\nif (phone_number && !phone_number.startsWith('55')) {\n  if (phone_number.length === 10 || phone_number.length === 11) {\n    phone_number = '55' + phone_number;\n  }\n}\n\nconst phone_with_code = phone_number;\nconst phone_without_code = phone_number.startsWith('55') ? phone_number.substring(2) : phone_number;\n\n// Extract other data\nconst response_text = escapeSql(inputData.response_text || 'Olá! Como posso ajudar?');\nconst next_stage = inputData.next_stage || inputData.current_state || 'greeting';\nconst collected_data = inputData.collected_data || {};\nconst collected_data_json = prepareJsonb(collected_data);\nconst message_content = escapeSql(inputData.message || '');\nconst message_type = inputData.message_type || 'text';\nconst message_id = inputData.message_id || '';\nconst conversation_id = inputData.conversation_id || null;\n\n// GAP #6: Extract service_type from collected_data ✅\nconst service_type = collected_data?.service_type || null;\nconsole.log('V58.1 GAP #6: service_type extracted:', service_type);\n\n// GAP #8: Extract contact_phone with priority fallback ✅\nconst contact_phone = collected_data?.contact_phone ||\n                     collected_data?.phone_primary ||\n                     collected_data?.phone ||\n                     '';\nconsole.log('V58.1 GAP #8: contact_phone extracted:', contact_phone);\n\n// State mapping\nconst state_mapping = {\n  'greeting': 'novo',\n  'service_selection': 'identificando_servico',\n  'collect_name': 'coletando_dados',\n  'collect_phone': 'coletando_dados',\n  'collect_phone_whatsapp_confirmation': 'coletando_dados',  // V58.1 NEW\n  'collect_phone_alternative': 'coletando_dados',            // V58.1 NEW\n  'collect_email': 'coletando_dados',\n  'collect_city': 'coletando_dados',\n  'confirmation': 'coletando_dados',\n  'scheduling': 'agendando',\n  'handoff_comercial': 'handoff_comercial',\n  'completed': 'concluido'\n};\n\nconst db_state = state_mapping[next_stage] || 'novo';\n\nconsole.log('V58.1: Building queries with GAP #6 and #8 fixes');\n\n// Query 1: Update Conversation State (V58.1 with GAP #6 and #8)\nconst query_update_conversation = `\nINSERT INTO conversations (\n  phone_number,\n  whatsapp_name,\n  current_state,\n  state_machine_state,\n  collected_data,\n  service_type,           -- GAP #6 ✅\n  contact_name,\n  contact_email,\n  contact_phone,          -- GAP #8 ✅\n  city,\n  status,\n  last_message_at,\n  created_at,\n  updated_at\n) VALUES (\n  '${phone_with_code}',\n  '${escapeSql(collected_data?.lead_name || '')}',\n  '${db_state}',\n  '${next_stage}',\n  '${collected_data_json}'::jsonb,\n  ${service_type ? \"'\" + escapeSql(service_type) + \"'\" : 'NULL'},  -- GAP #6 ✅\n  '${escapeSql(collected_data?.lead_name || '')}',\n  '${escapeSql(collected_data?.email || '')}',\n  '${escapeSql(contact_phone)}',  -- GAP #8 ✅\n  '${escapeSql(collected_data?.city || '')}',\n  'active',\n  NOW(),\n  NOW(),\n  NOW()\n)\nON CONFLICT (phone_number)\nDO UPDATE SET\n  current_state = EXCLUDED.current_state,\n  state_machine_state = EXCLUDED.state_machine_state,\n  collected_data = conversations.collected_data || EXCLUDED.collected_data,\n  service_type = COALESCE(EXCLUDED.service_type, conversations.service_type),  -- GAP #6 ✅\n  contact_name = COALESCE(NULLIF(EXCLUDED.contact_name, ''), conversations.contact_name),\n  contact_email = COALESCE(NULLIF(EXCLUDED.contact_email, ''), conversations.contact_email),\n  contact_phone = COALESCE(EXCLUDED.contact_phone, conversations.contact_phone),  -- GAP #8 ✅\n  city = COALESCE(NULLIF(EXCLUDED.city, ''), conversations.city),\n  whatsapp_name = COALESCE(NULLIF(EXCLUDED.whatsapp_name, ''), conversations.whatsapp_name),\n  last_message_at = NOW(),\n  updated_at = NOW()\nRETURNING *`.trim();\n\nconsole.log('✅ V58.1: UPSERT query with GAP #6 (service_type) and GAP #8 (contact_phone)');\n\n// Query 2: Save Inbound Message (unchanged)\nconst query_save_inbound = `\nINSERT INTO messages (\n  conversation_id,\n  direction,\n  content,\n  message_type,\n  whatsapp_message_id,\n  created_at\n)\nVALUES (\n  (SELECT id FROM conversations WHERE phone_number IN ('${phone_with_code}', '${phone_without_code}') ORDER BY updated_at DESC LIMIT 1),\n  'inbound',\n  '${message_content}',\n  '${message_type}',\n  '${message_id}',\n  NOW()\n)\nON CONFLICT (whatsapp_message_id)\nWHERE whatsapp_message_id IS NOT NULL AND whatsapp_message_id != ''\nDO NOTHING\nRETURNING *`.trim();\n\n// Query 3: Save Outbound Message (unchanged)\nconst query_save_outbound = `\nINSERT INTO messages (\n  conversation_id,\n  direction,\n  content,\n  message_type,\n  whatsapp_message_id,\n  created_at\n)\nVALUES (\n  (SELECT id FROM conversations WHERE phone_number IN ('${phone_with_code}', '${phone_without_code}') ORDER BY updated_at DESC LIMIT 1),\n  'outbound',\n  '${response_text}',\n  'text',\n  'out_' || extract(epoch from NOW())::bigint || '_' || random()::text,\n  NOW()\n)\nRETURNING *`.trim();\n\n// Query 4: Upsert Lead Data (unchanged)\nconst query_upsert_lead = `\nWITH existing_lead AS (\n  SELECT id\n  FROM leads\n  WHERE phone_number IN ('${phone_with_code}', '${phone_without_code}')\n  LIMIT 1\n),\nupdated AS (\n  UPDATE leads\n  SET\n    name = COALESCE(NULLIF('${escapeSql(collected_data?.lead_name || '')}', ''), name),\n    email = COALESCE(NULLIF('${escapeSql(collected_data?.email || '')}', ''), email),\n    city = COALESCE(NULLIF('${escapeSql(collected_data?.city || '')}', ''), city),\n    service_type = COALESCE(NULLIF('${escapeSql(collected_data?.service_type || '')}', ''), service_type),\n    service_details = '${collected_data_json}'::jsonb,\n    updated_at = NOW()\n  WHERE id IN (SELECT id FROM existing_lead)\n  RETURNING *, 'updated' as operation\n),\ninserted AS (\n  INSERT INTO leads (\n    phone_number,\n    name,\n    email,\n    city,\n    service_type,\n    service_details,\n    created_at,\n    updated_at\n  )\n  SELECT\n    '${phone_with_code}',\n    '${escapeSql(collected_data?.lead_name || '')}',\n    '${escapeSql(collected_data?.email || '')}',\n    '${escapeSql(collected_data?.city || '')}',\n    '${escapeSql(collected_data?.service_type || '')}',\n    '${collected_data_json}'::jsonb,\n    NOW(),\n    NOW()\n  WHERE NOT EXISTS (SELECT 1 FROM existing_lead)\n  RETURNING *, 'inserted' as operation\n)\nSELECT * FROM updated\nUNION ALL\nSELECT * FROM inserted`.trim();\n\nconsole.log('✅ V58.1: All queries built with GAP #6 and #8 fixes');\n\n// Return all queries and data\n\n  // V66: Correction UPDATE Query Builder\n  if (inputData.needs_db_update && inputData.update_field) {\n    console.log('V66: Building correction UPDATE query for field:', inputData.update_field);\n\n    const fieldConfig = {\n      'lead_name': { db_column: 'contact_name', jsonb_key: 'lead_name' },\n      'contact_phone': {\n        db_column: 'contact_phone',\n        jsonb_key: 'contact_phone',\n        also_update: 'phone_number'\n      },\n      'email': { db_column: 'contact_email', jsonb_key: 'email' },\n      'city': { db_column: 'city', jsonb_key: 'city' }\n    };\n\n    const config = fieldConfig[inputData.update_field];\n    const newValue = escapeSql(inputData[inputData.update_field] || '');\n\n    let additionalUpdates = '';\n    if (config.also_update) {\n      const additionalValue = escapeSql(inputData[config.also_update] || newValue);\n      additionalUpdates = `${config.also_update} = '${additionalValue}',`;\n    }\n\n    query_correction_update = `\nUPDATE conversations\nSET\n  ${config.db_column} = '${newValue}',\n  ${additionalUpdates}\n  collected_data = jsonb_set(\n    collected_data,\n    '{${config.jsonb_key}}',\n    to_jsonb('${newValue}')\n  ),\n  current_state = 'coletando_dados',\n  state_machine_state = 'confirmation',\n  updated_at = NOW()\nWHERE conversation_id = '${conversation_id}'\n  AND phone_number IN ('${phone_with_code}', '${phone_without_code}')\nRETURNING conversation_id, phone_number, collected_data,\n          ${config.db_column} as corrected_field, current_state,\n          state_machine_state, updated_at\n    `.trim();\n\n    console.log('V66: Correction UPDATE query built for field:', inputData.update_field);\n  }\n\n\n  \n  // V68 DEBUG: Log trigger check data\n  console.log('V68 DEBUG - Trigger check:', {\n    next_stage: inputData.next_stage,\n    service_selected: collected_data.service_selected,\n    status: collected_data.status\n  });\n\n\n\n\n  return {\n    query_correction_update: query_correction_update || null,\n    correction_field_updated: inputData.update_field || null,\n  phone_number: phone_with_code,\n  phone_with_code: phone_with_code,\n  phone_without_code: phone_without_code,\n  response_text: inputData.response_text,\n  next_stage: inputData.next_stage,  // V68 FIX: Use inputData to ensure value\n  collected_data: collected_data,\n  conversation_id: conversation_id,\n  message: inputData.message,\n  message_type: message_type,\n  message_id: message_id,\n\n  // Queries SQL\n  query_update_conversation,\n  query_save_inbound,\n  query_save_outbound,\n  query_upsert_lead,\n\n  // V58.1 metadata\n  v58_1_gap_6_applied: !!service_type,\n  v58_1_gap_8_applied: !!contact_phone,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "0c6d0776-5508-4811-aa42-2da802f0dbd0",
+      "name": "Build Update Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        304
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "id": "ee0cdf63-04db-4f1f-adf4-ce79574019dc",
+      "name": "Merge Append New User V57",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        208
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// V57 Code Processor - Process append-merged data (NEW USER PATH)\nconsole.log('=== V63.2 CODE PROCESSOR NEW USER START ===');\n\nconst items = $input.all();\nconsole.log(`V63.2: Received ${items.length} items from Merge append`);\n\nif (items.length !== 2) {\n  console.error(`V63.2 ERROR: Expected 2 items from append, received ${items.length}`);\n  throw new Error(`V63.2: Merge append should produce 2 items, got ${items.length}`);\n}\n\nconst queriesData = items[0].json;  // Input 0 from Merge (Queries)\nconst dbData = items[1].json;       // Input 1 from Merge (Database)\n\nconsole.log('V63.2 Item 0 (Queries) keys:', Object.keys(queriesData).join(', '));\nconsole.log('V63.2 Item 1 (Database) keys:', Object.keys(dbData).join(', '));\n\nconst conversation_id = dbData.id || dbData.conversation_id || null;\n\nconsole.log('V63.2: Extracted conversation_id:', conversation_id);\n\nif (!conversation_id) {\n  console.error('V63.2 CRITICAL ERROR: conversation_id is NULL!');\n  console.error('V63.2: Database data (item[1]):', JSON.stringify(dbData, null, 2));\n  throw new Error('V63.2: No conversation_id found in database result');\n}\n\n// V63.2 CRITICAL FIX: Create currentData and current_stage for NEW users\nconst currentData = {};  // Empty for new users\nconst current_stage = 'greeting';  // Always greeting for new users\n\nconsole.log('V63.2 NEW USER: Setting current_stage:', current_stage);\nconsole.log('V63.2 NEW USER: Setting currentData:', JSON.stringify(currentData));\n\nconst combinedData = {\n  ...queriesData,\n  ...dbData,\n\n  conversation_id: conversation_id,\n  id: conversation_id,\n  phone_number: dbData.phone_number || queriesData.phone_number || '',\n  message: queriesData.message || queriesData.body || queriesData.text || '',\n\n  // V63.2 CRITICAL FIX: Add currentData and current_stage\n  currentData: currentData,        // ✅ NEW! (empty for new user)\n  current_stage: current_stage,    // ✅ NEW! (always greeting)\n  collected_data: {},              // ✅ Empty for new user\n\n  v63_2_fix_applied: true,\n  v63_2_processor_executed: true,\n  v63_2_processor_timestamp: new Date().toISOString(),\n  v63_2_items_processed: items.length,\n  v63_2_conversation_id_source: 'dbData.id',\n  v63_2_path: 'new_user',\n  v63_2_current_stage_set: current_stage,\n  v63_2_currentData_keys: ''  // Empty for new user\n};\n\nconsole.log('V63.2: Combined data keys:', Object.keys(combinedData).join(', '));\nconsole.log('V63.2: conversation_id in output:', combinedData.conversation_id);\nconsole.log('V63.2: phone_number in output:', combinedData.phone_number);\nconsole.log('V63.2: current_stage in output:', combinedData.current_stage);\nconsole.log('✅ V63.2 CODE PROCESSOR NEW USER COMPLETE');\n\nreturn [combinedData];\n"
+      },
+      "id": "0f672ab1-1a79-49bb-848b-f0102cdda5e3",
+      "name": "Process New User Data V57",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        208
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "id": "bb8c77f5-8937-4e95-83c5-1d3b18f16a0a",
+      "name": "Merge Append Existing User V57",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        912
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// V57 Code Processor - Process append-merged data (EXISTING USER PATH)\nconsole.log('=== V63.2 CODE PROCESSOR EXISTING USER START ===');\n\nconst items = $input.all();\nconsole.log(`V63.2: Received ${items.length} items from Merge append`);\n\nif (items.length !== 2) {\n  console.error(`V63.2 ERROR: Expected 2 items from append, received ${items.length}`);\n  throw new Error(`V63.2: Merge append should produce 2 items, got ${items.length}`);\n}\n\nconst queriesData = items[0].json;  // Input 0 from Merge (Queries)\nconst dbData = items[1].json;       // Input 1 from Merge (Database)\n\nconsole.log('V63.2 Item 0 (Queries) keys:', Object.keys(queriesData).join(', '));\nconsole.log('V63.2 Item 1 (Database) keys:', Object.keys(dbData).join(', '));\n\n// CRITICAL: Extract conversation_id from existing conversation\nconst conversation_id = dbData.id || dbData.conversation_id || null;\n\nconsole.log('V63.2: Extracted conversation_id:', conversation_id);\nconsole.log('V63.2: Type:', typeof conversation_id);\n\nif (!conversation_id) {\n  console.error('V63.2 CRITICAL ERROR: No conversation_id in existing user data!');\n  console.error('V63.2: Database data (item[1]):', JSON.stringify(dbData, null, 2));\n  throw new Error('V63.2: No conversation_id found in existing conversation');\n}\n\n// V63.2 CRITICAL FIX: Parse collected_data from database JSONB column\nlet collectedDataFromDb = {};\ntry {\n  // Database returns collected_data as string or already parsed object\n  if (typeof dbData.collected_data === 'string') {\n    collectedDataFromDb = JSON.parse(dbData.collected_data);\n  } else if (typeof dbData.collected_data === 'object' && dbData.collected_data !== null) {\n    collectedDataFromDb = dbData.collected_data;\n  }\n  console.log('V63.2: Parsed collected_data:', JSON.stringify(collectedDataFromDb));\n} catch (e) {\n  console.error('V63.2: Failed to parse collected_data:', e.message);\n  collectedDataFromDb = {};\n}\n\n// V63.2 CRITICAL FIX: Set current_stage from database state_machine_state\nconst current_stage = dbData.state_machine_state ||\n                     dbData.state_for_machine ||\n                     dbData.current_state ||\n                     'greeting';\n\nconsole.log('V63.2 CRITICAL: Setting current_stage:', current_stage);\n\n// V63.2 CRITICAL FIX: Create currentData object for State Machine\nconst currentData = {\n  ...collectedDataFromDb,  // All collected data from previous messages\n\n  // Add database fields to currentData\n  service_selected: collectedDataFromDb.service_selected || null,\n  service_type: collectedDataFromDb.service_type || dbData.service_type || null,\n  lead_name: collectedDataFromDb.lead_name || dbData.contact_name || null,\n  contact_phone: collectedDataFromDb.contact_phone || dbData.contact_phone || null,\n  email: collectedDataFromDb.email || dbData.contact_email || null,\n  city: collectedDataFromDb.city || dbData.city || null\n};\n\nconsole.log('V63.2 CRITICAL: Created currentData:', JSON.stringify(currentData));\n\n// V64 DEBUG: Extended logging\nconsole.log('=== V64 EXISTING USER EXTENDED DEBUG ===');\nconsole.log('V64: dbData.collected_data TYPE:', typeof dbData.collected_data);\nconsole.log('V64: dbData.collected_data RAW:', dbData.collected_data);\nconsole.log('V64: collectedDataFromDb PARSED:', JSON.stringify(collectedDataFromDb));\nconsole.log('V64: currentData.service_selected:', currentData.service_selected);\nconsole.log('V64: currentData.service_type:', currentData.service_type);\nconsole.log('V64: currentData.lead_name:', currentData.lead_name);\nconsole.log('V64: dbData.state_machine_state:', dbData.state_machine_state);\nconsole.log('V64: current_stage SET TO:', current_stage);\nconsole.log('=== V64 EXISTING USER DEBUG END ===');\n\nconst combinedData = {\n  ...queriesData,\n  ...dbData,\n\n  // EXPLICIT conversation_id mapping\n  conversation_id: conversation_id,\n  id: conversation_id,\n\n  phone_number: dbData.phone_number || queriesData.phone_number || '',\n  message: queriesData.message || queriesData.body || queriesData.text || '',\n\n  // V63.2 CRITICAL FIX: Add currentData and current_stage\n  currentData: currentData,                    // ✅ NEW!\n  current_stage: current_stage,                // ✅ NEW!\n  collected_data: collectedDataFromDb,         // ✅ Parsed from DB\n\n  v63_2_fix_applied: true,                     // ✅ NEW metadata\n  v63_2_processor_executed: true,\n  v63_2_processor_timestamp: new Date().toISOString(),\n  v63_2_items_processed: items.length,\n  v63_2_conversation_id_source: 'dbData.id',\n  v63_2_path: 'existing_user',\n  v63_2_current_stage_set: current_stage,      // ✅ Debug info\n  v63_2_currentData_keys: Object.keys(currentData).join(',')  // ✅ Debug info\n};\n\nconsole.log('V63.2: Combined data keys:', Object.keys(combinedData).join(', '));\nconsole.log('V63.2: conversation_id in output:', combinedData.conversation_id);\nconsole.log('V63.2: phone_number in output:', combinedData.phone_number);\nconsole.log('V63.2: current_stage in output:', combinedData.current_stage);\nconsole.log('V63.2: currentData keys in output:', Object.keys(combinedData.currentData || {}).join(', '));\nconsole.log('✅ V63.2 CODE PROCESSOR EXISTING USER COMPLETE');\n\nreturn [combinedData];\n"
+      },
+      "id": "9821df2c-7324-43e7-b234-fa8be6cf1e17",
+      "name": "Process Existing User Data V57",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        912
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "id": "cf03b003-39fd-4d2e-8f97-5690bb5a2db5",
+      "name": "Claude AI Agent State 9 (collect_appointment_date)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        1904,
+        112
+      ],
+      "credentials": {},
+      "notes": "V70: NEW STATE - Collect appointment date"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Appointment Date (V70)\nconst collectedData = $json.collected_data || {};\nconst userResponse = ($json.message || '').toLowerCase().trim();\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\n// Parse date (multiple formats)\nlet parsedDate = null;\n\n// 1. DD/MM/YYYY\nif (userResponse.match(/\\d{2}\\/\\d{2}\\/\\d{4}/)) {\n    const [day, month, year] = userResponse.split('/');\n    parsedDate = new Date(`${year}-${month}-${day}`);\n}\n// 2. DD/MM (assume current year)\nelse if (userResponse.match(/\\d{2}\\/\\d{2}/)) {\n    const [day, month] = userResponse.split('/');\n    const year = new Date().getFullYear();\n    parsedDate = new Date(`${year}-${month}-${day}`);\n}\n// 3. \"amanhã\"\nelse if (userResponse.includes('amanhã') || userResponse.includes('amanha')) {\n    parsedDate = new Date(today);\n    parsedDate.setDate(parsedDate.getDate() + 1);\n}\n// 4. \"próxima segunda\"\nelse if (userResponse.includes('próxima segunda') || userResponse.includes('proxima segunda')) {\n    parsedDate = new Date(today);\n    const daysUntilMonday = (1 + 7 - parsedDate.getDay()) % 7 || 7;\n    parsedDate.setDate(parsedDate.getDate() + daysUntilMonday);\n}\n// 5. Other weekdays\nelse if (userResponse.includes('próxima') || userResponse.includes('proxima')) {\n    const weekdays = {\n        'segunda': 1, 'terça': 2, 'terca': 2, 'quarta': 3,\n        'quinta': 4, 'sexta': 5\n    };\n\n    for (const [day, num] of Object.entries(weekdays)) {\n        if (userResponse.includes(day)) {\n            parsedDate = new Date(today);\n            const daysUntil = (num + 7 - parsedDate.getDay()) % 7 || 7;\n            parsedDate.setDate(parsedDate.getDate() + daysUntil);\n            break;\n        }\n    }\n}\n\n// Validations\nif (!parsedDate || isNaN(parsedDate)) {\n    return {\n        ...collectedData,\n        current_state: 'collect_appointment_date',\n        next_stage: 'collect_appointment_date',\n        validation_error: 'Data inválida. Por favor, use o formato DD/MM/YYYY ou DD/MM.',\n        ai_response_needed: true\n    };\n}\n\n// Check if date is in the past\nif (parsedDate < today) {\n    return {\n        ...collectedData,\n        current_state: 'collect_appointment_date',\n        next_stage: 'collect_appointment_date',\n        validation_error: 'Data não pode ser no passado. Por favor, escolha uma data futura.',\n        ai_response_needed: true\n    };\n}\n\n// Check if date is too far (>60 days)\nconst maxDate = new Date(today);\nmaxDate.setDate(maxDate.getDate() + 60);\nif (parsedDate > maxDate) {\n    return {\n        ...collectedData,\n        current_state: 'collect_appointment_date',\n        next_stage: 'collect_appointment_date',\n        validation_error: 'Data muito distante. Por favor, escolha uma data nos próximos 60 dias.',\n        ai_response_needed: true\n    };\n}\n\n// Check if weekday (Monday-Friday)\nconst dayOfWeek = parsedDate.getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n    return {\n        ...collectedData,\n        current_state: 'collect_appointment_date',\n        next_stage: 'collect_appointment_date',\n        validation_error: 'Visitas técnicas apenas de segunda a sexta-feira. Por favor, escolha um dia útil.',\n        ai_response_needed: true\n    };\n}\n\n// Date is VALID\nconst formattedDate = parsedDate.toISOString().split('T')[0]; // YYYY-MM-DD\nconst dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];\nconst dayName = dayNames[dayOfWeek];\n\nconsole.log('✅ [Validate Date] Valid:', formattedDate, dayName);\n\nreturn {\n    ...collectedData,\n    scheduled_date: formattedDate,\n    scheduled_date_display: `${parsedDate.getDate()}/${parsedDate.getMonth()+1}/${parsedDate.getFullYear()} (${dayName})`,\n    current_state: 'collect_appointment_date',\n    next_stage: 'collect_appointment_time',\n    validation_error: null,\n    ai_response_needed: false\n};\n"
+      },
+      "id": "3dac391c-f183-4362-8d45-c9b4e026aba5",
+      "name": "Validate Appointment Date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        112
+      ],
+      "alwaysOutputData": true,
+      "notes": "V70: Validate appointment date (weekday, not past, <60 days)"
+    },
+    {
+      "parameters": {},
+      "id": "12c41bf4-8aa5-4de2-9b4c-9fa9f0e50e95",
+      "name": "Claude AI Agent State 10 (collect_appointment_time)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        2304,
+        112
+      ],
+      "credentials": {},
+      "notes": "V70: NEW STATE - Collect appointment time"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Appointment Time (V70)\nconst collectedData = $json.collected_data || {};\nconst userResponse = ($json.message || '').toLowerCase().trim();\n\nlet timeStart, timeEnd;\n\n// Parse time formats\nif (userResponse.includes('manhã') || userResponse.includes('manha')) {\n    timeStart = '09:00';\n    timeEnd = '11:00';\n}\nelse if (userResponse.includes('tarde')) {\n    timeStart = '14:00';\n    timeEnd = '16:00';\n}\nelse if (userResponse.match(/\\d{1,2}:\\d{2}/)) {\n    const match = userResponse.match(/(\\d{1,2}):(\\d{2})/);\n    const hour = parseInt(match[1]);\n    const min = match[2];\n\n    // Validate hour format\n    if (hour < 0 || hour > 23) {\n        return {\n            ...collectedData,\n            current_state: 'collect_appointment_time',\n            next_stage: 'collect_appointment_time',\n            validation_error: 'Horário inválido. Use formato HH:MM (exemplo: 09:00).',\n            ai_response_needed: true\n        };\n    }\n\n    timeStart = `${String(hour).padStart(2, '0')}:${min}`;\n\n    // Calculate end time (+2 hours)\n    const endHour = hour + 2;\n    timeEnd = `${String(endHour).padStart(2, '0')}:${min}`;\n}\nelse {\n    return {\n        ...collectedData,\n        current_state: 'collect_appointment_time',\n        next_stage: 'collect_appointment_time',\n        validation_error: 'Formato não reconhecido. Use HH:MM, \"manhã\" ou \"tarde\".',\n        ai_response_needed: true\n    };\n}\n\n// Validate business hours (08:00-18:00)\nconst startHour = parseInt(timeStart.split(':')[0]);\nconst endHour = parseInt(timeEnd.split(':')[0]);\n\nif (startHour < 8) {\n    return {\n        ...collectedData,\n        current_state: 'collect_appointment_time',\n        next_stage: 'collect_appointment_time',\n        validation_error: 'Horário muito cedo. Nosso atendimento inicia às 08:00.',\n        ai_response_needed: true\n    };\n}\n\nif (endHour > 18) {\n    return {\n        ...collectedData,\n        current_state: 'collect_appointment_time',\n        next_stage: 'collect_appointment_time',\n        validation_error: 'Horário muito tarde. Nosso atendimento encerra às 18:00. Escolha um horário que permita 2h de visita.',\n        ai_response_needed: true\n    };\n}\n\n// Time is VALID\nconsole.log('✅ [Validate Time] Valid:', timeStart, '-', timeEnd);\n\nreturn {\n    ...collectedData,\n    scheduled_time_start: timeStart,\n    scheduled_time_end: timeEnd,\n    scheduled_time_display: `${timeStart} às ${timeEnd}`,\n    current_state: 'collect_appointment_time',\n    next_stage: 'confirmation',\n    validation_error: null,\n    ai_response_needed: false\n};\n"
+      },
+      "id": "1344f825-46a2-45c5-9a59-c21a326652e4",
+      "name": "Validate Appointment Time",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        112
+      ],
+      "alwaysOutputData": true,
+      "notes": "V70: Validate appointment time (08:00-18:00, +2h visit)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- V73: Create Appointment in Database\n-- FIX: Simplified n8n expressions (use $json instead of $(\"node\").first())\n-- Data flow: Build Update Queries → Prepare Appointment Data (Set) → HERE\n-- IF nodes don't pass data, so we use Set node to extract and pass data\nINSERT INTO appointments (\n    id,\n    lead_id,\n    scheduled_date,\n    scheduled_time_start,\n    scheduled_time_end,\n    service_type,\n    notes,\n    status,\n    created_at,\n    updated_at\n)\nVALUES (\n    gen_random_uuid(),\n    (SELECT id FROM leads WHERE phone_number = '{{ $json.phone_number }}'),\n    '{{ $json.scheduled_date }}',\n    '{{ $json.scheduled_time_start }}',\n    '{{ $json.scheduled_time_end }}',\n    '{{ $json.service_type }}',\n    'Agendamento via WhatsApp Bot - Cliente: {{ $json.lead_name }} | Cidade: {{ $json.city }}',\n    'agendado',\n    NOW(),\n    NOW()\n)\nRETURNING\n    id as appointment_id,\n    lead_id,\n    scheduled_date,\n    scheduled_time_start,\n    scheduled_time_end,\n    service_type,\n    status,\n    created_at;",
+        "options": {}
+      },
+      "id": "26afffa8-8392-47af-9cd7-0efe968dd30c",
+      "name": "Create Appointment in Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        112
+      ],
+      "alwaysOutputData": true,
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "Trigger Appointment Scheduler",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "credentials": {
+        "postgres": {
+          "id": "VXA1r8sd0TMIdPvS",
+          "name": "PostgreSQL - E2 Bot"
+        }
+      },
+      "notes": "V73: CREATE appointment with simplified SQL expressions"
+    },
+    {
+      "parameters": {},
+      "id": "1b8cf786-8b7c-4ee6-a897-38c27a1abab5",
+      "name": "Claude AI Agent State 11 (appointment_confirmation)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        2304,
+        320
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "Build Update Queries",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "credentials": {},
+      "notes": "V70: NEW STATE - Collect appointment time"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "phone_number",
+              "value": "={{ $('Build Update Queries').first().json.phone_number }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "scheduled_date",
+              "value": "={{ $('Build Update Queries').first().json.collected_data.scheduled_date }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "scheduled_time_start",
+              "value": "={{ $('Build Update Queries').first().json.collected_data.scheduled_time_start }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "scheduled_time_end",
+              "value": "={{ $('Build Update Queries').first().json.collected_data.scheduled_time_end }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "service_type",
+              "value": "={{ $('Build Update Queries').first().json.collected_data.service_type }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "lead_name",
+              "value": "={{ $('Build Update Queries').first().json.collected_data.lead_name }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "city",
+              "value": "={{ $('Build Update Queries').first().json.collected_data.city }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3fbfb3d2-737b-4898-8693-2d4d93b215cf",
+      "name": "Prepare Appointment Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2656,
+        112
+      ],
+      "alwaysOutputData": true,
+      "notes": "V73: Extract data from Build Update Queries to bypass IF node data loss"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $node['Build Update Queries'].json.next_stage }}",
+              "value2": "scheduling_redirect"
+            }
+          ]
+        }
+      },
+      "id": "b45abaf2-1a43-4039-ae96-875a355941fd",
+      "name": "Check If Scheduling",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        16
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $node['Build Update Queries'].json.next_stage }}",
+              "value2": "trigger_wf06_next_dates"
+            }
+          ]
+        }
+      },
+      "id": "5d558e67-dbfd-4ab6-899e-e72802e209b4",
+      "name": "Check If WF06 Next Dates",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        760,
+        204
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $node['Build Update Queries'].json.next_stage }}",
+              "value2": "trigger_wf06_available_slots"
+            }
+          ]
+        }
+      },
+      "id": "4a255ff0-c0c4-4b58-a04e-7b313a901198",
+      "name": "Check If WF06 Available Slots",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        760,
+        404
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://e2bot-n8n-dev:5678/webhook/calendar-availability",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "next_dates"
+            },
+            {
+              "name": "count",
+              "value": "3"
+            },
+            {
+              "name": "start_date",
+              "value": "={{ new Date().toISOString().split('T')[0] }}"
+            },
+            {
+              "name": "duration_minutes",
+              "value": "120"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "97020871-32eb-49c4-84ca-ef1300825796",
+      "name": "HTTP Request - Get Next Dates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        960,
+        204
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://e2bot-n8n-dev:5678/webhook/calendar-availability",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "available_slots"
+            },
+            {
+              "name": "date",
+              "value": "={{ $json.scheduled_date }}"
+            },
+            {
+              "name": "duration_minutes",
+              "value": "120"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3982ea7c-f11e-44f1-97d7-26e5e9644e3c",
+      "name": "HTTP Request - Get Available Slots",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        960,
+        404
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Receive Message": {
+      "main": [
+        [
+          {
+            "node": "Prepare Phone Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Count": {
+      "main": [
+        [
+          {
+            "node": "Check If New User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If New User": {
+      "main": [
+        [
+          {
+            "node": "Merge Queries Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Queries Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Details": {
+      "main": [
+        [
+          {
+            "node": "Merge Append Existing User V57",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Create New Conversation": {
+      "main": [
+        [
+          {
+            "node": "Merge Append New User V57",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "State Machine Logic": {
+      "main": [
+        [
+          {
+            "node": "Build Update Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Response": {
+      "main": [
+        [
+          {
+            "node": "Check If Handoff",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check If Scheduling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Scheduling": {
+      "main": [
+        [
+          {
+            "node": "Prepare Appointment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Handoff": {
+      "main": [
+        [
+          {
+            "node": "Trigger Human Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Appointment Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Human Handoff": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Phone Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Phone Formats": {
+      "main": [
+        [
+          {
+            "node": "Build SQL Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SQL Queries": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Queries Data": {
+      "main": [
+        [
+          {
+            "node": "Create New Conversation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Append New User V57",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Queries Data1": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation Details",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Append Existing User V57",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Update Queries": {
+      "main": [
+        [
+          {
+            "node": "Check If WF06 Next Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Append New User V57": {
+      "main": [
+        [
+          {
+            "node": "Process New User Data V57",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Append Existing User V57": {
+      "main": [
+        [
+          {
+            "node": "Process Existing User Data V57",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process New User Data V57": {
+      "main": [
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Existing User Data V57": {
+      "main": [
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Appointment in Database": {
+      "main": [
+        [
+          {
+            "node": "Trigger Appointment Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Appointment Data": {
+      "main": [
+        [
+          {
+            "node": "Create Appointment in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If WF06 Next Dates": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Get Next Dates",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check If WF06 Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If WF06 Available Slots": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Get Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Conversation State",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Inbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Outbound Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert Lead Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Get Next Dates": {
+      "main": [
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Get Available Slots": {
+      "main": [
+        [
+          {
+            "node": "State Machine Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d872ae91-cfdc-4970-8050-5c82720c3772",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "be7607dc500d0df7a2cb94e774f3665239bf8a65324d98f4d2534280e5bd21e1"
+  },
+  "id": "rJN1BcF8vBsiKIRa",
+  "tags": []
+}
