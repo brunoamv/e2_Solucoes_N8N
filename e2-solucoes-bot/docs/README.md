@@ -30,6 +30,30 @@ docs/
 ├── INDEX.md                            Complete documentation catalog
 ├── README.md                           This file - Documentation overview
 │
+├── guidelines/ (8 comprehensive guides) ⭐ NEW (2026-04-29)
+│   ├── README.md                       Guidelines organization guide
+│   ├── 00_VISAO_GERAL.md               Arquitetura conceitual do sistema ⭐
+│   ├── 01_N8N_BEST_PRACTICES.md        Limitações n8n 2.x e workarounds ⭐
+│   ├── 02_STATE_MACHINE_PATTERNS.md    Padrão central de conversação ⭐
+│   ├── 03_DATABASE_PATTERNS.md         Schema e queries PostgreSQL ⭐
+│   ├── 04_WORKFLOW_INTEGRATION.md      Comunicação microserviços ⭐
+│   ├── 05_TESTING_VALIDATION.md        Estratégias de teste
+│   ├── 06_DEPLOYMENT_GUIDE.md          Processo de deployment
+│   └── 07_SECURITY_COMPLIANCE.md       Segurança e LGPD
+│
+├── development/ (6 practical guides) ⭐ NEW (2026-04-29)
+│   ├── README.md                       Development navigation guide ⭐
+│   ├── 01_WORKFLOW_MODIFICATION.md     Modificar workflows ⭐
+│   ├── 02_DEBUGGING_GUIDE.md           Debug e troubleshooting ⭐
+│   ├── 03_COMMON_TASKS.md              Tarefas comuns ⭐
+│   ├── 04_CODE_REVIEW_CHECKLIST.md     Checklist de revisão ⭐
+│   └── 05_LOCAL_SETUP.md               Setup ambiente local (30-60 min) ⭐
+│
+├── diagrams/ (3 visual diagrams) ⭐ NEW (2026-04-29)
+│   ├── README.md                       Diagrams navigation guide ⭐
+│   ├── 01_SYSTEM_ARCHITECTURE.md       Arquitetura completa (850 lines) ⭐
+│   └── 02_STATE_MACHINE_FLOW.md        15 estados detalhados (750 lines) ⭐
+│
 ├── analysis/                           Technical analyses (7 subdirectories)
 │   ├── DOCUMENTATION_REPORT.md         Current documentation report
 │   ├── TECHNICAL_INDEX.md              Technical index and reference
@@ -84,18 +108,53 @@ docs/
 │   └── [other setup guides]
 │
 ├── Guides/                             User guides
-├── development/                        Development documentation
-├── guidelines/                         Project guidelines
 ├── validation/                         Validation and testing
 ├── sprints/                            Sprint documentation
 ├── monitoring/                         Monitoring documentation
-├── diagrams/                           Architecture diagrams
 └── errors/                             Error logs and screenshots
 ```
 
 ---
 
 ## 🗂️ Documentation by Category
+
+### 📖 Guidelines (Conceptual - "What and Why") ⭐ NEW
+- **Location**: `/docs/guidelines/`
+- **Purpose**: Conceptual architecture guides and system patterns
+- **Total**: 8 comprehensive guides (~5,900 lines)
+- **Key Files**:
+  - `00_VISAO_GERAL.md` - Arquitetura conceitual do sistema ⭐
+  - `01_N8N_BEST_PRACTICES.md` - Limitações n8n 2.x e workarounds ⭐
+  - `02_STATE_MACHINE_PATTERNS.md` - Padrão central (15 estados) ⭐
+  - `03_DATABASE_PATTERNS.md` - Schema e queries PostgreSQL ⭐
+  - `04_WORKFLOW_INTEGRATION.md` - Comunicação microserviços ⭐
+  - `05_TESTING_VALIDATION.md` - Estratégias de teste
+  - `06_DEPLOYMENT_GUIDE.md` - Processo de deployment
+  - `07_SECURITY_COMPLIANCE.md` - Segurança e LGPD
+- **When to Use**: Understanding system architecture, design patterns, strategic decisions
+
+### 💻 Development (Practical - "How to") ⭐ NEW
+- **Location**: `/docs/development/`
+- **Purpose**: Practical step-by-step development guides
+- **Total**: 6 practical guides (~3,373 lines)
+- **Key Files**:
+  - `README.md` - Complete navigation guide ⭐
+  - `01_WORKFLOW_MODIFICATION.md` - Modificar workflows na prática ⭐
+  - `02_DEBUGGING_GUIDE.md` - Debug e troubleshooting ⭐
+  - `03_COMMON_TASKS.md` - Tarefas comuns passo a passo ⭐
+  - `04_CODE_REVIEW_CHECKLIST.md` - Checklist de revisão completo ⭐
+  - `05_LOCAL_SETUP.md` - Setup ambiente local (30-60 min) ⭐
+- **When to Use**: Implementing features, debugging, code review, local development
+
+### 🎨 Diagrams (Visual - "See It") ⭐ NEW
+- **Location**: `/docs/diagrams/`
+- **Purpose**: Visual architecture diagrams (ASCII format for terminal compatibility)
+- **Total**: 3 comprehensive diagrams (~1,880 lines)
+- **Key Files**:
+  - `README.md` - Diagrams navigation guide ⭐
+  - `01_SYSTEM_ARCHITECTURE.md` - Arquitetura completa do sistema (850 lines) ⭐
+  - `02_STATE_MACHINE_FLOW.md` - 15 estados detalhados (750 lines) ⭐
+- **When to Use**: Onboarding new developers, understanding system flow, architecture review
 
 ### 📚 Setup & Configuration (Start Here!)
 - **Location**: `/docs/Setups/`
@@ -238,7 +297,10 @@ docs/
 
 ## 📊 Documentation Statistics
 
-**Total Organized**: 300+ documents across 15 categories
+**Total Organized**: 320+ documents across 18 categories ⭐ UPDATED
+- **guidelines/**: 8 files (~5,900 lines) ⭐ NEW - Conceptual architecture
+- **development/**: 6 files (~3,373 lines) ⭐ NEW - Practical guides
+- **diagrams/**: 3 files (~1,880 lines) ⭐ NEW - Visual architecture
 - **analysis/**: 53 files (technical analyses)
 - **deployment/**: 51 files (deployment guides)
 - **fix/**: 82 files (bug fix reports)
@@ -247,6 +309,7 @@ docs/
 - **implementation/**: 16 files (implementation guides)
 - **Setups/**: 13 files (setup guides)
 
+**New Documentation (2026-04-29)**: 17 files (~11,153 lines)
 **Organization Date**: 2026-04-29
 **Current Production**: V1 (WF01 V2.8.3, WF02 V114, WF05 V7, WF06 V2.2, WF07 V13)
 
@@ -321,20 +384,39 @@ Examples:
 
 ## 🎓 Learning Resources
 
-### For Beginners
+### For Beginners ⭐ UPDATED
 
-1. **Start Here**: `/docs/Setups/QUICKSTART.md` ⭐
+**Quick Start (2 hours)**:
+1. **Setup Local Environment**: `/docs/development/05_LOCAL_SETUP.md` ⭐ (30-60 min)
+2. **Understand Architecture**: `/docs/guidelines/00_VISAO_GERAL.md` ⭐ (15 min)
+3. **See System Diagrams**: `/docs/diagrams/01_SYSTEM_ARCHITECTURE.md` ⭐ (20 min)
+4. **Check Production Status**: `/docs/status/DEPLOYMENT_STATUS.md` ⭐ (10 min)
+
+**Alternative Path (Operations Focus)**:
+1. **Start Here**: `/docs/Setups/QUICKSTART.md` ⭐ (30-45 min)
 2. **Understand Credentials**: `/docs/Setups/SETUP_CREDENTIALS.md` ⭐
-3. **Learn n8n Limitations**: `/docs/analysis/system/ANALYSIS_N8N_VERSION_UPGRADE_VS_WORKAROUNDS.md`
+3. **Learn n8n Limitations**: `/docs/guidelines/01_N8N_BEST_PRACTICES.md` ⭐
 4. **Check Production Status**: `/docs/status/DEPLOYMENT_STATUS.md` ⭐
 
-### For Developers
+### For Developers ⭐ UPDATED
 
+**Essential Reading**:
 1. **Project Context**: `CLAUDE.md` (root) ⭐
 2. **Documentation Index**: `/docs/INDEX.md` ⭐
-3. **Bug Fix History**: `/docs/fix/` (organized by workflow)
-4. **Planning History**: `/docs/PLAN/` (organized by workflow)
-5. **Analysis History**: `/docs/analysis/` (organized by category)
+3. **Architecture Overview**: `/docs/guidelines/00_VISAO_GERAL.md` ⭐
+4. **State Machine Pattern**: `/docs/guidelines/02_STATE_MACHINE_PATTERNS.md` ⭐
+5. **Development Guide**: `/docs/development/README.md` ⭐
+
+**Practical Guides**:
+- **Modify Workflows**: `/docs/development/01_WORKFLOW_MODIFICATION.md` ⭐
+- **Debug Issues**: `/docs/development/02_DEBUGGING_GUIDE.md` ⭐
+- **Common Tasks**: `/docs/development/03_COMMON_TASKS.md` ⭐
+- **Code Review**: `/docs/development/04_CODE_REVIEW_CHECKLIST.md` ⭐
+
+**Historical Reference**:
+- **Bug Fix History**: `/docs/fix/` (organized by workflow)
+- **Planning History**: `/docs/PLAN/` (organized by workflow)
+- **Analysis History**: `/docs/analysis/` (organized by category)
 
 ### For Operations
 
@@ -350,13 +432,19 @@ Examples:
 ### Organization Timeline
 
 - **2026-04-08**: Initial reorganization (moved files from root to categories)
-- **2026-04-29**: Complete organization with subdirectories:
-  - analysis/ organized into 6 subdirectories (53 files)
+- **2026-04-29 Morning**: Complete organization with subdirectories:
+  - analysis/ organized into 7 subdirectories (53 files)
   - deployment/ organized into 7 subdirectories (51 files)
   - fix/ organized into 7 subdirectories (82 files)
   - PLAN/ organized into 10 subdirectories (137 files)
   - status/ organized into 2 subdirectories (47 files)
   - All documentation updated to reflect organized structure
+- **2026-04-29 Evening**: New documentation tier creation ⭐
+  - guidelines/ created (8 comprehensive guides, ~5,900 lines)
+  - development/ created (6 practical guides, ~3,373 lines)
+  - diagrams/ created (3 visual diagrams, ~1,880 lines)
+  - CLAUDE.md, INDEX.md, README.md updated to reflect new tiers
+  - Total: 17 new documentation files (~11,153 lines)
 
 ### Documentation Coverage
 
@@ -381,6 +469,9 @@ Examples:
 - ✅ **Workflows Organized**: 7 active, 57 in `/old/` for historical reference
 - ✅ **Version Range Strategy**: Large version histories split into manageable ranges
 - ✅ **Comprehensive READMEs**: Navigation guides in each major directory
+- ✅ **Three-Tier Documentation** ⭐ NEW: Guidelines (conceptual) + Development (practical) + Diagrams (visual)
+- ✅ **Comprehensive Onboarding**: 2-hour path for new developers with clear learning progression
+- ✅ **Visual Architecture**: ASCII diagrams for terminal-compatible system visualization
 
 ---
 
