@@ -411,6 +411,9 @@ docker logs -f e2bot-n8n-dev | grep -E "ERROR|V13|INSERT"
 ## Documentation
 
 **Quick Access**:
+- **Quick Start**: `docs/development/05_LOCAL_SETUP.md` (30-60 min setup completo) ⭐
+- **Navigation**: `docs/development/README.md` (navegação completa) ⭐
+- **Architecture**: `docs/diagrams/01_SYSTEM_ARCHITECTURE.md` (diagramas visuais) ⭐
 - Setup: `docs/Setups/QUICKSTART.md` (30-45 min)
 - Email: `docs/Setups/SETUP_EMAIL.md` (Port 465 SSL/TLS)
 - Credentials: `docs/Setups/SETUP_CREDENTIALS.md`
@@ -439,6 +442,26 @@ docker logs -f e2bot-n8n-dev | grep -E "ERROR|V13|INSERT"
 ```
 docs/
 ├── INDEX.md, README.md (updated 2026-04-29)
+├── guidelines/ (8 comprehensive guides) ⭐ NEW
+│   ├── 00_VISAO_GERAL.md (arquitetura conceitual)
+│   ├── 01_N8N_BEST_PRACTICES.md (limitações n8n 2.x)
+│   ├── 02_STATE_MACHINE_PATTERNS.md (padrão central)
+│   ├── 03_DATABASE_PATTERNS.md (schema e queries)
+│   ├── 04_WORKFLOW_INTEGRATION.md (microserviços)
+│   ├── 05_TESTING_VALIDATION.md (estratégias de teste)
+│   ├── 06_DEPLOYMENT_GUIDE.md (processo de release)
+│   └── 07_SECURITY_COMPLIANCE.md (segurança e LGPD)
+├── development/ (6 practical guides) ⭐ NEW
+│   ├── 01_WORKFLOW_MODIFICATION.md (modificar workflows)
+│   ├── 02_DEBUGGING_GUIDE.md (debug e troubleshooting)
+│   ├── 03_COMMON_TASKS.md (tarefas comuns)
+│   ├── 04_CODE_REVIEW_CHECKLIST.md (checklist de revisão)
+│   ├── 05_LOCAL_SETUP.md (setup ambiente local)
+│   └── README.md (navegação completa)
+├── diagrams/ (3 visual diagrams) ⭐ NEW
+│   ├── 01_SYSTEM_ARCHITECTURE.md (850 lines - arquitetura completa)
+│   ├── 02_STATE_MACHINE_FLOW.md (750 lines - 15 estados detalhados)
+│   └── README.md (280 lines - navigation guide)
 ├── analysis/ (53 files in 7 subdirectories)
 ├── deployment/ (51 files in 7 subdirectories)
 ├── fix/ (82 files in 7 subdirectories)
@@ -447,8 +470,7 @@ docs/
 ├── implementation/ (16 files)
 ├── Setups/ (13 config guides)
 ├── Guides/ (user docs)
-├── development/, guidelines/, validation/
-├── sprints/, monitoring/, diagrams/, errors/
+├── validation/, sprints/, monitoring/, errors/
 
 scripts/
 ├── README.md (304 scripts organized)
