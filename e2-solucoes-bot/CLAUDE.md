@@ -1,8 +1,8 @@
 # E2 Bot - Context
 
-> **Prod**: WF01 V2.8.3 | WF02 V114 ✅ COMPLETE | WF05 V3.6
-> **Ready**: WF05 V8 PART 1 ✅ (DB schema) | WF05 V8 PART 2 🔴 (OAuth pending) | WF06 V2.1 COMPLETE ✅ | WF07 V13 ✅
-> **Updated**: 2026-04-28 23:30 BRT
+> **Production V1**: WF01 V2.8.3 | WF02 V114 ✅ COMPLETE | WF05 V7 | WF06 V2.2 | WF07 V13 ✅
+> **Status**: ✅ ORGANIZED - Single source of truth structure implemented
+> **Updated**: 2026-04-29 18:00 BRT
 
 ## Stack
 
@@ -13,13 +13,13 @@ n8n 2.14.2 + Claude 3.5 + PostgreSQL + Evolution API v2.3.7 | PT-BR
 
 ## Workflows
 
-| WF | Prod | Ready | Function |
-|----|------|-------|----------|
-| **01** | V2.8.3 ✅ | - | Dedup via PostgreSQL ON CONFLICT |
-| **02** | V114 ✅ COMPLETE | - | AI conversation with proactive UX + WF06 integration + V111 row lock + V113 suggestions + V114 TIME fields |
-| **05** | V3.6 (no validation) | V8 Part 1 ✅ (DB), Part 2 🔴 (OAuth) | Google Calendar + DB + WF07 trigger |
-| **06** | V2.1 ✅ | - | Calendar availability microservice (OAuth + empty calendar + input data fix) |
-| **07** | V13 ✅ | - | nginx → HTTP → SMTP → DB (INSERT...SELECT pattern) |
+| WF | Production V1 | Location | Function |
+|----|---------------|----------|----------|
+| **01** | V2.8.3 ✅ | `production/wf01/` | Dedup via PostgreSQL ON CONFLICT |
+| **02** | V114 ✅ COMPLETE | `production/wf02/` | AI conversation with proactive UX + WF06 integration + V111 row lock + V113 suggestions + V114 TIME fields |
+| **05** | V7 Hardcoded ✅ | `production/wf05/` | Google Calendar + DB + WF07 trigger (hardcoded business hours) |
+| **06** | V2.2 ✅ | `production/wf06/` | Calendar availability microservice (OAuth + empty calendar + response mode) |
+| **07** | V13 ✅ | `production/wf07/` | nginx → HTTP → SMTP → DB (INSERT...SELECT pattern) |
 
 **Services**: 1-Solar | 2-Subestação | 3-Projetos | 4-BESS | 5-Análise
 **WF02 Flow**: Services 1/3 + confirm → WF06 → WF05 | Others → Handoff
@@ -28,18 +28,30 @@ n8n 2.14.2 + Claude 3.5 + PostgreSQL + Evolution API v2.3.7 | PT-BR
 
 ## Files
 
-**Workflows** (`n8n/workflows/`):
+**Workflows** (`n8n/workflows/`) - **ORGANIZED STRUCTURE**:
 ```
-Active (9):
-  01_main_whatsapp_handler_V2.8.3_NO_LOOP.json
-  02_ai_agent_conversation_V114_FUNCIONANDO.json ⭐ PRODUCTION - Downloaded from n8n after all changes
-  05_appointment_scheduler_v3.6.json | v7_hardcoded_values.json
-  06_calendar_availability_service_v2_1.json
-  07_send_email_v13_insert_select.json
+📁 production/          # Production V1 Package (SINGLE SOURCE OF TRUTH)
+  ├── wf01/ → 01_main_whatsapp_handler_V2.8.3_NO_LOOP.json
+  ├── wf02/ → 02_ai_agent_conversation_V114_FUNCIONANDO.json ⭐
+  ├── wf05/ → 05_appointment_scheduler_v7_hardcoded_values.json
+  ├── wf06/ → 06_calendar_availability_service_v2_2.json
+  └── wf07/ → 07_send_email_v13_insert_select.json
+
+📁 development/         # Development versions
+  ├── wf02/ (development iterations)
+  ├── wf05/ (v3.6, v8 experimental)
+  └── wf06/ (v2, v2.1)
+
+📁 historical/          # Complete version history
+  └── wf02/ (V77-V113 iterations)
+
+⚠️ IMPORTANT: NO workflow JSON files in root directory!
+            All workflows organized in subfolders - zero duplication.
 
 Production WF02 V114 ✅ COMPLETE:
   - Workflow ID: 9tG2gR6KBt6nYyHT
   - Node Count: 52 nodes
+  - Location: production/wf02/02_ai_agent_conversation_V114_FUNCIONANDO.json
   - Includes ALL fixes:
     ✅ V111 Database Row Locking (FOR UPDATE SKIP LOCKED)
     ✅ V113.1 WF06 Suggestions Persistence (date_suggestions + slot_suggestions)
@@ -47,13 +59,12 @@ Production WF02 V114 ✅ COMPLETE:
     ✅ V79.1 Schema-Aligned Build Update Queries (no contact_phone)
     ✅ V105 Routing Fix (Update State BEFORE Check If WF06)
   - Documentation: docs/WF02_V114_PRODUCTION_DEPLOYMENT.md
-  - Scripts:
-    - scripts/wf02-v114-slot-time-fields-fix.js (State Machine)
-    - scripts/wf02-v111-build-sql-queries-row-locking.js (SQL Queries)
-    - scripts/wf02-v113-build-update-queries1-wf06-next-dates.js (Dates)
-    - scripts/wf02-v113-build-update-queries2-wf06-available-slots.js (Slots)
-
-Old (68): n8n/workflows/old/ - WF02-07 historical + V74.1_2 + V76-V113 iterations
+  - README: n8n/workflows/README.md (complete organization guide)
+  - Scripts (scripts/wf02/state-machines/):
+    - wf02-v114-slot-time-fields-fix.js (State Machine)
+    - wf02-v111-build-sql-queries-row-locking.js (SQL Queries)
+    - wf02-v113-build-update-queries1-wf06-next-dates.js (Dates)
+    - wf02-v113-build-update-queries2-wf06-available-slots.js (Slots)
 ```
 
 **DB Schema**:
@@ -115,10 +126,10 @@ docker logs -f e2bot-n8n-dev 2>&1 | grep -E "V111:|V110: Current → Next:"
 
 # Docs:
 # - Quick Deploy: docs/WF02_V111_QUICK_DEPLOY.md ⭐ START HERE
-# - Full Deployment: docs/deployment/DEPLOY_WF02_V111_DATABASE_ROW_LOCKING.md
-# - Root Cause Analysis: docs/fix/BUGFIX_WF02_V111_DATABASE_STATE_RACE_CONDITION.md
-# - V110 Investigation: docs/fix/BUGFIX_WF02_V110_EXECUTION_9045_COMPLETE_ROOT_CAUSE.md
-# - V111 Code: scripts/wf02-v111-build-sql-queries-row-locking.js
+# - Full Deployment: docs/deployment/wf02/v100-v114/DEPLOY_WF02_V111_DATABASE_ROW_LOCKING.md
+# - Root Cause Analysis: docs/fix/wf02/v100-v114/BUGFIX_WF02_V111_DATABASE_STATE_RACE_CONDITION.md
+# - V110 Investigation: docs/fix/wf02/v100-v114/BUGFIX_WF02_V110_EXECUTION_9045_COMPLETE_ROOT_CAUSE.md
+# - V111 Code: scripts/wf02/state-machines/wf02-v111-build-sql-queries-row-locking.js
 ```
 
 ### WF02 V114 🔴 CRITICAL (PostgreSQL TIME Fields Fix)
@@ -169,7 +180,7 @@ docker logs -f e2bot-n8n-dev 2>&1 | grep -E "V114|TIME"
 # Docs:
 # - Quick Deploy: docs/WF02_V114_QUICK_DEPLOY.md ⭐ START HERE
 # - Complete Summary: docs/WF02_V114_COMPLETE_SUMMARY.md
-# - V114 Code: scripts/wf02-v114-slot-time-fields-fix.js
+# - V114 Code: scripts/wf02/state-machines/wf02-v114-slot-time-fields-fix.js
 # - Previous Version: V113.1 (date_suggestions and slot_suggestions persistence)
 ```
 
@@ -183,7 +194,7 @@ docker logs -f e2bot-n8n-dev 2>&1 | grep -E "V114|TIME"
 
 # PART 1: V104 State Machine (puts state in collected_data)
 # 1. Copy V104 State Machine Code
-cat /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/scripts/wf02-v104-database-state-update-fix.js
+cat /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/scripts/wf02/state-machines/wf02-v104-database-state-update-fix.js
 
 # 2. Update n8n Workflow - State Machine Node
 # Open: http://localhost:5678/workflow/9tG2gR6KBt6nYyHT
@@ -192,7 +203,7 @@ cat /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/scripts/wf02-v104-
 
 # PART 2: V104.2 Build Update Queries (reads state from collected_data + schema-compliant)
 # 3. Copy V104.2 Build Update Queries Code
-cat /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/scripts/wf02-v104_2-build-update-queries-schema-fix.js
+cat /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/scripts/wf02/state-machines/wf02-v104_2-build-update-queries-schema-fix.js
 
 # 4. Update n8n Workflow - Build Update Queries Node
 # Same workflow: http://localhost:5678/workflow/9tG2gR6KBt6nYyHT
@@ -253,17 +264,17 @@ docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
 # - Impact: Infinite loop + undefined messages completely eliminated on ALL routes ✅
 
 # Docs:
-# - Deployment V104.2: docs/deployment/DEPLOY_WF02_V104_2_BUILD_UPDATE_QUERIES_COMPLETE_FIX.md
-# - Deployment V105: docs/deployment/DEPLOY_WF02_V105_WF06_ROUTING_FIX.md
-# - Deployment V106.1: docs/deployment/DEPLOY_WF02_V106_1_COMPLETE_FIX.md
+# - Deployment V104.2: docs/deployment/wf02/v100-v114/DEPLOY_WF02_V104_2_BUILD_UPDATE_QUERIES_COMPLETE_FIX.md
+# - Deployment V105: docs/deployment/wf02/v100-v114/DEPLOY_WF02_V105_WF06_ROUTING_FIX.md
+# - Deployment V106.1: docs/deployment/wf02/v100-v114/DEPLOY_WF02_V106_1_COMPLETE_FIX.md
 # - Quick Deploy V105: docs/WF02_V105_QUICK_DEPLOY.md
-# - Bug Reports: docs/fix/BUGFIX_WF02_V104_1_BUILD_UPDATE_QUERIES_STATE_FIX.md (state)
-#                docs/fix/BUGFIX_WF02_V104_2_SCHEMA_MISMATCH.md (schema)
-#                docs/fix/BUGFIX_WF02_V105_WF06_ROUTING_STATE_UPDATE.md (routing)
-#                docs/fix/BUGFIX_WF02_V106_RESPONSE_TEXT_ROUTING.md (response_text - incomplete)
-#                docs/fix/BUGFIX_WF02_V106_1_CRITICAL_WF06_FLOW_BREAK.md (response_text - complete)
-# - V104 State Machine: scripts/wf02-v104-database-state-update-fix.js
-# - V104.2 Build Update Queries: scripts/wf02-v104_2-build-update-queries-schema-fix.js
+# - Bug Reports: docs/fix/wf02/v100-v114/BUGFIX_WF02_V104_1_BUILD_UPDATE_QUERIES_STATE_FIX.md (state)
+#                docs/fix/wf02/v100-v114/BUGFIX_WF02_V104_2_SCHEMA_MISMATCH.md (schema)
+#                docs/fix/wf02/v100-v114/BUGFIX_WF02_V105_WF06_ROUTING_STATE_UPDATE.md (routing)
+#                docs/fix/wf02/v100-v114/BUGFIX_WF02_V106_RESPONSE_TEXT_ROUTING.md (response_text - incomplete)
+#                docs/fix/wf02/v100-v114/BUGFIX_WF02_V106_1_CRITICAL_WF06_FLOW_BREAK.md (response_text - complete)
+# - V104 State Machine: scripts/wf02/state-machines/wf02-v104-database-state-update-fix.js
+# - V104.2 Build Update Queries: scripts/wf02/state-machines/wf02-v104_2-build-update-queries-schema-fix.js
 # - V105: No code files (workflow connection change only)
 # - V106.1: No code files (workflow Send node configuration only)
 ```
@@ -271,7 +282,7 @@ docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
 ### WF02 V91 (State Initialization Fix - Previous Version)
 ```bash
 # 1. Copy V91 State Machine Code
-cat /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/scripts/wf02-v91-state-initialization-fix.js
+cat /home/bruno/Desktop/Programas/E2_Solucoes/e2-solucoes-bot/scripts/wf02/state-machines/wf02-v91-state-initialization-fix.js
 
 # 2. Update n8n Workflow
 # Open: http://localhost:5678/workflow/fpMUFXvBulYXX4OX  # WF02 V90 workflow ID
@@ -309,9 +320,9 @@ docker logs -f e2bot-n8n-dev | grep -E "V91: RESOLVED currentStage|V91: WF06 dat
 # - V91: Comprehensive logging for debugging ✅
 
 # Docs:
-# - Deployment: docs/deployment/DEPLOY_WF02_V91_STATE_INITIALIZATION_FIX.md
-# - V90 Refactored: scripts/wf02-v90-state-machine-refactored.js
-# - V91 Critical Fix: scripts/wf02-v91-state-initialization-fix.js
+# - Deployment: docs/deployment/wf02/v80-v99/DEPLOY_WF02_V91_STATE_INITIALIZATION_FIX.md
+# - V90 Refactored: scripts/wf02/state-machines/wf02-v90-state-machine-refactored.js
+# - V91 Critical Fix: scripts/wf02/state-machines/wf02-v91-state-initialization-fix.js
 ```
 
 ### WF06 V2.1 COMPLETE (OAuth + Empty Calendar + Input Data Source)
@@ -340,7 +351,7 @@ curl -X POST http://localhost:5678/webhook/calendar-availability \
 # ✅ Works with empty calendars AND calendars with events
 # ✅ WF02 V80 integration successful
 
-# Docs: docs/deployment/DEPLOY_WF06_V2_1_COMPLETE_FIX.md
+# Docs: docs/deployment/wf06/DEPLOY_WF06_V2_1_COMPLETE_FIX.md
 ```
 
 ### WF07 V13
@@ -348,7 +359,7 @@ curl -X POST http://localhost:5678/webhook/calendar-availability \
 # Import: 07_send_email_v13_insert_select.json
 # Test: { lead_email, lead_name, service_type, city, calendar_success }
 # Expected: Email sent + DB log RETURNING
-# Docs: docs/fix/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md
+# Docs: docs/fix/wf07/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md
 ```
 
 ---
@@ -407,41 +418,52 @@ docker logs -f e2bot-n8n-dev | grep -E "ERROR|V13|INSERT"
 
 **Implementation**:
 - **WF02 V104+V104.2+V105+V106.1**: 🔴 COMPLETE FIX (State sync + schema + routing + response_text)
-  - Deployment V104.2: `docs/deployment/DEPLOY_WF02_V104_2_BUILD_UPDATE_QUERIES_COMPLETE_FIX.md` (code changes)
-  - Deployment V105: `docs/deployment/DEPLOY_WF02_V105_WF06_ROUTING_FIX.md` (workflow connections)
-  - Deployment V106.1: `docs/deployment/DEPLOY_WF02_V106_1_COMPLETE_FIX.md` (Send node configuration)
+  - Deployment V104.2: `docs/deployment/wf02/v100-v114/DEPLOY_WF02_V104_2_BUILD_UPDATE_QUERIES_COMPLETE_FIX.md`
+  - Deployment V105: `docs/deployment/wf02/v100-v114/DEPLOY_WF02_V105_WF06_ROUTING_FIX.md`
+  - Deployment V106.1: `docs/deployment/wf02/v100-v114/DEPLOY_WF02_V106_1_COMPLETE_FIX.md`
   - Quick Deploy V105: `docs/WF02_V105_QUICK_DEPLOY.md`
-  - Bug Reports: `docs/fix/BUGFIX_WF02_V104_1_BUILD_UPDATE_QUERIES_STATE_FIX.md` (state reading)
-                `docs/fix/BUGFIX_WF02_V104_2_SCHEMA_MISMATCH.md` (schema compliance)
-                `docs/fix/BUGFIX_WF02_V105_WF06_ROUTING_STATE_UPDATE.md` (routing fix)
-                `docs/fix/BUGFIX_WF02_V106_RESPONSE_TEXT_ROUTING.md` (response_text - incomplete)
-                `docs/fix/BUGFIX_WF02_V106_1_CRITICAL_WF06_FLOW_BREAK.md` (response_text - complete)
-  - V104 State Machine: `scripts/wf02-v104-database-state-update-fix.js`
-  - V104.2 Build Update Queries: `scripts/wf02-v104_2-build-update-queries-schema-fix.js`
-  - V105: No code files (workflow connection change only)
-  - V106.1: No code files (workflow Send node configuration only)
-- **WF02 V91**: Deployment: `docs/deployment/DEPLOY_WF02_V91_STATE_INITIALIZATION_FIX.md` (State resolution fix)
-- **WF02 V90**: Refactored: `scripts/wf02-v90-state-machine-refactored.js` (Clean code base)
-- **WF02 V80**: Deployment: `docs/deployment/DEPLOY_WF02_V80_COMPLETE_STATE_MACHINE.md` (Complete states + WF06 + V74 return)
-- **WF02 Analysis**: Problem: `docs/analysis/WF02_STATE_MACHINE_WF06_INTEGRATION_PROBLEM.md`
-- **WF06 V2.1**: Deployment: `docs/deployment/DEPLOY_WF06_V2_1_COMPLETE_FIX.md` (OAuth + empty calendar + input data source)
-  - OAuth Fix Plan: `docs/PLAN/PLAN_WF06_V2_OAUTH_FIX.md`
-  - Empty Calendar Bugfix: `docs/fix/BUGFIX_WF06_V2_EMPTY_CALENDAR_HANDLING.md`
-  - Input Data Source Bugfix: `docs/fix/BUGFIX_WF06_V2_1_INPUT_DATA_SOURCE.md`
-- WF07 V13: `docs/fix/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md`
-- WF05 V7: `docs/deployment/DEPLOY_WF05_V7_HARDCODED_FINAL.md`
+  - Bug Reports: `docs/fix/wf02/v100-v114/BUGFIX_WF02_V104_*.md` (state + schema + routing + response_text)
+  - V104 Code: `scripts/wf02/state-machines/wf02-v104-database-state-update-fix.js`
+  - V104.2 Code: `scripts/wf02/state-machines/wf02-v104_2-build-update-queries-schema-fix.js`
+- **WF02 V91**: Deployment: `docs/deployment/wf02/v80-v99/DEPLOY_WF02_V91_STATE_INITIALIZATION_FIX.md`
+- **WF02 V90**: Refactored: `scripts/wf02/state-machines/wf02-v90-state-machine-refactored.js`
+- **WF02 V80**: Deployment: `docs/deployment/wf02/v80-v99/DEPLOY_WF02_V80_COMPLETE_STATE_MACHINE.md`
+- **WF02 Analysis**: `docs/analysis/wf02-versions/WF02_STATE_MACHINE_WF06_INTEGRATION_PROBLEM.md`
+- **WF06 V2.1**: Deployment: `docs/deployment/wf06/DEPLOY_WF06_V2_1_COMPLETE_FIX.md`
+  - OAuth Fix Plan: `docs/PLAN/wf06/PLAN_WF06_V2_OAUTH_FIX.md`
+  - Bug Reports: `docs/fix/wf06/BUGFIX_WF06_V2_*.md`
+- **WF07 V13**: Bugfix: `docs/fix/wf07/BUGFIX_WF07_V13_INSERT_SELECT_FIX.md`
+- **WF05 V7**: Deployment: `docs/deployment/wf05/DEPLOY_WF05_V7_HARDCODED_FINAL.md`
 
-**Structure** (2026-04-08 reorganization):
+**Structure** (2026-04-29 complete organization):
 ```
 docs/
-├── INDEX.md, README.md
-├── Setups/ (config guides)
+├── INDEX.md, README.md (updated 2026-04-29)
+├── analysis/ (53 files in 7 subdirectories)
+├── deployment/ (51 files in 7 subdirectories)
+├── fix/ (82 files in 7 subdirectories)
+├── PLAN/ (137 files in 10 subdirectories)
+├── status/ (47 files in 2 subdirectories)
+├── implementation/ (16 files)
+├── Setups/ (13 config guides)
 ├── Guides/ (user docs)
-├── implementation/ (WF02, WF05, WF06, WF07)
-├── analysis/ (technical analyses)
-├── fix/ (bugfixes)
-├── deployment/ (deploys)
-└── PLAN/ (planning)
+├── development/, guidelines/, validation/
+├── sprints/, monitoring/, diagrams/, errors/
+
+scripts/
+├── README.md (304 scripts organized)
+├── wf02/ (159 files: state-machines/, generators/, fixes/)
+├── wf05/ (16 files: generators/, fixes/)
+├── wf06/ (1 file)
+├── wf07/ (17 files: generators/, fixes/)
+├── deployment/, testing/, validation/
+├── migration/, utilities/, evolution/
+└── docker/, deprecated/
+
+n8n/workflows/
+├── production/ (WF01, WF02, WF05, WF06, WF07)
+├── development/ (wf02/, wf05/, wf06/)
+└── historical/ (wf02/ V77-V113)
 ```
 
 ---
