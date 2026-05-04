@@ -1,8 +1,8 @@
 # E2 Bot - Context
 
 > **Production V1**: WF01 V2.8.3 | WF02 V114 ✅ COMPLETE | WF05 V7 | WF06 V2.2 | WF07 V13 ✅
-> **Status**: ✅ ORGANIZED - Single source of truth structure implemented
-> **Updated**: 2026-04-29 18:00 BRT
+> **Status**: ✅ PRODUCTION LIVE - Primeiro teste real em 2026-05-04 | Fluxo completo funcional
+> **Updated**: 2026-05-04 BRT
 
 ## Stack
 
@@ -367,16 +367,25 @@ curl -X POST http://localhost:5678/webhook/calendar-availability \
 ## Commands
 
 ```bash
-# DB
+# DB (DEV)
 docker exec e2bot-postgres-dev psql -U postgres -d e2bot_dev \
   -c "SELECT phone_number, lead_name, service_type, current_state FROM conversations ORDER BY updated_at DESC LIMIT 5;"
 
-# Evolution API
-curl -s http://localhost:8080/instance/fetchInstances \
-  -H "apikey: ae569043cfa169380c378347f91a1141ea572541d2d1cadbed222db519c8a891" | jq
+# DB (PROD)
+docker exec e2bot-postgres-prd psql -U postgres -d e2bot_prod \
+  -c "SELECT phone_number, current_state, state_machine_state FROM conversations ORDER BY updated_at DESC LIMIT 5;"
+
+# Evolution API (PROD — via localhost port bind 8082)
+curl -s http://localhost:8082/instance/fetchInstances \
+  -H "apikey: <EVOLUTION_API_KEY>" | jq
 
 # Logs
 docker logs -f e2bot-n8n-dev | grep -E "ERROR|V13|INSERT"
+docker logs -f e2bot-n8n-worker-prd 2>&1 | grep -E "ERROR|execution"
+
+# Reset conversa para re-teste (PROD)
+docker exec e2bot-postgres-prd psql -U postgres -d e2bot_prod \
+  -c "UPDATE conversations SET current_state='novo', state_machine_state=NULL, collected_data='{}', error_count=0 WHERE phone_number='<NUMERO>';"
 ```
 
 ---
@@ -387,6 +396,17 @@ docker logs -f e2bot-n8n-dev | grep -E "ERROR|V13|INSERT"
 1. **queryReplacement**: Does NOT resolve `={{ }}` → Use INSERT...SELECT
 2. **$env access**: Blocked (Code + Set) → Use hardcoded values
 3. **Filesystem**: Read/Write blocked → Use HTTP Request + nginx
+4. **Draft vs Published** (queue mode): `workflow_entity.nodes` = editor rascunho; `workflow_history[activeVersionId].nodes` = o que o worker executa. Editar pelo editor pode não propagar. Verificar via SQL se execução ainda usa versão antiga.
+5. **Queue mode network split**: Webhooks executam no n8n main (tem internet); Execute Workflow (subworkflows) executam no worker (rede separada). Worker precisa de acesso explícito à rede externa para APIs como Google Calendar.
+
+### Production Architecture (climacocal.com.br — 2026-05-04)
+- **Cloudflare Tunnel** (não A records diretos): Tunnel ID `3483e46e-fcb9-470f-959c-65b73266c79c`
+  - DNS: CNAME `n8n` + `e2solucoeswhatsapp` → `<tunnel-id>.cfargotunnel.com`
+  - Traefik: file-based provider (`/etc/traefik/dynamic/e2bot.yml`), entrypoints `web` (port 80)
+- **Evolution API port bind**: `127.0.0.1:8082:8080` — gerenciar via `localhost:8082`, não pela URL externa
+- **Webhook path real**: `whatsapp-evolution` (não `whatsapp`) — Evolution API deve apontar para `/webhook/whatsapp-evolution`
+- **Container de templates**: `e2bot-templates-prd` (nginx) serve `email-templates/` como `http://e2bot-templates-prd/`
+- **n8n Worker**: Requer rede `proxy` além de `e2bot-backend` para acessar Google Calendar
 
 ### Evolution Path
 - **WF07**: V2-V5 (fs blocked) → V9 (HTTP) → V13 (INSERT...SELECT) ✅
@@ -405,12 +425,15 @@ docker logs -f e2bot-n8n-dev | grep -E "ERROR|V13|INSERT"
 9. **n8n Data Access Limitation**: `$input.first().json` only accesses previous node, use `$node["Node Name"].json` for explicit references
 10. **n8n Empty Item Behavior**: Returns `[{ json: {} }]` not `[]` with `continueOnFail: true` → Filter by meaningful properties (id, start)
 11. **State Initialization Critical**: State Machine may execute TWICE in same workflow → Use 4-level fallback chain + explicit `current_stage` return (V91 fix)
+12. **init.sql scope**: Tabelas adicionadas ao código do bot devem ser adicionadas ao `init.sql` simultaneamente. `appointment_reminders` faltou e causou erro em produção (WF05 execution 88).
+13. **$env no Execute Workflow**: `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` bloqueia `$env` em TODOS os nodes, incluindo Configure Execute Workflow. Use IDs hardcoded (não `$env.WORKFLOW_ID_*`).
 
 ---
 
 ## Documentation
 
 **Quick Access**:
+- **Production Guide**: `docs/deployment/production/PRODUCTION_DEPLOYMENT_GUIDE.md` (V1.4 — inclui erros reais encontrados em 2026-05-04) ⭐
 - **Quick Start**: `docs/development/05_LOCAL_SETUP.md` (30-60 min setup completo) ⭐
 - **Navigation**: `docs/development/README.md` (navegação completa) ⭐
 - **Architecture**: `docs/diagrams/01_SYSTEM_ARCHITECTURE.md` (diagramas visuais) ⭐
