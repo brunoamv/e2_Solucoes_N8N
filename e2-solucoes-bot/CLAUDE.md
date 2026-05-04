@@ -4,6 +4,12 @@
 > **Status**: ✅ PRODUCTION LIVE - Primeiro teste real em 2026-05-04 | Fluxo completo funcional
 > **Updated**: 2026-05-04 BRT
 
+## Regras de Colaboração
+
+> 🔴 **NUNCA fazer `git push` sem perguntar ao Bruno antes.**
+> Commits locais são permitidos. Push para o repositório remoto requer confirmação explícita.
+> Perguntar sempre: "Posso fazer o push dos commits para o repositório remoto?"
+
 ## Stack
 
 n8n 2.14.2 + Claude 3.5 + PostgreSQL + Evolution API v2.3.7 | PT-BR
